@@ -1,0 +1,34 @@
+{
+    "1ste Jaar": {
+        "Semester 1": ["OOSD1" , "Databases", "Software Analysis", "Computer Systems", "Web Dev 1", "Cybersecurity", "IT Fundamentals"],
+        "Semester 2": ["OOSD2", "Web Dev 2", "Computer Networks 1", "Operation Systems", "Business & Management", "Software Dev Project 1", "System Engineering Lab", "Communication Lab"]
+    },
+    "2de Jaar": {
+        "Semester 1": {
+            "Algemeen": ["Functional Analysis", "Relational Databases & Datawarehousing", "Classic Computer Science Algorithms", "Professional Communication", "Costing"],
+            "Development": ["Front-end Web Dev", "Web Services", "Advanced Software Dev 1"],
+            "IT-Operations": ["Windows Server 1", "Computer Networks 2", "Linux"],
+            "AI & Data Engineer": ["Web Services", "Linux for Data Scientists", "Mathematics for Machine Learning"]
+        },
+        
+        "Semester 2": {
+            "Algemeen": ["Research Methods", "Data Science & AI", "IT2Business", "IT Professional"],
+            "Web-Dev": ["Enterprise Web Dev: Java", "Advanced Software Development 2", "Software Dev Project 2"],
+            "System & Network Admin": ["Cybersecurity & Virtualisation", "System Engineering Project", "Computer Networks 3"],
+            "ERP-Dev": ["ERP 1", "Business Software Project", "ERP 2"],
+            "AI & Data Engineer": ["Big Data Processing", "Machine Learning", "Data Engineering Project 1"]
+        }
+    },
+    "3de Jaar": {
+        "Algemeen": ["Business Analysis", "Stage", "Bachelorproef", "IT Professional & Career Orientation"],
+        "Mobile & Enterprise Dev": ["Android", "C#", "DevOps Project: development", "Database Programming"],
+        "System & Network Admin": ["Windows Server 2", "Infrastructure Automation", "Computer Networks 4", "Cybersecurity Advanced", "DevOps Project: Operations"],
+        "AI & Data Engineer": ["Deep Learning","Modern Data Structures","Machine Learning Operations","Trends in AI", "Data Engineering Project 2"],
+        "Functional & Business Analyst": ["Business Processes Advanced", "Content Management Systems", "ERP System Config", "Project e-Business"],
+        "Mainframe Expert": ["Mainframe Discovery", "Mainframe Sys Admin", "Mainframe Transaction Sys", "Mainframe Software Dev"],
+        "Database Admin": ["Windows Server 2", "Database Programming & Admin", "Devops project data admin", "Infrastructure Automation"],
+        "Keuzevakken": ["Communication Professionnelle", "Mainframe Master", "Business Start Up IT", "IP Project", "Studium Generale", "iOS", "Ondernemen", "Entrepeneurship", "E-marketing", "Ander Keuzepakket", "Design Thinking Lab"]
+    },
+    "Afgestudeerd": "Afgestudeerd",
+    "Graduaat": "GO5"
+}

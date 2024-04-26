@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600,700&display=swap');
+*{
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+body{
+  background-color: #505050;
+}
+.btn{
+  position: absolute;
+    top: 10px;
+    left: 45px;
+    height: 37px;
+    width: 37px;
+    text-align: center;
+    background: #1b1b1b;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: left 0.4s ease;
+    padding-top: 0;
+}
+.btn.click{
+  left: 260px;
+}
+.btn span{
+    color: white;
+    font-size: 15px;
+    line-height: 36px;
+}
+.btn.click span:before{
+  content: '\f00d';
+}
+.sidebar{
+  position: fixed;
+  width: 250px;
+  height: 100%;
+  left: -250px;
+  background: #1b1b1b;
+  transition: left 0.4s ease;
+}
+.sidebar.show{
+  left: 0px;
+}
+.sidebar .text{
+  color: white;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 65px;
+  text-align: center;
+  background: #1e1e1e;
+  letter-spacing: 1px;
+}
+nav ul{
+  background: #1b1b1b;
+  height: 100%;
+  width: 100%;
+  list-style: none;
+      padding-left: 10px;
+}
+nav ul li{
+  line-height: 50px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+nav ul li:last-child{
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+nav ul li a{
+  position: relative;
+  color: white;
+  text-decoration: none;
+  font-size: 13px;
+  padding-left: 14px;
+  font-weight: 500;
+  display: block;
+  width: 100%;
+  border-left: 3px solid transparent;
+}
+nav ul li.active a{
+  color: #FC5404;
+    background: #1e1e1e;
+    border-left-color: #FC5404;
+}
+nav ul li a:hover{
+  background: #1e1e1e;
+}
+
+.feat-show{
+  transition: all 0.5s;
+}
+
+nav ul li.active ul{
+ transition: all 0.5s;
+}
+nav ul ul{
+  position: static;
+  display: none; 
+}
+
+nav ul.show{
+  display: block;
+  transition: all 0.5s;
+}
+
+nav ul ul li{
+  line-height: 42px;
+  border-top: none;
+}
+nav ul ul li a{
+  font-size: 12px;
+  color: #e6e6e6;
+  
+}
+nav ul li.active ul li a{
+  color: #e6e6e6;
+  background: #1b1b1b;
+  border-left-color: transparent;
+}
+
+nav a:hover{
+  color: #FC5404 !important;
+}
+nav ul ul li a:hover{
+  color: #FC5404 !important;
+  background: #1e1e1e!important;
+}
+nav ul li a span{
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  font-size: 15px;
+  transition: transform 0.4s;
+}
+nav ul li a span.rotate{
+  transform: translateY(-50%) rotate(-180deg);
+}
+html, body{
+  height: 100%;
+}
+
+
+tr{
+  border-bottom: 1px solid #e6e6e6;
+}
+td{
+  padding: 10px;
+}
+
+.content{
+  width: 85%;
+  height: 100vh;
+  margin: auto;
+  margin-top: 2em;
+  text-align: center;
+}
+
+.contentbox{
+  width: 100%;
+  height: 40em;
+  background: #202020;
+  border-radius: 1em;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  overflow-y: auto;
+  text-align: center;
+
+  
+}
+
+.contentbox > table{
+  flex: 1;
+}
+
+.userInfoContainer{
+  flex-direction: row;
+  color: white;
+}
+.userAvatar{
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin: 1em;
+}
+table{
+  color: #bebebe;
+}
+
+.buttons{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+
+}
+
+.list{
+  padding: 1em;
+}
+
+.userLink{
+  text-decoration: none;
+  font-weight: bold;
+  color: #aaaaaa;
+}
+
+
+
+.listItem{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 1em;
+  border-bottom: 1px solid #505050;
+  
+}
+
+.listItem p{
+  color: white;
+}
+
+
+
+.mybtn{
+  background: #404040;
+  padding: 0.5em 1em;
+  border-radius: 0.5em;
+  display: flex;
+  width: 75%;
+  margin: 1em;
+  text-decoration: none;
+  text-align: center;
+}
+.mybtn:hover{
+  background: #606060;
+
+}
+.userLink:hover{
+  color: #5a5a5a;
+  background: none;
+}
+
+
+.mybtnsmall{
+  height: fit-content;
+  background: #505050;
+  padding: 0.5em 1em;
+  border-radius: 0.2em;
+  display: flex;
+  margin: 1em;
+  text-decoration: none;
+}
+
+::-webkit-scrollbar {
+    display: none;
+}
+
+@media screen and (max-width: 800px){
+  .contentbox{
+    flex-direction: column;
+  }
+  .buttons{
+    width: 100%;
+  }
+  .list{
+    width: 100%;
+    height: 50em;
+  }
+}
