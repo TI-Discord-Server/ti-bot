@@ -5,5 +5,7 @@ RUN apk add git
 COPY . /src
 WORKDIR /src
 
-RUN pip install -r /src/requirements.txt
+RUN pip install -r /src/requirements.txt ;\
+    chmod +x /src/BotSep.py
 
+ENTRYPOINT [ "python3", "/src/BotSep.py" ]
