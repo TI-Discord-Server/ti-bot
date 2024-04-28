@@ -161,7 +161,7 @@ async def on_ready():
     
 
 
-    #await bot.tree.sync(guild=discord.Object(id=771394209419624489))
+    await bot.tree.sync(guild=discord.Object(id=771394209419624489))
             
     print(f'Logged in as {bot.user.name}')
 

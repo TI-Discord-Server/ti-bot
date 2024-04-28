@@ -91,7 +91,7 @@ async def assignmessageID(confessionID, messageID):
     await confessions.update_one({"_id": confessionID}, {"$set": {"messageID": messageID}})
 
 async def getQueue():
-    return await confessions.find({"status": "waiting"})
+    return await confessions.find({"status": "waiting"}).to_list(length=None)
 
 async def getCheckingConfession():
     conf= await confessions.find_one({"status": "checking"})
