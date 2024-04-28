@@ -75,7 +75,7 @@ def createHash(mail):
 # ----------------------
 
 async def getNewConfession():
-    if getQueueLength() > 0:
+    if await getQueueLength() > 0:
         queue = getQueue()
         confession = random.choice(list(queue))
         if confession:
