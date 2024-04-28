@@ -45,7 +45,7 @@ class Moderation(commands.Cog):
     async def warns(self, interaction : discord.Interaction, member: discord.Member):
         data = await getWarnings(member.id)
         em = discord.Embed(title="Warnings", description=f"Warnings for {member.mention}\n\n", color=0x00ff00)
-        em.description += "\n".join([f"**ID:** `{x['_id']}`\n **Reason:** {x['reason']}\n **Given By**: {interaction.guild.get_member(x['staffmember']).mention}\n **Timestamp**: <t:{calendar.timegm(x['timestamp'].timetuple())}:D>\n" for x in data])
+        em.description += "\n".join([f"**ID:** `{x['_id']}`\n **Reason:** {x['reason']}\n **Given By**: {interaction.guild.get_member(x['staffmember']).mention if interaction.guild.get_member(x['staffmember']) else 'Left'}\n **Timestamp**: <t:{calendar.timegm(x['timestamp'].timetuple())}:D>\n" for x in data])
         await interaction.response.send_message(embed=em)
 
         
