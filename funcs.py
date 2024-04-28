@@ -76,7 +76,7 @@ def createHash(mail):
 
 async def getNewConfession():
     if await getQueueLength() > 0:
-        queue = getQueue()
+        queue = await getQueue()
         confession = random.choice(list(queue))
         if confession:
             await confessions.update_one({"_id": confession["_id"]}, {"$set": {"status": "checking"}})
