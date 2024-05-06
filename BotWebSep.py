@@ -19,7 +19,7 @@ ipc_client = Client(secret_key = "test123")
 app.config["SECRET_KEY"] = "test123"
 app.config["DISCORD_CLIENT_ID"] = 1161274501972107394   # Discord client ID.
 app.config["DISCORD_CLIENT_SECRET"] = "QBvOx3DvLN08MLMnRvf1yRmnw1mjNhpa"   # Discord client secret.
-app.config["DISCORD_REDIRECT_URI"] = "http://klipperpi.local:25567/callback" 
+app.config["DISCORD_REDIRECT_URI"] = "https://discordbotti.ginsys.net/callback" 
 #app.config["DISCORD_REDIRECT_URI"] = "http://127.0.0.1:25567/callback" 
   
 
