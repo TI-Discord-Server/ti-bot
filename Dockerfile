@@ -6,7 +6,6 @@ COPY . /src
 WORKDIR /src
 
 RUN pip install -r /src/requirements.txt ;\
-    chmod +x /src/BotSep.py;chmod +x /src/BotWebSep.py
+    chmod +x /src/BotSep.py
 
 ENTRYPOINT [ "python3", "/src/BotSep.py" ]
-ENTRYPOINT [ "python3", "/src/BotWebSep.py" ]
