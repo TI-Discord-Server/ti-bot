@@ -197,7 +197,7 @@ class Modmail(commands.Cog):
             await member.send(embed=em)
 
             await self.createTranscript(ctx.channel)
-            url = f"http://206.82.251.13:25581/transcript/{ctx.channel.id}"
+            url = f"https://discordbotti.ginsys.net/transcript/{ctx.channel.id}"
             em = discord.Embed(title=f"Transcript - {ctx.channel.name}", description=f"[Klik hier]({url}) om het transcript te bekijken!", color=0x00ff00)
             em.timestamp = datetime.now()
             channel = discord.utils.get(ctx.guild.channels, name="modmail-logs")
