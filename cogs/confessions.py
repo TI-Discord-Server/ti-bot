@@ -59,7 +59,7 @@ class Confessions(commands.Cog):
 
             await mainChannel.send("\U0000200b", view=ConfessionsView())
         
-        if time == "15:00" or time == "10:37" or time == "08:36":
+        if time == "15:00" or time == "10:41" or time == "08:36":
             await self.handleConfession()
 
 
