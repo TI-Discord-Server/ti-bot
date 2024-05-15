@@ -56,7 +56,7 @@ class Confessions(commands.Cog):
                 await msg.add_reaction("♻️")
                 await assignmessageID(confession["_id"], msg.id)
 
-
+ 
             await mainChannel.send("\U0000200b", view=ConfessionsView())
         
         if time == "15:00" or time == "10:48" or time == "08:30":
