@@ -37,7 +37,7 @@ class Confessions(commands.Cog):
         checkChannel = discord.utils.get(guild.channels, name="confessions-check")
         mainChannel = discord.utils.get(guild.channels, name="confessions")
 
-        if time == "09:10":
+        if time == "15:15":
             chosen = []
 
             amount = 2 if await getQueueLength() >= 2 else await getQueueLength()
