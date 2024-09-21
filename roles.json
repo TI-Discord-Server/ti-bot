@@ -21,7 +21,7 @@
     },
     "3de Jaar": {
         "Algemeen": ["Business Analysis", "Stage", "Bachelorproef", "IT Professional & Career Orientation"],
-        "Mobile & Enterprise Dev": ["Android", "C#", "DevOps Project: development", "Database Programming"],
+        "Mobile & Enterprise Dev": ["Android", "C#", "DevOps Project: development", "Database Programming", "RISE"],
         "System & Network Admin": ["Windows Server 2", "Infrastructure Automation", "Computer Networks 4", "Cybersecurity Advanced", "DevOps Project: Operations"],
         "AI & Data Engineer": ["Deep Learning","Modern Data Structures","Machine Learning Operations","Trends in AI", "Data Engineering Project 2"],
         "Functional & Business Analyst": ["Business Processes Advanced", "Content Management Systems", "ERP System Config", "Project e-Business"],
