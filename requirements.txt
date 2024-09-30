@@ -1,8 +1,0 @@
-discord
-discord-ext-ipc
-quart
-quart_discord
-pymongo
-requests
-nest_asyncio
-motor

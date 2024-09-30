@@ -1,171 +1,344 @@
-import os, urllib, requests
-from quart import Quart, render_template, request, send_from_directory, session, redirect, url_for
-from quart_discord import DiscordOAuth2Session
-from discord.ext import ipc
-import urllib3
-from funcs import *
+import discord
+from discord.ext import commands
+
+import asyncio
+import aiohttp
+import traceback
+import os
+import datetime
+import logging
+from logging.handlers import RotatingFileHandler
+from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+
+from utils.errors import (
+    ForbiddenAction,
+    ResponseTimeout,
+    UnknownMessage,
+    UnknownUser,
+    UnknownRole,
+)
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD")
+MONGODB_IP_ADDRESS = os.getenv("MONGODB_IP_ADDRESS")
 
 
-app = Quart(__name__)
-ipc_client = ipc.Client(secret_key = "test123")
-
-app.config["SECRET_KEY"] = "test123"
-app.config["DISCORD_CLIENT_ID"] = 928776060647133224   # Discord client ID.
-app.config["DISCORD_CLIENT_SECRET"] = "3mLzT-L7Fwo9gZB7sZFH59Zg4fpg3igt"   # Discord client secret.
-app.config["DISCORD_REDIRECT_URI"] = "https://nftracker.me/callback"   
-
-discord = DiscordOAuth2Session(app)
-
-@app.route("/")
-async def home():
-	if await discord.authorized:
-		user = await discord.fetch_user()
-	else:
-		user = None
-	return await render_template("pages/index.html", authorized = await discord.authorized, user = user)
-
-@app.route("/pricing")
-async def pricing():
-	if await discord.authorized:
-		user = await discord.fetch_user()
-	else:
-		user = None
-	return await render_template("pages/pricing.html", authorized = await discord.authorized, user = user)
-
-@app.route("/contact")
-async def contact():
-	if await discord.authorized:
-		user = await discord.fetch_user()
-	else:
-		user = None
-	return await render_template("pages/contact.html", authorized = await discord.authorized, user = user)
-
-@app.route("/login")
-async def login():
-	return await discord.create_session()
-
-@app.route("/callback")
-async def callback():
-	try:
-		await discord.callback()
-	except Exception:
-		pass
-
-	return redirect(url_for("home"))
-
-@app.route("/dashboard")
-async def dashboard():
-	if not await discord.authorized:
-		return redirect(url_for("login")) 
-
-	guild_count = await ipc_client.request("get_guild_count")
-	guild_ids = await ipc_client.request("get_guild_ids")
-
-	user_guilds = await discord.fetch_guilds()
-
-	guilds = []
-
-	for guild in user_guilds:
-		if guild.permissions.administrator:			
-			guild.class_color = "green-border" if guild.id in guild_ids else "red-border"
-			guilds.append(guild)
-
-	guilds.sort(key = lambda x: x.class_color == "red-border")
-	name = (await discord.fetch_user()).name
-	return await render_template("pages/dashboard.html", guild_count = guild_count, guilds = guilds, username=name, authorized = await discord.authorized, user = await discord.fetch_user())
-
-@app.route("/dashboard/<int:guild_id>")
-async def dashboard_server(guild_id):
-
-	if not await discord.authorized:
-		return redirect(url_for("login")) 
-
-	guild = await ipc_client.request("get_guild", guild_id = guild_id)
-	channels = await ipc_client.request("get_channels", guild_id = guild_id)
-	channelData = GetGuildChannelData(guild_id)
-	if channelData:
-		channelType = channelData["data"]["channelType"]
+class MakiContext(commands.Context):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
-		if channelType == "combined":
-			channelID = channelData["data"]["channelID"]
-			channel = None
-			for c in channels:
-				if c.id == channelID:
-					channel = c
-					break
-			setChannels = {
-				"name": channel.name,
-				"id": channel.id
-			}
-		else:
-			channelID = channelData["data"]["channels"]
-			setChannels = {}
-			for blockchain, setChannelID in channelID.items():
-				for c in channels:
-					if c["id"] == setChannelID:
-						setChannels[blockchain] = {"name": c["name"], "id": c["id"]}
-		
-		out ={
-		"guild": guild,
-		"channels": setChannels,
-		"authorized": await discord.authorized,
-		"user": await discord.fetch_user(),
-		"allchannels": channels,
-		"setup": True
-		}
-	else:
-		out ={
-		"guild": guild,
-		"authorized": await discord.authorized,
-		"user": await discord.fetch_user(),
-		"setup" : False
-		}
-		
+class Bot(commands.Bot):
+    def __init__(self, **kwargs):
+        motor = AsyncIOMotorClient(
+            f"mongodb://bot:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:27017/bot?authMechanism=SCRAM-SHA-256",
+            connect=True,
+        )
+        motor.get_io_loop = asyncio.get_running_loop
+        self.db = motor.bot
 
+        self.token = BOT_TOKEN
 
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        intents = discord.Intents(
+            guilds=True,
+            members=True,
+            bans=True,
+            emojis=True,
+            integrations=False,
+            webhooks=True,
+            invites=True,
+            voice_states=True,
+            presences=False,
+            guild_messages=True,
+            dm_messages=False,
+            guild_reactions=True,
+            dm_reactions=False,
+            typing=False,
+            guild_typing=False,
+            dm_typing=False,
+            scheduled_events=False,
+            emojis_and_stickers=True,
+            message_content=True,
+            auto_moderation_configuration=True,
+            auto_moderation_execution=True,
+        )
+        member_cache_flags = discord.MemberCacheFlags(
+            voice=True, joined=False, interaction=True
+        )  # discord.MemberCacheFlags.from_intents(intents)
+        super().__init__(
+            **kwargs,
+            loop=loop,
+            max_messages=10_000,
+            command_prefix="!",
+            chunk_guilds_at_startup=False,
+            auto_sync_commands=False,
+            member_cache_flags=member_cache_flags,
+            intents=intents,
+        )
 
+        self.session = aiohttp.ClientSession(loop=loop)
+        self.uptime = datetime.datetime.now()
 
-	if guild is None:
-		return redirect(f'https://discord.com/oauth2/authorize?client_id=928776060647133224&permissions=313360&scope=bot%20applications.commands&guild_id={guild_id}&response_type=code&redirect_uri={app.config["DISCORD_REDIRECT_URI"]}')
-	
-	
-	return await render_template("pages/serverdashboard.html", **out)
+        self.activity = discord.CustomActivity(self.presence)
+        self.status = discord.Status.online
 
-@app.route("/logout")
-async def logout():
-	discord.revoke()
-	return redirect(url_for("home"))
+        self.cooldown_users = commands.CooldownMapping.from_cooldown(
+            2, 1, commands.BucketType.user
+        )
+        self.cooldown_channels = commands.CooldownMapping.from_cooldown(
+            7, 2, commands.BucketType.channel
+        )
+        self.cooldown_guilds = commands.CooldownMapping.from_cooldown(
+            9, 1, commands.BucketType.guild
+        )
 
-@app.route("/invite")
-async def invite():
-	return redirect("https://discord.com/oauth2/authorize?client_id=928776060647133224&permissions=313360&scope=bot%20applications.commands")
+        self.add_check(
+            commands.bot_has_permissions(
+                add_reactions=True,
+                attach_files=True,
+                embed_links=True,
+                external_emojis=True,
+                read_message_history=True,
+                read_messages=True,
+                send_messages=True,
+                send_messages_in_threads=True,
+            ).predicate
+        )
 
-@app.route("/dashboard/<int:guild_id>/updatechannels", methods = ["POST"])
-async def updateguildchannels(guild_id):
-	if not await discord.authorized:
-		return redirect(url_for("login")) 
-	
-	dictt = await request.form
-	dbout = {}
-	for blockchain, channelID in dictt.items():
-		dbout[blockchain] = int(channelID)
-	insertServer(guild_id, "seperate", dbout)
-	
-	return redirect(url_for("dashboard_server", guild_id = guild_id))
+        bot_log = logging.getLogger("Bot")
+        bot_log.setLevel(logging.INFO)
+        bot_log.addHandler(
+            RotatingFileHandler(
+                "Bot.log",
+                encoding="utf-8",
+                mode="a",
+                maxBytes=1024 * 1024,
+                backupCount=1,
+            )
+        )
 
-@app.route("/ipncallback", methods = ["POST"])
-async def ipncallback():
-	values = await request.get_json()
-	print(values)
-	
-	return "ok"
+        self.log = bot_log
 
+        discord_log = logging.getLogger("discord")
+        discord_log.setLevel(logging.WARNING)
+        discord_log.addHandler(
+            RotatingFileHandler(
+                "Bot.log",
+                encoding="utf-8",
+                mode="a",
+                maxBytes=1024 * 1024,
+                backupCount=1,
+            )
+        )
 
-# @app.route("/test2546")
-# async def test():
-# 	await ipc_client.request("sendMsg")
-# 	return "test"
+        for m in [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]:
+            if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
+                try:
+                    self.load_extension("cogs." + m)
+                except Exception as e:
+                    self.log.critical(f"Couldn't load {m} cog : e")
+                    raise Exception(e)
+        self.loop.create_task(self.do_startup_tasks())
+        self.run(self.token)
+
+    async def do_startup_tasks(self):
+        await self.wait_until_ready()
+        self.ready = True
+        self.log.debug(f"Logged in as {self.user}")
+
+    async def on_ready(self):
+        self.log.info("Ready called")
+
+    async def on_connect(self):
+        await self.sync_commands(method="bulk")
+        self.log.info("Synchronized application commands")
+
+    async def on_message(self, message):
+        if message.author.id in self.owner_ids:
+            return
+        try:
+            ctx = await self.get_context(message, cls=MakiContext)
+            if ctx.valid:
+                await self.invoke(ctx)
+        except Exception:
+            return
+
+    async def on_application_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandNotFound):
+            return
+
+        elif isinstance(error, commands.NoPrivateMessage):
+            try:
+                await ctx.respond(
+                    ":x: | This command can't be used in private messages!",
+                    ephemeral=True,
+                )
+            except Exception:
+                return
+            return
+
+        elif isinstance(error, commands.MissingPermissions):
+            try:
+                await ctx.respond(
+                    ":x: | You don't have the required permissions!", ephemeral=True
+                )
+            except Exception:
+                return
+            return
+
+        elif isinstance(error, commands.BotMissingPermissions):
+            try:
+                await ctx.respond(
+                    ":x: | I don't have the required permissions!", ephemeral=True
+                )
+            except Exception:
+                return
+            return
+
+        elif isinstance(error, commands.CommandOnCooldown):
+            try:
+                await ctx.respond(
+                    ":hourglass: | Nog even geduld, je heb en cooldown bereikt!",
+                    ephemeral=True,
+                )
+            except Exception:
+                return
+            return
+
+        elif isinstance(error, commands.CheckFailure):
+            if str(error) == "Moderator":
+                try:
+                    await ctx.respond(
+                        ":x: | Enkel server moderators kunnen dit commando gebruiken!",
+                        ephemeral=True,
+                    )
+                except Exception:
+                    return
+            elif str(error) == "Administrator":
+                try:
+                    await ctx.respond(
+                        ":x: | Enkel server administrators kunnen dit commando gebruiken!",
+                        ephemeral=True,
+                    )
+                except Exception:
+                    return
+            return
+
+        elif isinstance(error, discord.ApplicationCommandInvokeError):
+            if isinstance(error.original, discord.Forbidden):
+                try:
+                    await ctx.respond(
+                        ":x: | Ik ontbreek enkele permissies!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            if isinstance(error.original, discord.NotFound):
+                try:
+                    await ctx.respond(
+                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, discord.HTTPException):
+                try:
+                    await ctx.respond(
+                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, discord.DiscordServerError):
+                try:
+                    await ctx.respond(
+                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, ForbiddenAction):
+                try:
+                    await ctx.respond(
+                        ":x: | Je hebt geen toestemming om dit te doen!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, ResponseTimeout):
+                try:
+                    await ctx.respond(
+                        ":hourglass: | Probeer het later nogeens!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, UnknownMessage):
+                try:
+                    await ctx.respond(":x: | Onbekend bericht!", ephemeral=True)
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, UnknownUser):
+                try:
+                    await ctx.respond(":x: | Onbekende gebruiker!", ephemeral=True)
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, UnknownRole):
+                try:
+                    await ctx.respond(":x: | Onbekende rol!", ephemeral=True)
+                except Exception:
+                    return
+                return
+
+            elif isinstance(error.original, aiohttp.client_exceptions.ClientOSError):
+                try:
+                    await ctx.respond(
+                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
+                    )
+                except Exception:
+                    return
+                return
+
+            else:
+                print(
+                    "".join(
+                        traceback.format_exception(
+                            type(error), error, error.__traceback__
+                        )
+                    )
+                )
+                em = discord.Embed(
+                    title=ctx.command.qualified_name,
+                    description=ctx.command.qualified_name,
+                    colour=discord.Colour(0x000000),
+                )
+                em.set_author(
+                    name=f"{self.user.name} | Error",
+                    icon_url=ctx.author.display_avatar.url,
+                )
+                em.set_footer(text="Gelieve dit te melden aan het team!")
+                try:
+                    await ctx.respond(embed=em, ephemeral=True)
+                except Exception:
+                    pass
+
+    async def on_error(self, *args, **kwargs):
+        self.log.critical(traceback.format_exc())
+
 
 if __name__ == "__main__":
-	app.run(debug=True, host="0.0.0.0", port=443, certfile=os.path.abspath("nftracker_me.crt"), keyfile=os.path.abspath("nftracker.me.key"))
+    Bot()
