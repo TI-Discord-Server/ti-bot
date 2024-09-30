@@ -96,7 +96,7 @@ class JaarKeuzeSelect(discord.ui.Select):
                 em = discord.Embed(title=f"{self.values[0]} Rol", description="Je hebt de rol gekregen!", color=0x0076C5)
             else:
                 await interaction.user.remove_roles(role)
-                em = discord.Embed(title=f"{self.values[0]} Rol", description="Je hebt de rol verwijdert!", color=0x0076C5)
+                em = discord.Embed(title=f"{self.values[0]} Rol", description="Je hebt de rol verwijderd!", color=0x0076C5)
             
             await interaction.response.send_message(embed=em, ephemeral=True)
         else:
