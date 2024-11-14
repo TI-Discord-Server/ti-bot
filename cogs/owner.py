@@ -1,18 +1,25 @@
+# Don't remove unused imports as they can be used in the py command.
+import asyncio
+import datetime
+import pymongo
+
+import os
 import discord
 from discord.ext import commands
 
-import os
+from utils.checks import developer
+from ..main import Bot
 
 
 class owner(commands.Cog, name="owner"):
-    def __init__(self, bot):
+    def __init__(self, bot: "Bot") -> None:
         super().__init__()
-        self.bot = bot
+        self.bot: "Bot" = bot
 
-    @commands.command(hidden=True, brief="Python")
-    @commands.is_owner()
-    async def py(self, ctx):
-        """Python"""
+    @commands.command(hidden=True, brief="Executes code.")
+    @developer()
+    async def py(self, ctx: commands.Context[commands.AutoShardedBot]) -> None:
+        """Executes code."""
         code = ctx.message.content[4:]
         code = "    " + code.replace("\n", "\n    ")
         code = "async def __eval_function__():\n" + code
@@ -20,36 +27,24 @@ class owner(commands.Cog, name="owner"):
         additional = {}
         additional["self"] = self
         additional["ctx"] = ctx
+        additional["channel"] = ctx.channel
+        additional["author"] = ctx.author
+        additional["server"] = ctx.guild
 
         try:
             exec(code, {**globals(), **additional}, locals())
 
             await locals()["__eval_function__"]()
         except Exception as e:
-            em = discord.Embed(description=str(e), colour=0xFFFFFE)
+            em = discord.Embed(description=str(e), color=0xFFFFFE)
             try:
                 await ctx.send(embed=em)
             except Exception:
                 return
 
-    @commands.command(name="say")
-    @commands.guild_only()
-    @commands.has_permissions(administrator=True)
-    @commands.cooldown(1, 6, commands.BucketType.user)
-    async def say(self, ctx, *, message=None):
-        """Let the bot send a message. You can attach a file too!"""
-        files = []
-        for file in ctx.message.attachments:
-            files.append(await file.to_file())
-        if message:
-            await ctx.send(message, files=files)
-        else:
-            await ctx.send(files=files)
-        await ctx.message.delete()
-
     @commands.command(hidden=True, brief="Shows all parts of the bot.")
-    @commands.is_owner()
-    async def cogs(self, ctx):
+    @developer()
+    async def cogs(self, ctx: commands.Context[commands.AutoShardedBot]) -> None:
         """Shows all parts of the bot."""
         cogs = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
         loaded = [
@@ -61,14 +56,16 @@ class owner(commands.Cog, name="owner"):
             if "`{}`".format(c.split(".")[-1]) not in loaded
         ]
         total_cogs = len(cogs)
-        embed = discord.Embed(title=f"Cogs ({total_cogs})", colour=0x000000)
+        embed = discord.Embed(
+            title=f"Maki dashboard | Cogs ({total_cogs})", color=self.bot.color
+        )
         embed.add_field(
-            name=f"✅ Geladen ({len(loaded)})",
+            name=f"✅ **Loaded** ({len(loaded)})",
             value=", ".join(loaded) if loaded != [] else "`None`",
             inline=False,
         )
         embed.add_field(
-            name=f"⛔ Ontladen ({len(unloaded)})",
+            name=f"⛔ **Unloaded** ({len(unloaded)})",
             value=", ".join(unloaded) if unloaded != [] else "`None`",
             inline=False,
         )
@@ -78,8 +75,10 @@ class owner(commands.Cog, name="owner"):
             return
 
     @commands.command(hidden=True, brief="Load a cog.")
-    @commands.is_owner()
-    async def load(self, ctx, *, module: str):
+    @developer()
+    async def load(
+        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
+    ) -> None:
         """Load a cog."""
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
@@ -90,12 +89,14 @@ class owner(commands.Cog, name="owner"):
             for m in modules:
                 if m not in loaded_modules:
                     try:
-                        self.bot.load_extension("cogs." + m)
+                        await self.bot.load_extension("cogs." + m)
                     except Exception:
                         i += 1
                         failed_to_load.append(m)
             if i == 0:
-                em = discord.Embed(title="All Cogs Have Been Loaded", colour=0x000000)
+                em = discord.Embed(
+                    title="All Cogs Have Been Loaded", color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -123,16 +124,16 @@ class owner(commands.Cog, name="owner"):
                         em = discord.Embed(
                             title="Already Loaded",
                             description=f"`{module}`",
-                            colour=0x000000,
+                            color=self.bot.color,
                         )
                         try:
                             await ctx.send(embed=em)
                         except Exception:
                             return
                         return
-                    self.bot.load_extension(m)
+                    await self.bot.load_extension(m)
                     em = discord.Embed(
-                        title="Loaded", description=f"`{module}`", colour=0x000000
+                        title="Loaded", description=f"`{module}`", color=self.bot.color
                     )
                     try:
                         await ctx.send(embed=em)
@@ -141,7 +142,9 @@ class owner(commands.Cog, name="owner"):
                     return
                 else:
                     em = discord.Embed(
-                        title="Not Found", description=f"`{module}`", colour=0x000000
+                        title="Not Found",
+                        description=f"`{module}`",
+                        color=self.bot.color,
                     )
                     try:
                         await ctx.send(embed=em)
@@ -149,15 +152,19 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(title="Error", description=str(e), colour=0x000000)
+                em = discord.Embed(
+                    title="Error", description=str(e), color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
                     return
 
     @commands.command(hidden=True, brief="Unloads a cog.")
-    @commands.is_owner()
-    async def unload(self, ctx, *, module: str):
+    @developer()
+    async def unload(
+        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
+    ) -> None:
         """Unloads a cog."""
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
@@ -170,12 +177,14 @@ class owner(commands.Cog, name="owner"):
                     pass
                 else:
                     try:
-                        self.bot.unload_extension("cogs." + m)
+                        await self.bot.unload_extension("cogs." + m)
                     except Exception:
                         i += 1
                         failed_to_load.append(m)
             if i == 0:
-                em = discord.Embed(title="All Cogs Have Been Unloaded", colour=0x000000)
+                em = discord.Embed(
+                    title="All Cogs Have Been Unloaded", color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -205,7 +214,7 @@ class owner(commands.Cog, name="owner"):
                         em = discord.Embed(
                             title="Can't Unload",
                             description=f"`{module}`",
-                            colour=0x000000,
+                            color=self.bot.color,
                         )
                         try:
                             await ctx.send(embed=em)
@@ -216,16 +225,18 @@ class owner(commands.Cog, name="owner"):
                         em = discord.Embed(
                             title="Already Unloaded",
                             description=f"`{module}`",
-                            colour=0x000000,
+                            color=self.bot.color,
                         )
                         try:
                             await ctx.send(embed=em)
                         except Exception:
                             return
                         return
-                    self.bot.unload_extension(m)
+                    await self.bot.unload_extension(m)
                     em = discord.Embed(
-                        title="Unloaded", description=f"`{module}`", colour=0x000000
+                        title="Unloaded",
+                        description=f"`{module}`",
+                        color=self.bot.color,
                     )
                     try:
                         await ctx.send(embed=em)
@@ -234,12 +245,12 @@ class owner(commands.Cog, name="owner"):
                     return
                 else:
                     try:
-                        self.bot.unload_extension(m)
+                        await self.bot.unload_extension(m)
                     except Exception:
                         em = discord.Embed(
                             title="Not Found",
                             description=f"`{module}`",
-                            colour=0x000000,
+                            color=self.bot.color,
                         )
                         try:
                             await ctx.send(embed=em)
@@ -247,7 +258,9 @@ class owner(commands.Cog, name="owner"):
                             return
                         return
                     em = discord.Embed(
-                        title="Unloaded", description=f"`{module}`", colour=0x000000
+                        title="Unloaded",
+                        description=f"`{module}`",
+                        color=self.bot.color,
                     )
                     try:
                         await ctx.send(embed=em)
@@ -255,15 +268,19 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(title="Error", description=str(e), colour=0x000000)
+                em = discord.Embed(
+                    title="Error", description=str(e), color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
                     return
 
     @commands.command(hidden=True, brief="Reloads a cog.")
-    @commands.is_owner()
-    async def reload(self, ctx, *, module: str):
+    @developer()
+    async def reload(
+        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
+    ) -> None:
         """Reloads a cog."""
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
@@ -274,16 +291,18 @@ class owner(commands.Cog, name="owner"):
             for m in modules:
                 if m in loaded_modules:
                     try:
-                        self.bot.unload_extension("cogs." + m)
+                        await self.bot.unload_extension("cogs." + m)
                     except Exception:
                         pass
                 try:
-                    self.bot.load_extension("cogs." + m)
+                    await self.bot.load_extension("cogs." + m)
                 except Exception:
                     i += 1
                     failed_to_load.append(module)
             if i == 0:
-                em = discord.Embed(title="All Cogs Have Been Reloaded", colour=0x000000)
+                em = discord.Embed(
+                    title="All Cogs Have Been Reloaded", color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -311,12 +330,13 @@ class owner(commands.Cog, name="owner"):
             try:
                 if module in modules:
                     if module in loaded_modules:
-                        self.bot.unload_extension(m)
-                        self.bot.load_extension(m)
+                        await self.bot.reload_extension(m)
                     else:
-                        self.bot.load_extension(m)
+                        await self.bot.load_extension(m)
                     em = discord.Embed(
-                        title="Reloaded", description=f"`{module}`", colour=0x000000
+                        title="Reloaded",
+                        description=f"`{module}`",
+                        color=self.bot.color,
                     )
                     try:
                         await ctx.send(embed=em)
@@ -325,7 +345,9 @@ class owner(commands.Cog, name="owner"):
                     return
                 else:
                     em = discord.Embed(
-                        title="Not Found", description=f"`{module}`", colour=0x000000
+                        title="Not Found",
+                        description=f"`{module}`",
+                        color=self.bot.color,
                     )
                     try:
                         await ctx.send(embed=em)
@@ -333,13 +355,15 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(title="Error", description=str(e), colour=0x000000)
+                em = discord.Embed(
+                    title="Error", description=str(e), color=self.bot.color
+                )
                 try:
                     await ctx.send(embed=em)
                 except Exception:
                     return
 
 
-def setup(bot):
+async def setup(bot):
     c = owner(bot)
-    bot.add_cog(c)
+    await bot.add_cog(c)

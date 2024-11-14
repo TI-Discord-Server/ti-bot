@@ -17,3 +17,9 @@ class UnknownRole(Exception):
 
 class UnknownMessage(Exception):
     pass
+
+class UnknownEmoji(Exception):
+    pass
+
+class UnknownInvite(Exception):
+    pass

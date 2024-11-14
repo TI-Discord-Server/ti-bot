@@ -1,37 +1,60 @@
-import discord
-from discord.ext import commands
-
 import asyncio
-import aiohttp
-import traceback
-import os
+import contextlib
 import datetime
 import logging
+import os
+import traceback
 from logging.handlers import RotatingFileHandler
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+from typing import Awaitable, Final, Protocol
 
+import aiohttp
+import discord
+from discord import app_commands
+from discord.ext import commands
+from discord.interactions import Interaction
+from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from env import (
+    BOT_TOKEN,
+    MONGODB_PASSWORD,
+    MONGODB_IP_ADDRESS,
+)
 from utils.errors import (
     ForbiddenAction,
     ResponseTimeout,
+    UnknownEmoji,
+    UnknownInvite,
     UnknownMessage,
-    UnknownUser,
     UnknownRole,
+    UnknownUser,
 )
 
 load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD")
-MONGODB_IP_ADDRESS = os.getenv("MONGODB_IP_ADDRESS")
 
+DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = (
+    frozenset(
+        [
+            123468845749895170,  # Quinten - @quintenvw
+            406131690742743050,  # Amber - @annanas
+            402102269509894144,  # Kobe - @k0be_
+            329293977494880257,  # Arthur - @arthurvg
+            925002667502239784,  # Jaak - @princessakina
+            251334912576192513,  # Maxime - @tailstm
+            203245885608558592,  # Roan - @littlebladed
+            304989265518133249,  # Sterre - @clustarz
+            337521371414396928,  # Warre - @warru
+        ]
+    )
+)
 
-class MakiContext(commands.Context):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class Responder(Protocol):
+    def __call__(self, content: str, *, ephemeral: bool) -> Awaitable[None]: ...
 
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
+        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
         motor = AsyncIOMotorClient(
             f"mongodb://bot:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:27017/bot?authMechanism=SCRAM-SHA-256",
             connect=True,
@@ -43,6 +66,7 @@ class Bot(commands.Bot):
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        # Select whatever we need here and make sure we have the correct things enabled on the Discord Developer Portal.
         intents = discord.Intents(
             guilds=True,
             members=True,
@@ -52,7 +76,7 @@ class Bot(commands.Bot):
             webhooks=True,
             invites=True,
             voice_states=True,
-            presences=False,
+            presences=True,
             guild_messages=True,
             dm_messages=False,
             guild_reactions=True,
@@ -60,60 +84,34 @@ class Bot(commands.Bot):
             typing=False,
             guild_typing=False,
             dm_typing=False,
-            scheduled_events=False,
+            guild_scheduled_events=False,
             emojis_and_stickers=True,
             message_content=True,
             auto_moderation_configuration=True,
             auto_moderation_execution=True,
         )
-        member_cache_flags = discord.MemberCacheFlags(
-            voice=True, joined=False, interaction=True
-        )  # discord.MemberCacheFlags.from_intents(intents)
         super().__init__(
-            **kwargs,
+            **kwargs,  # type: ignore
             loop=loop,
             max_messages=10_000,
-            command_prefix="!",
-            chunk_guilds_at_startup=False,
-            auto_sync_commands=False,
-            member_cache_flags=member_cache_flags,
+            command_prefix="?",
+            chunk_guilds_at_startup=True,
+            auto_sync_commands=True,
             intents=intents,
         )
 
         self.session = aiohttp.ClientSession(loop=loop)
         self.uptime = datetime.datetime.now()
 
-        self.activity = discord.CustomActivity(self.presence)
+        self.activity = discord.CustomActivity("Oil up Warre")
         self.status = discord.Status.online
 
-        self.cooldown_users = commands.CooldownMapping.from_cooldown(
-            2, 1, commands.BucketType.user
-        )
-        self.cooldown_channels = commands.CooldownMapping.from_cooldown(
-            7, 2, commands.BucketType.channel
-        )
-        self.cooldown_guilds = commands.CooldownMapping.from_cooldown(
-            9, 1, commands.BucketType.guild
-        )
-
-        self.add_check(
-            commands.bot_has_permissions(
-                add_reactions=True,
-                attach_files=True,
-                embed_links=True,
-                external_emojis=True,
-                read_message_history=True,
-                read_messages=True,
-                send_messages=True,
-                send_messages_in_threads=True,
-            ).predicate
-        )
-
-        bot_log = logging.getLogger("Bot")
+        # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
+        bot_log = logging.getLogger(f"bot")
         bot_log.setLevel(logging.INFO)
         bot_log.addHandler(
             RotatingFileHandler(
-                "Bot.log",
+                f"bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
@@ -127,7 +125,7 @@ class Bot(commands.Bot):
         discord_log.setLevel(logging.WARNING)
         discord_log.addHandler(
             RotatingFileHandler(
-                "Bot.log",
+                f"bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
@@ -135,184 +133,201 @@ class Bot(commands.Bot):
             )
         )
 
+        self.__started = False
+        self.owner_ids: frozenset[int] = (  # type: ignore
+            DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS
+        )
+
+        self.tree.error(self.on_application_command_error)
+
+        # fix: we don't use self.run() as it uses asyncio.run, which replaces our event loop created above.
+        #      as a result, we can't make aiohttp requests with self.session because requests are technically made
+        #      between two different event loops, and it doesn't like that :(
+        loop.run_until_complete(self.__init())
+
+    async def __init(self):
+        async with self:
+            try:
+                await self.start(self.token, reconnect=True)
+            except KeyboardInterrupt:
+                return
+
+    async def __load_cogs(self) -> None:
         for m in [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]:
             if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
                 try:
-                    self.load_extension("cogs." + m)
-                except Exception as e:
-                    self.log.critical(f"Couldn't load {m} cog : e")
-                    raise Exception(e)
-        self.loop.create_task(self.do_startup_tasks())
-        self.run(self.token)
+                    await self.load_extension("cogs." + m)
+                except Exception:
+                    self.log.critical(f"Couldn't load {m} cog", exc_info=True)
 
-    async def do_startup_tasks(self):
-        await self.wait_until_ready()
-        self.ready = True
-        self.log.debug(f"Logged in as {self.user}")
+    async def setup_hook(self) -> None:
+        await self.__load_cogs()
 
-    async def on_ready(self):
+        # We have auto sync commands enabled, so we don't need to manually sync them.
+        # with contextlib.suppress(Exception):
+        #     await self.tree.sync()
+        #     self.log.info("Synchronized application commands")
+
+    async def on_ready(self) -> None:
         self.log.info("Ready called")
 
-    async def on_connect(self):
-        await self.sync_commands(method="bulk")
-        self.log.info("Synchronized application commands")
+        if not self.__started:
+            self.__started = True
+            self.log.debug(f"Logged in as {self.user}")
 
-    async def on_message(self, message):
-        if message.author.id in self.owner_ids:
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author.id not in self.owner_ids:
             return
-        try:
-            ctx = await self.get_context(message, cls=MakiContext)
+
+        with contextlib.suppress(Exception):
+            ctx = await self.get_context(message)
+
             if ctx.valid:
                 await self.invoke(ctx)
-        except Exception:
+
+    def _format_cooldown(self, retry_after: float) -> str:
+        m, s = divmod(retry_after, 60)
+        h, m = divmod(m, 60)
+
+        if h != 0:
+            return "{} hour" + ("s" if h != 1 else "").format(int(h))
+        elif m != 0:
+            return "{} minute" + ("s" if m != 1 else "").format(int(m))
+        else:
+            return "{} second" + ("s" if s != 1 else "").format(max(int(s), 1))
+
+    async def __handle_application_error(
+        self,
+        interaction: Interaction,
+        error: app_commands.AppCommandError,
+        respond: Responder,
+    ) -> bool:
+        original: BaseException
+
+        if isinstance(error, app_commands.CommandInvokeError):
+            original = error.original
+        elif (
+            isinstance(error, app_commands.TransformerError)
+            and error.__cause__ is not None
+        ):
+            original = error.__cause__
+        else:
+            return False
+
+        if isinstance(original, UnknownMessage):
+            with contextlib.suppress(Exception):
+                await respond(":x: | I couldn't find that message!", ephemeral=True)
+        elif isinstance(original, UnknownUser):
+            with contextlib.suppress(Exception):
+                await respond(":x: | I couldn't find that user!", ephemeral=True)
+        elif isinstance(original, UnknownRole):
+            with contextlib.suppress(Exception):
+                await respond(":x: | I couldn't find that role!", ephemeral=True)
+        elif isinstance(original, UnknownEmoji):
+            with contextlib.suppress(Exception):
+                await respond(":x: | I couldn't find that emoji!", ephemeral=True)
+        elif isinstance(original, UnknownInvite):
+            with contextlib.suppress(Exception):
+                await respond(":x: | I couldn't find that invite!", ephemeral=True)
+        else:
+            return False
+
+        return True
+
+    async def on_application_command_error(
+        self, interaction: Interaction, error: app_commands.AppCommandError
+    ):
+        respond = (
+            interaction.response.send_message
+            if not interaction.response.is_done()
+            else interaction.followup.send
+        )
+
+        if await self.__handle_application_error(interaction, error, respond):
             return
 
-    async def on_application_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandNotFound):
+        if isinstance(
+            error,
+            (
+                app_commands.CommandNotFound,
+                app_commands.NoPrivateMessage,
+                app_commands.MissingPermissions,
+            ),
+        ):
             return
-
-        elif isinstance(error, commands.NoPrivateMessage):
-            try:
-                await ctx.respond(
-                    ":x: | This command can't be used in private messages!",
-                    ephemeral=True,
-                )
-            except Exception:
-                return
-            return
-
-        elif isinstance(error, commands.MissingPermissions):
-            try:
-                await ctx.respond(
-                    ":x: | You don't have the required permissions!", ephemeral=True
-                )
-            except Exception:
-                return
-            return
-
-        elif isinstance(error, commands.BotMissingPermissions):
-            try:
-                await ctx.respond(
+        elif isinstance(error, app_commands.BotMissingPermissions):
+            with contextlib.suppress(Exception):
+                await respond(
                     ":x: | I don't have the required permissions!", ephemeral=True
                 )
-            except Exception:
-                return
-            return
 
-        elif isinstance(error, commands.CommandOnCooldown):
-            try:
-                await ctx.respond(
-                    ":hourglass: | Nog even geduld, je heb en cooldown bereikt!",
-                    ephemeral=True,
+            return
+        elif isinstance(error, app_commands.CommandOnCooldown):
+            time = self._format_cooldown(error.retry_after)
+
+            with contextlib.suppress(Exception):
+                await respond(
+                    ":hourglass: **| Cooldown:** {}".format(time), ephemeral=True
                 )
-            except Exception:
-                return
-            return
 
-        elif isinstance(error, commands.CheckFailure):
-            if str(error) == "Moderator":
-                try:
-                    await ctx.respond(
-                        ":x: | Enkel server moderators kunnen dit commando gebruiken!",
+            return
+        elif (
+            isinstance(error, app_commands.CheckFailure)
+            or (
+                hasattr(error, 'original')
+                and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
+            )
+        ):
+            message = str(getattr(error, 'original', error))
+
+            if message == "Moderator":
+                with contextlib.suppress(Exception):
+                    await respond(
+                        ":x: | Only server moderators can use this command!",
                         ephemeral=True,
                     )
-                except Exception:
-                    return
-            elif str(error) == "Administrator":
-                try:
-                    await ctx.respond(
-                        ":x: | Enkel server administrators kunnen dit commando gebruiken!",
+            elif message == "Administrator":
+                with contextlib.suppress(Exception):
+                    await respond(
+                        ":x: | Only server administrators can use this command!",
                         ephemeral=True,
                     )
-                except Exception:
-                    return
-            return
 
-        elif isinstance(error, discord.ApplicationCommandInvokeError):
+            return
+        elif isinstance(error, app_commands.CommandInvokeError):
             if isinstance(error.original, discord.Forbidden):
-                try:
-                    await ctx.respond(
-                        ":x: | Ik ontbreek enkele permissies!", ephemeral=True
+                with contextlib.suppress(Exception):
+                    await respond(
+                        ":x: | I don't have the required permissions!",
+                        ephemeral=True,
                     )
-                except Exception:
-                    return
-                return
 
-            if isinstance(error.original, discord.NotFound):
-                try:
-                    await ctx.respond(
-                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
-                    )
-                except Exception:
-                    return
                 return
+            elif isinstance(
+                error.original,
+                (discord.NotFound, discord.HTTPException, discord.DiscordServerError),
+            ):
+                with contextlib.suppress(Exception):
+                    await respond(":x: | An unknown error occurred!", ephemeral=True)
 
-            elif isinstance(error.original, discord.HTTPException):
-                try:
-                    await ctx.respond(
-                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
-                    )
-                except Exception:
-                    return
                 return
-
-            elif isinstance(error.original, discord.DiscordServerError):
-                try:
-                    await ctx.respond(
-                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
-                    )
-                except Exception:
-                    return
-                return
-
             elif isinstance(error.original, ForbiddenAction):
-                try:
-                    await ctx.respond(
-                        ":x: | Je hebt geen toestemming om dit te doen!", ephemeral=True
-                    )
-                except Exception:
-                    return
-                return
+                with contextlib.suppress(Exception):
+                    await respond(":x: | You can't do that!", ephemeral=True)
 
+                return
             elif isinstance(error.original, ResponseTimeout):
-                try:
-                    await ctx.respond(
-                        ":hourglass: | Probeer het later nogeens!", ephemeral=True
-                    )
-                except Exception:
-                    return
+                with contextlib.suppress(Exception):
+                    await respond(":hourglass: | Try again later!", ephemeral=True)
+
                 return
 
-            elif isinstance(error.original, UnknownMessage):
-                try:
-                    await ctx.respond(":x: | Onbekend bericht!", ephemeral=True)
-                except Exception:
-                    return
                 return
+            elif isinstance(error.original, aiohttp.ClientOSError):
+                with contextlib.suppress(Exception):
+                    await respond(":x: | An unknown error occurred!", ephemeral=True)
 
-            elif isinstance(error.original, UnknownUser):
-                try:
-                    await ctx.respond(":x: | Onbekende gebruiker!", ephemeral=True)
-                except Exception:
-                    return
                 return
-
-            elif isinstance(error.original, UnknownRole):
-                try:
-                    await ctx.respond(":x: | Onbekende rol!", ephemeral=True)
-                except Exception:
-                    return
-                return
-
-            elif isinstance(error.original, aiohttp.client_exceptions.ClientOSError):
-                try:
-                    await ctx.respond(
-                        ":x: | Een okbekende error is voorgekomen!", ephemeral=True
-                    )
-                except Exception:
-                    return
-                return
-
             else:
                 print(
                     "".join(
@@ -322,19 +337,93 @@ class Bot(commands.Bot):
                     )
                 )
                 em = discord.Embed(
-                    title=ctx.command.qualified_name,
-                    description=ctx.command.qualified_name,
-                    colour=discord.Colour(0x000000),
+                    title=interaction.command.qualified_name,  # type: ignore
+                    description=interaction.command.qualified_name,  # type: ignore
+                    colour=discord.Colour(0xFFFFFF),
                 )
                 em.set_author(
-                    name=f"{self.user.name} | Error",
-                    icon_url=ctx.author.display_avatar.url,
+                    name="Critical Error",
+                    icon_url=interaction.user.display_avatar.url,
                 )
-                em.set_footer(text="Gelieve dit te melden aan het team!")
+                em.set_footer(text="Please report this error to a developer!")
+
                 try:
-                    await ctx.respond(embed=em, ephemeral=True)
+                    await respond(embed=em, ephemeral=True)
                 except Exception:
                     pass
+
+    async def on_command_error(
+        self, ctx: commands.Context, error: commands.CommandError
+    ):
+        command: commands.Command = ctx.command  # type: ignore
+
+        if isinstance(error, commands.CommandNotFound):
+            return
+        elif isinstance(
+            error,
+            (
+                commands.BadArgument,
+                commands.MissingRequiredArgument,
+                commands.UserInputError,
+            ),
+        ):
+            msg = ""
+
+            if not command.usage:
+                for x in command.params:
+                    if x != "ctx" and x != "self":
+                        if "None" in str(command.params[x]):
+                            msg += " [{}]".format(x)
+                        else:
+                            msg += " <{}>".format(x)
+            else:
+                msg += f" {command.usage}"
+
+            em = discord.Embed(colour=discord.Colour(0xFFFFFF))
+            em.set_author(
+                name=f"{command.full_parent_name} {command.name}",
+                icon_url=ctx.author.display_avatar.url,
+            )
+            em.add_field(
+                name="Usage",
+                value="`{}{}{}`".format(ctx.prefix, ctx.command, msg),
+                inline=False,
+            )
+            em.set_footer(text=command.help)
+
+            with contextlib.suppress(Exception):
+                await ctx.send(embed=em)
+            return
+
+        elif isinstance(error, (discord.Forbidden, commands.BotMissingPermissions)):
+            with contextlib.suppress(Exception):
+                await ctx.send(":x: | I don't have the required permissions!")
+
+            return
+        elif hasattr(error, "original") and isinstance(
+            error.original, discord.HTTPException  # type: ignore
+        ):
+            with contextlib.suppress(Exception):
+                await ctx.send(":x: | An unknown error occurred!")
+
+            return
+        elif isinstance(error, commands.CommandInvokeError):
+            print(
+                "".join(
+                    traceback.format_exception(type(error), error, error.__traceback__)
+                )
+            )
+            e = discord.Embed(
+                description=ctx.message.content, colour=discord.Colour(0xFFFFFF)
+            )
+            e.set_author(
+                name="Critical Error",
+                icon_url=ctx.author.display_avatar.url,
+            )
+            e.set_footer(text="Please report this error to a developer!")
+
+            with contextlib.suppress(Exception):
+                await ctx.send(embed=e)
 
     async def on_error(self, *args, **kwargs):
         self.log.critical(traceback.format_exc())
