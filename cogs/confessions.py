@@ -40,7 +40,7 @@ class Confessions(commands.Cog):
         if time == "15:15":
             chosen = [] 
 
-            amount = 3 if await getQueueLength() >= 3 else await getQueueLength()
+            amount = 2 if await getQueueLength() >= 2 else await getQueueLength()
 
             for i in range(amount):
                 rand = await getNewConfession()
