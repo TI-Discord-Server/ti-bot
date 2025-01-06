@@ -19,6 +19,7 @@ class NormalRoles(commands.Cog):
 =======================
 <a:hackerman:860201371655340072> - TIAO student
 <:peeposhy:773835107521003541> - IOEM student
+✈️ - Buitenlandse Stage
 🛫 - Erasmus
 <:frogshys:853749867867406346> - Graduaat student"""
 
