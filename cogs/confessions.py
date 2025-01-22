@@ -193,7 +193,7 @@ class MakeModal(discord.ui.Modal):
             discord.ui.TextInput(
                 label="Wat is jouw confession?",
                 style=discord.TextStyle.long,
-                max_length=2000,
+                max_length=1950,
             )
         )
     
