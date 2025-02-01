@@ -6,3 +6,11 @@ Run using `python3 main.py`.
 - Maak een Discord bot via de [Discord developer portal](https://discord.com/developers/applications) om je code te testen voordat je iets in production gebruikt.
 - Gelieve de ./cogs en ./utils folders correct te gebruiken. ./utils is voor code die herbruikt kan/moet worden en back-end logic. ./cogs is voor alle tasks, commands, etc. waar users interactie mee hebben. Kijk gerust naar de voorbeelden in ./cogs/help.py en ./cogs/faq.py.
 - Upload emojis die gebruikt worden door de bot naar de Discord developer portal in plaats van server emojis te gebruiken. Zo ontstaan er geen permission issues of missing emojis.
+
+## Slash commands
+- Wanneer je de commands niet kan zien, reload Discord applicatie.
+- Het duurt soms even voor de (nieuwe) slash commands zichtbaar zijn
+
+## Emojis
+- Upload emojis [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
+- Maak er zo gebruik van: <:emoji_name:emoji_id>
