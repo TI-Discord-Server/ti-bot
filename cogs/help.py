@@ -1,46 +1,37 @@
 import discord
-from discord.ext import commands, tasks
+from discord.app_commands import command
+from discord.ext import commands
 
-import random
 
-
-class help(commands.Cog, name="help"):
+class Help(commands.Cog, name="help"):
     def __init__(self, bot):
-        super().__init__()
         self.bot = bot
         self.bot.remove_command("help")  # Removes the built-in help command
-        self.change_status.start()
 
-    @tasks.loop(minutes=10)
-    async def change_status(self):
-        print("Changing status...")
-        choice = random.choice(
-            [
-                "Python is en slang",
-                "Java is en eiland",
-                "Java is en Minecraft versie",
-                "Rust is oranje stof op metaal",
-                "Ruby is en steen",
-                "C# is een muzieksleutel",
-                "Swift is een vogel",
-                "Perl is een sieraad",
-                "Go is een bordspel",
-                "Kotlin is een eiland",
-                "Elixir is een magisch drankje",
-            ]
-        )
-        await self.bot.change_presence(
-            activity=discord.CustomActivity(name=choice), status=discord.Status.online
+    @command(name="help", description="Get a list of all available commands.")
+    async def help_command(self, interaction: discord.Interaction):
+        """Displays a help menu with all available slash commands."""
+
+        embed = discord.Embed(
+            title="<:clipboard:1334552918367404072> Help Menu",
+            description="Here are all the available commands:",
+            color=discord.Color.blue(),
         )
 
-    @change_status.before_loop
-    async def before_change_status(self):
-        await self.bot.wait_until_ready()
+        # Loop through all registered slash commands
+        for c in self.bot.tree.get_commands():
+            embed.add_field(
+                name=f"/{c.name}",
+                value=c.description or "No description",
+                inline=False,
+            )
 
-    def cog_unload(self):
-        self.change_status.cancel()
+        embed.set_footer(text="Use a command by typing / followed by the command name.")
+
+        await interaction.response.send_message(
+            embed=embed, ephemeral=True
+        )  # Sends only to the user
 
 
 async def setup(bot):
-    n = help(bot)
-    await bot.add_cog(n)
+    await bot.add_cog(Help(bot))
