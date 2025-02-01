@@ -32,21 +32,20 @@ from utils.errors import (
 
 load_dotenv()
 
-DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = (
-    frozenset(
-        [
-            123468845749895170,  # Quinten - @quintenvw
-            406131690742743050,  # Amber - @annanas
-            402102269509894144,  # Kobe - @k0be_
-            329293977494880257,  # Arthur - @arthurvg
-            925002667502239784,  # Jaak - @princessakina
-            251334912576192513,  # Maxime - @tailstm
-            203245885608558592,  # Roan - @littlebladed
-            304989265518133249,  # Sterre - @clustarz
-            337521371414396928,  # Warre - @warru
-        ]
-    )
+DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset(
+    [
+        123468845749895170,  # Quinten - @quintenvw
+        406131690742743050,  # Amber - @annanas
+        402102269509894144,  # Kobe - @k0be_
+        329293977494880257,  # Arthur - @arthurvg
+        925002667502239784,  # Jaak - @princessakina
+        251334912576192513,  # Maxime - @tailstm
+        203245885608558592,  # Roan - @littlebladed
+        304989265518133249,  # Sterre - @clustarz
+        337521371414396928,  # Warre - @warru
+    ]
 )
+
 
 class Responder(Protocol):
     def __call__(self, content: str, *, ephemeral: bool) -> Awaitable[None]: ...
@@ -61,7 +60,7 @@ class Bot(commands.Bot):
         )
         motor.get_io_loop = asyncio.get_running_loop
         self.db = motor.bot
-
+        self.color = discord.Color.blurple()
         self.token = BOT_TOKEN
 
         loop = asyncio.new_event_loop()
@@ -153,6 +152,7 @@ class Bot(commands.Bot):
                 return
 
     async def __load_cogs(self) -> None:
+        await self.load_extension("jishaku")
         for m in [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]:
             if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
                 try:
@@ -271,14 +271,11 @@ class Bot(commands.Bot):
                 )
 
             return
-        elif (
-            isinstance(error, app_commands.CheckFailure)
-            or (
-                hasattr(error, 'original')
-                and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
-            )
+        elif isinstance(error, app_commands.CheckFailure) or (
+            hasattr(error, "original")
+            and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
         ):
-            message = str(getattr(error, 'original', error))
+            message = str(getattr(error, "original", error))
 
             if message == "Moderator":
                 with contextlib.suppress(Exception):
@@ -401,7 +398,8 @@ class Bot(commands.Bot):
 
             return
         elif hasattr(error, "original") and isinstance(
-            error.original, discord.HTTPException  # type: ignore
+            error.original,
+            discord.HTTPException,  # type: ignore
         ):
             with contextlib.suppress(Exception):
                 await ctx.send(":x: | An unknown error occurred!")

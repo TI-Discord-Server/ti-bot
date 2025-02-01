@@ -1,14 +1,11 @@
 # Don't remove unused imports as they can be used in the py command.
-import asyncio
-import datetime
-import pymongo
 
 import os
 import discord
 from discord.ext import commands
 
 from utils.checks import developer
-from ..main import Bot
+from main import Bot
 
 
 class owner(commands.Cog, name="owner"):
@@ -57,7 +54,7 @@ class owner(commands.Cog, name="owner"):
         ]
         total_cogs = len(cogs)
         embed = discord.Embed(
-            title=f"Maki dashboard | Cogs ({total_cogs})", color=self.bot.color
+            title=f"TI dashboard | Cogs ({total_cogs})", color=self.bot.color
         )
         embed.add_field(
             name=f"✅ **Loaded** ({len(loaded)})",
