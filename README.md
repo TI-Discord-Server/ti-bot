@@ -14,3 +14,25 @@ Run using `python3 main.py`.
 ## Emojis
 - Upload emojis [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
 - Maak er zo gebruik van: <:emoji_name:emoji_id>
+
+## TODOS
+
+Nyo:
+- mod functies (ban, mute, kick, etc...) 
+- unban verzoek
+- Prune (optioneel)
+
+Quinten: 
+- Confessions
+- Voorbeeld variabelen gebruiken adhv collection
+
+Jaak:
+- Verify functie (Office365 auth?)
+
+Kobe:
+- Modmail
+- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando
+
+Warre:
+- Bekendmaking punten commando (variabel maken)
+- Report functie
