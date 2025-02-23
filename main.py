@@ -79,7 +79,7 @@ class DiscordWebhookHandler(logging.Handler):
             msg = self.format(record)
             embed = discord.Embed(
                 title="Log Entry",
-                description=f"```{msg}```",  # Insert your log message here if needed
+                description=f"```{msg}```",
                 color=self._get_color(record.levelname),
                 timestamp=datetime.datetime.utcnow()
             )
