@@ -3,6 +3,7 @@ import contextlib
 import datetime
 import logging
 import os
+import sys
 import traceback
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
@@ -246,6 +247,9 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self.__load_cogs()
+
+        # Check if the database connection is working
+        await self.check_db_connection()
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
         # with contextlib.suppress(Exception):
@@ -509,6 +513,17 @@ class Bot(commands.Bot):
 
     async def on_error(self, *args, **kwargs):
         self.log.critical(traceback.format_exc())
+
+    async def check_db_connection(self) -> None:
+        try:
+            # Force a connection by pinging the MongoDB server
+            await self.db.client.admin.command("ping")
+            self.log.info("Successfully connected to the MongoDB database.")
+        except Exception as e:
+            self.log.critical("Database connection error: %s", e)
+            # Exit the bot if the connection check fails
+            await asyncio.sleep(1)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
