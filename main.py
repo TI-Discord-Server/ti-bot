@@ -212,10 +212,13 @@ class Bot(commands.Bot):
         discord_log.addHandler(console_handler)
 
         # Add a webhook handler to log to a Discord webhook.
-        discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL)
-        discord_webhook_handler.setLevel(logging.INFO)
-        bot_log.addHandler(discord_webhook_handler)
-        discord_log.addHandler(discord_webhook_handler)
+        if WEBHOOK_URL:
+            discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL)
+            discord_webhook_handler.setLevel(logging.INFO)
+            bot_log.addHandler(discord_webhook_handler)
+            discord_log.addHandler(discord_webhook_handler)
+        else:
+            self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
 
         self.__started = False
         self.owner_ids: frozenset[int] = (  # type: ignore
