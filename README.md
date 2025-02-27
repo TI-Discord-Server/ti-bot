@@ -15,6 +15,31 @@ Run using `python3 main.py`.
 - Upload emojis [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
 - Maak er zo gebruik van: <:emoji_name:emoji_id>
 
+## Environment Variables (.env)
+De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` voor een voorbeeld. De volgende variabelen zijn nodig:
+
+- `BOT_TOKEN`: Je Discord bot token
+- `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB server
+- `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB authenticatie
+- `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
+
+## MongoDB Gebruiker Toevoegen
+Als je nog geen bot-gebruiker hebt voor MongoDB:
+
+```mongo
+use bot
+db.createUser({
+  user: "bot",
+  pwd: "Password123",
+  roles: [
+    { role: "readWrite", db: "bot" }
+  ]
+})
+```
+
+Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
+
+
 ## TODOS
 
 Nyo:
