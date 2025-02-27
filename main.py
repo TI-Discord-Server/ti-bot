@@ -3,6 +3,7 @@ import contextlib
 import datetime
 import logging
 import os
+import sys
 import traceback
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
@@ -19,6 +20,7 @@ from env import (
     BOT_TOKEN,
     MONGODB_PASSWORD,
     MONGODB_IP_ADDRESS,
+    WEBHOOK_URL,
 )
 from utils.errors import (
     ForbiddenAction,
@@ -49,6 +51,68 @@ DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset
 
 class Responder(Protocol):
     def __call__(self, content: str, *, ephemeral: bool) -> Awaitable[None]: ...
+
+
+class DiscordWebhookHandler(logging.Handler):
+    def __init__(self, webhook_url):
+        super().__init__()
+        self.webhook_url = webhook_url
+        # Do not create a ClientSession here—set it to None; it will be lazily created.
+        self.session = None
+
+    async def _ensure_session(self):
+        # Create the ClientSession only when needed and within an async context.
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
+
+    def emit(self, record):
+        try:
+            # Schedule the asynchronous sending of the log record.
+            asyncio.create_task(self._async_emit(record))
+        except Exception:
+            self.handleError(record)
+
+    async def _async_emit(self, record):
+        await self._ensure_session()
+        try:
+            # Create a Discord webhook using the asynchronously created session.
+            webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
+            msg = self.format(record)
+            embed = discord.Embed(
+                title="Log Entry",
+                description=f"```{msg}```",
+                color=self._get_color(record.levelname),
+                timestamp=datetime.datetime.utcnow(),
+            )
+            embed.add_field(name="Level", value=record.levelname, inline=True)
+            embed.add_field(name="Logger", value=record.name, inline=True)
+            await webhook.send(embed=embed)
+        except Exception:
+            self.handleError(record)
+
+    def _get_color(self, levelname):
+        # Map log level names to Discord color objects.
+        colors = {
+            "DEBUG": discord.Color.light_grey(),
+            "INFO": discord.Color.green(),
+            "WARNING": discord.Color.yellow(),
+            "ERROR": discord.Color.red(),
+            "CRITICAL": discord.Color.dark_red(),
+        }
+        return colors.get(levelname, discord.Color.default())
+
+    def close(self):
+        # If the session was created, schedule its closure.
+        if self.session is not None and not self.session.closed:
+            try:
+                # Try to fetch the running loop; if there isn’t one, skip closing.
+                loop = asyncio.get_running_loop()
+                # Schedule the asynchronous close
+                loop.create_task(self.session.close())
+            except RuntimeError:
+                # No running event loop available; session may be cleaned up on process exit.
+                pass
+        super().close()
 
 
 class Bot(commands.Bot):
@@ -106,11 +170,11 @@ class Bot(commands.Bot):
         self.status = discord.Status.online
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
-        bot_log = logging.getLogger(f"bot")
+        bot_log = logging.getLogger("bot")
         bot_log.setLevel(logging.INFO)
         bot_log.addHandler(
             RotatingFileHandler(
-                f"bot.log",
+                "bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
@@ -124,13 +188,29 @@ class Bot(commands.Bot):
         discord_log.setLevel(logging.WARNING)
         discord_log.addHandler(
             RotatingFileHandler(
-                f"bot.log",
+                "bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
                 backupCount=1,
             )
         )
+
+        # Add a console handler to log to the console as well.
+        console_handler = logging.StreamHandler()
+        bot_log.addHandler(console_handler)
+        discord_log.addHandler(console_handler)
+
+        # Add a webhook handler to log to a Discord webhook.
+        if WEBHOOK_URL:
+            discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL)
+            discord_webhook_handler.setLevel(logging.INFO)
+            bot_log.addHandler(discord_webhook_handler)
+            discord_log.addHandler(discord_webhook_handler)
+        else:
+            self.log.warning(
+                "No webhook URL provided; logging to Discord webhook disabled."
+            )
 
         self.__started = False
         self.owner_ids: frozenset[int] = (  # type: ignore
@@ -162,6 +242,9 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self.__load_cogs()
+
+        # Check if the database connection is working
+        await self.check_db_connection()
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
         # with contextlib.suppress(Exception):
@@ -425,6 +508,17 @@ class Bot(commands.Bot):
 
     async def on_error(self, *args, **kwargs):
         self.log.critical(traceback.format_exc())
+
+    async def check_db_connection(self) -> None:
+        try:
+            # Force a connection by pinging the MongoDB server
+            await self.db.client.admin.command("ping")
+            self.log.info("Successfully connected to the MongoDB database.")
+        except Exception as e:
+            self.log.critical("Database connection error: %s", e)
+            # Exit the bot if the connection check fails
+            await asyncio.sleep(1)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
