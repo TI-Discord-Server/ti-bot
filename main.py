@@ -114,16 +114,6 @@ class DiscordWebhookHandler(logging.Handler):
                 pass
         super().close()
 
-    def _get_color(self, level_name):
-        colors = {
-            "DEBUG": discord.Color.light_grey(),
-            "INFO": discord.Color.green(),
-            "WARNING": discord.Color.yellow(),
-            "ERROR": discord.Color.red(),
-            "CRITICAL": discord.Color.dark_red(),
-        }
-        return colors.get(level_name, discord.Color.default())
-
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
