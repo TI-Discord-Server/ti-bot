@@ -82,7 +82,7 @@ class DiscordWebhookHandler(logging.Handler):
                 title="Log Entry",
                 description=f"```{msg}```",
                 color=self._get_color(record.levelname),
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.datetime.utcnow(),
             )
             embed.add_field(name="Level", value=record.levelname, inline=True)
             embed.add_field(name="Logger", value=record.name, inline=True)
@@ -93,11 +93,11 @@ class DiscordWebhookHandler(logging.Handler):
     def _get_color(self, levelname):
         # Map log level names to Discord color objects.
         colors = {
-            'DEBUG': discord.Color.light_grey(),
-            'INFO': discord.Color.green(),
-            'WARNING': discord.Color.yellow(),
-            'ERROR': discord.Color.red(),
-            'CRITICAL': discord.Color.dark_red()
+            "DEBUG": discord.Color.light_grey(),
+            "INFO": discord.Color.green(),
+            "WARNING": discord.Color.yellow(),
+            "ERROR": discord.Color.red(),
+            "CRITICAL": discord.Color.dark_red(),
         }
         return colors.get(levelname, discord.Color.default())
 
@@ -116,11 +116,11 @@ class DiscordWebhookHandler(logging.Handler):
 
     def _get_color(self, level_name):
         colors = {
-            'DEBUG': discord.Color.light_grey(),
-            'INFO': discord.Color.green(),
-            'WARNING': discord.Color.yellow(),
-            'ERROR': discord.Color.red(),
-            'CRITICAL': discord.Color.dark_red()
+            "DEBUG": discord.Color.light_grey(),
+            "INFO": discord.Color.green(),
+            "WARNING": discord.Color.yellow(),
+            "ERROR": discord.Color.red(),
+            "CRITICAL": discord.Color.dark_red(),
         }
         return colors.get(level_name, discord.Color.default())
 
@@ -180,11 +180,11 @@ class Bot(commands.Bot):
         self.status = discord.Status.online
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
-        bot_log = logging.getLogger(f"bot")
+        bot_log = logging.getLogger("bot")
         bot_log.setLevel(logging.INFO)
         bot_log.addHandler(
             RotatingFileHandler(
-                f"bot.log",
+                "bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
@@ -198,7 +198,7 @@ class Bot(commands.Bot):
         discord_log.setLevel(logging.WARNING)
         discord_log.addHandler(
             RotatingFileHandler(
-                f"bot.log",
+                "bot.log",
                 encoding="utf-8",
                 mode="a",
                 maxBytes=1024 * 1024,
@@ -218,7 +218,9 @@ class Bot(commands.Bot):
             bot_log.addHandler(discord_webhook_handler)
             discord_log.addHandler(discord_webhook_handler)
         else:
-            self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
+            self.log.warning(
+                "No webhook URL provided; logging to Discord webhook disabled."
+            )
 
         self.__started = False
         self.owner_ids: frozenset[int] = (  # type: ignore
@@ -288,18 +290,18 @@ class Bot(commands.Bot):
             return "{} second" + ("s" if s != 1 else "").format(max(int(s), 1))
 
     async def __handle_application_error(
-            self,
-            interaction: Interaction,
-            error: app_commands.AppCommandError,
-            respond: Responder,
+        self,
+        interaction: Interaction,
+        error: app_commands.AppCommandError,
+        respond: Responder,
     ) -> bool:
         original: BaseException
 
         if isinstance(error, app_commands.CommandInvokeError):
             original = error.original
         elif (
-                isinstance(error, app_commands.TransformerError)
-                and error.__cause__ is not None
+            isinstance(error, app_commands.TransformerError)
+            and error.__cause__ is not None
         ):
             original = error.__cause__
         else:
@@ -326,7 +328,7 @@ class Bot(commands.Bot):
         return True
 
     async def on_application_command_error(
-            self, interaction: Interaction, error: app_commands.AppCommandError
+        self, interaction: Interaction, error: app_commands.AppCommandError
     ):
         respond = (
             interaction.response.send_message
@@ -338,12 +340,12 @@ class Bot(commands.Bot):
             return
 
         if isinstance(
-                error,
-                (
-                        app_commands.CommandNotFound,
-                        app_commands.NoPrivateMessage,
-                        app_commands.MissingPermissions,
-                ),
+            error,
+            (
+                app_commands.CommandNotFound,
+                app_commands.NoPrivateMessage,
+                app_commands.MissingPermissions,
+            ),
         ):
             return
         elif isinstance(error, app_commands.BotMissingPermissions):
@@ -363,8 +365,8 @@ class Bot(commands.Bot):
 
             return
         elif isinstance(error, app_commands.CheckFailure) or (
-                hasattr(error, "original")
-                and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
+            hasattr(error, "original")
+            and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
         ):
             message = str(getattr(error, "original", error))
 
@@ -392,8 +394,8 @@ class Bot(commands.Bot):
 
                 return
             elif isinstance(
-                    error.original,
-                    (discord.NotFound, discord.HTTPException, discord.DiscordServerError),
+                error.original,
+                (discord.NotFound, discord.HTTPException, discord.DiscordServerError),
             ):
                 with contextlib.suppress(Exception):
                     await respond(":x: | An unknown error occurred!", ephemeral=True)
@@ -441,19 +443,19 @@ class Bot(commands.Bot):
                     pass
 
     async def on_command_error(
-            self, ctx: commands.Context, error: commands.CommandError
+        self, ctx: commands.Context, error: commands.CommandError
     ):
         command: commands.Command = ctx.command  # type: ignore
 
         if isinstance(error, commands.CommandNotFound):
             return
         elif isinstance(
-                error,
-                (
-                        commands.BadArgument,
-                        commands.MissingRequiredArgument,
-                        commands.UserInputError,
-                ),
+            error,
+            (
+                commands.BadArgument,
+                commands.MissingRequiredArgument,
+                commands.UserInputError,
+            ),
         ):
             msg = ""
 
@@ -489,8 +491,8 @@ class Bot(commands.Bot):
 
             return
         elif hasattr(error, "original") and isinstance(
-                error.original,
-                discord.HTTPException,  # type: ignore
+            error.original,
+            discord.HTTPException,  # type: ignore
         ):
             with contextlib.suppress(Exception):
                 await ctx.send(":x: | An unknown error occurred!")
