@@ -21,6 +21,8 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` v
 - `BOT_TOKEN`: Je Discord bot token
 - `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB server
 - `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB authenticatie
+- `MONGODB_PORT`: De poort van je MongoDB server (standaard waarde = 27017)
+- `MONGODB_USERNAME`: De naam van de MongoDB tabel en gebruiker (standaard waarde = bot)
 - `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
 
 ## MongoDB Gebruiker Toevoegen
