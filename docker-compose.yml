@@ -1,0 +1,14 @@
+
+## docker build -t tibot-v3 .
+## docker compose up -d    
+## OF je doet
+## docker run -e BOT_TOKEN="tokenxxx"   -e MONGODB_IP_ADDRESS="127.0.0.1"   -e MONGODB_PASSWORD="xxxxx"   -e WEBHOOK_URL="https://discord.com/api/webhooks/1343185088115904662/YXcrhENRo6d1eQQFL5mCjOpF5Y8A0JS1udqraJB70v33vHAFrJ2Nqade7hagB0Zid6ta"   --link mongo:mongo   tibot-v3  
+version: '3.8'
+services:
+  webapp:
+    image: tibot-v3
+    env_file:
+      - .env
+    network_mode: "host"  # Use host network to access 127.0.0.1
+    restart: always
+
