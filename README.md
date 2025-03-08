@@ -13,9 +13,10 @@ This bot can be started using python3 or via a container.
 
 ## 🚀 Deploying Tibot-v3 with Docker
 
+1. Open the file **`docker-compose.yml`**.
+
 ### Using Docker Compose
 
-1. Open the file **`docker-compose.yml`**.
 2. Ensure your **`.env`** file is in the repository's root folder with the exact name `.env`.
 3. Run the following command in your CLI from the root folder to build the Docker image:
 
