@@ -2,10 +2,10 @@
 
 ## run tibot-v3 developers
 
-Deze bot kan gestart worden via **python3** of via een container
+This bot can be started using python3 or via a container.
 
-1. maak een .env file aan en vul die zoals gebruikelijk in (zie verder README)
-2. start de bot op jouw gewenste manier
+1. Create a .env file and fill it in as usual (see the README for details).
+2. Start the bot in your preferred way.
 
 ### without docker
 
