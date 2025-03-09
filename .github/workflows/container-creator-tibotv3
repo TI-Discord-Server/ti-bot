@@ -2,7 +2,7 @@ name: container-creator-tibotv3
 
 on:
   push:
-    branches: ['tibot-v3']
+    branches: ['*']
 
 env:
   REGISTRY: ghcr.io
@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-and-push-image:
     name: publish-web-api-container
-    runs-on: ubuntu-latest  # Use a GitHub-hosted runner
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
