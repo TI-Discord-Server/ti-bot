@@ -97,7 +97,7 @@ class EmailVerification(commands.Cog):
             member = ctx.guild.get_member(user_id)
             if member:
                 view = KickUserView(user_id)
-                await ctx.send(f"Wil je de gebruiker {member.mention} ook kicken van de server?", view=view)
+                await ctx.send(f"Wil je de gebruiker {member.mention} ook kicken van de server?", view=view, ephemeral=True, delete_after=True)
             else:
                 await ctx.send("De gebruiker is niet aanwezig in deze server.")
         else:
