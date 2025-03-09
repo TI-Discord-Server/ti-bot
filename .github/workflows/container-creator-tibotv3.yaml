@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build-and-push-image:
-    name: publish-web-api-container
+    name: publish-tibotv3-pre-release
     runs-on: ubuntu-latest
     permissions:
       contents: read
