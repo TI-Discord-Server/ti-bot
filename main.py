@@ -22,7 +22,7 @@ from env import (
     MONGODB_IP_ADDRESS,
     MONGODB_PORT,
     MONGODB_USERNAME,
-    WEBHOOK_URL
+    WEBHOOK_URL,
 )
 from utils.errors import (
     ForbiddenAction,
@@ -84,7 +84,7 @@ class DiscordWebhookHandler(logging.Handler):
                 title="Log Entry",
                 description=f"```{msg}```",
                 color=self._get_color(record.levelname),
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=datetime.datetime.now(datetime.UTC),
             )
             embed.add_field(name="Level", value=record.levelname, inline=True)
             embed.add_field(name="Logger", value=record.name, inline=True)
