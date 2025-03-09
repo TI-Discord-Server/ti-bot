@@ -1,0 +1,75 @@
+name: container-creator-tibotv3
+
+on:
+  push:
+    branches: ['tibot-v3']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push-image:
+    name: publish-web-api-container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate a timestamped tag based on the branch name and timestamp
+      - name: Generate timestamp tag
+        id: timestamp
+        run: |
+          # Set timezone to Belgium (CET/CEST)
+          export TZ="Europe/Brussels"
+          # Get the current timestamp in YYYYMMDD-HHMMSS format
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          # Get the branch name and use it in the tag
+          BRANCH_NAME="${{ github.ref_name }}"
+          # Set the tag as '<branch_name>-TIMESTAMP'
+          TAG="${BRANCH_NAME}-${TIMESTAMP}"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.TAG }}  # Dynamic tag with branch name and timestamp
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ github.run_number }}
+
+      # Trigger FluxCD Webhook to inform Flux about the new image
+      # - name: Trigger FluxCD Webhook image-updater
+      #   run: |
+      #     ENCODED_TOKEN="WThWYXIqV25oM1hvNnN4bXFqTTlGNHoqVjI4YXNG"
+      #     TOKEN=$(echo "$ENCODED_TOKEN" | base64 --decode)
+      #     WEBHOOK_URL="http://webhook-receiver.flux-system.svc/hook/fe04f819f6980c7e18aa388019af270a640234c15682b2324b1bb6a72442e825"
+      #     REQUEST_BODY='{"username": "testuser", "action": "login"}'
+      #     HMAC_HASH=$(echo -n "$REQUEST_BODY" | openssl dgst -sha1 -r -hmac "$TOKEN" | awk '{print $1}')
+      #     curl -X POST "$WEBHOOK_URL" -H "X-Signature: sha1=$HMAC_HASH" -d "$REQUEST_BODY"
