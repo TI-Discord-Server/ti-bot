@@ -2,7 +2,7 @@ name: container-creator-tibotv3
 
 on:
   push:
-    branches: ['tibot-v3']
+    branches: ['tibotv3']
 
 env:
   REGISTRY: ghcr.io
