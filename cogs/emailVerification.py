@@ -80,6 +80,7 @@ class EmailVerification(commands.Cog):
         else:
             await ctx.send("No luck, deze user is niet in onze server")
 
+    @commands.command()
     @commands.has_role("Moderator")
     async def deleteMail(self, ctx: commands.Context, *, email):
         hash = createHash(email)
