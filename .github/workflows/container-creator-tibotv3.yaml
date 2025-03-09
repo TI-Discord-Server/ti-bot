@@ -41,7 +41,7 @@ jobs:
           # Set timezone to Belgium (CET/CEST)
           export TZ="Europe/Brussels"
           # Get the current timestamp in YYYYMMDD-HHMMSS format
-          TIMESTAMP=$(date +"%Y%m%d-%H:%M:%S")
+          TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
           # Get the branch name and use it in the tag
           BRANCH_NAME="${{ github.ref_name }}"
           # Set the tag as '<branch_name>-TIMESTAMP'
