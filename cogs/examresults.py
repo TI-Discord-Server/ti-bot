@@ -59,5 +59,4 @@ class examresults(commands.Cog, name="when_exam_results"):
 
 
 async def setup(bot):
-    n = examresults(bot)
-    await bot.add_cog(n)
+    await bot.add_cog(examresults(bot))
