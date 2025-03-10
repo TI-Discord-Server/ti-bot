@@ -243,6 +243,7 @@ class Bot(commands.Bot):
                     self.log.critical(f"Couldn't load {m} cog", exc_info=True)
 
     async def setup_hook(self) -> None:
+        await self.load_extension("cogs.confessions.confession_commands")
         await self.__load_cogs()
 
         # Check if the database connection is working
