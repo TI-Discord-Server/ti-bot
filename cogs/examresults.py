@@ -3,6 +3,7 @@ from discord.app_commands import (
     command,
 )
 from discord.ext import commands
+from utils.has_role import has_role
 
 
 class examresults(commands.Cog, name="when_exam_results"):
@@ -35,7 +36,7 @@ class examresults(commands.Cog, name="when_exam_results"):
         name="set_exam_results",
         description="Set a new exam result date (Moderators only).",
     )
-    @commands.has_permissions(manage_guild=True)  # Check for moderator permissions
+    @has_role("Moderator")
     async def setExamResults(self, interaction: discord.Interaction, new_date: str):
         # Update the exam result date in the settings collection
         await self.db.settings.update_one(
