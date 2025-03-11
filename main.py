@@ -168,7 +168,7 @@ class Bot(commands.Bot):
         self.session = aiohttp.ClientSession(loop=loop)
         self.uptime = datetime.datetime.now()
 
-        self.activity = discord.CustomActivity("Oil up Warre")
+        self.activity = discord.CustomActivity("DM mij om de staff te contacteren")
         self.status = discord.Status.online
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
