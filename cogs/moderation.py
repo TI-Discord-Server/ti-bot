@@ -16,13 +16,27 @@ class Moderation(commands.Cog):
     @app_commands.checks.has_role("The Council")
     async def warn(self, interaction: discord.Interaction, member: discord.Member, *, reason: str):
         await insertWarning(member.id, reason, interaction.user.id)
-        em = discord.Embed(title="Warning", description=f"{member.mention} has been warned for {reason}", color=0xff0000)
+
+        # Probeer een DM te sturen en vang eventuele fouten op
+        dm_sent = True
+        try:
+            await member.send(f"Je hebt een waarschuwing gekregen in de TI discord met reden: `{reason}`")
+        except discord.Forbidden:
+            dm_sent = False
+        except Exception:
+            dm_sent = False
+
+        # Maak de embed met de waarschuwing
+        em = discord.Embed(title="Warning", description=f"{member.mention} has been warned for {reason}",
+                           color=0xff0000)
+
+        # Voeg een opmerking toe als de DM niet kon worden verzonden
+        if not dm_sent:
+            em.add_field(name="Note", value="De gebruiker heeft geen DM ontvangen (waarschijnlijk DMs uitgeschakeld).",
+                         inline=False)
+
         await interaction.response.send_message(embed=em)
-        await member.send(f"Je hebt een waarschuwing gekregen in de TI discord met reden:  `{reason}`")
 
-
-
-    
     @app_commands.command()
     @app_commands.guilds(discord.Object(id=771394209419624489))
     @app_commands.checks.has_role("The Council")
