@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
 
 import aiohttp
+from aiohttp import web
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -244,8 +245,6 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self.__load_cogs()
-
-        # Check if the database connection is working
         await self.check_db_connection()
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
@@ -255,6 +254,7 @@ class Bot(commands.Bot):
 
     async def on_ready(self) -> None:
         self.log.info("Ready called")
+        await self.setup_health_check()
 
         if not self.__started:
             self.__started = True
@@ -521,6 +521,26 @@ class Bot(commands.Bot):
             # Exit the bot if the connection check fails
             await asyncio.sleep(1)
             sys.exit(1)
+
+    async def setup_health_check(self):
+        async def health_handler(request):
+            data = {
+                "discord_connection": "connected" if self.is_ready() else "disconnected",
+                "discord_heartbeat_latency": f"{round(self.latency * 1000)} ms",
+                "uptime": str(datetime.datetime.now() - self.uptime)
+            }
+            return web.json_response(data)
+
+        app = web.Application()
+        app.router.add_get('/health', health_handler)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        self.site = web.TCPSite(runner, '127.0.0.1', 3000)
+
+        await self.wait_until_ready()
+        await self.site.start()
+        self.log.info("Health check endpoint started on http://127.0.0.1:3000/health")
 
 
 if __name__ == "__main__":
