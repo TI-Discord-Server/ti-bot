@@ -63,13 +63,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ github.run_number }}
-
-      # Trigger FluxCD Webhook to inform Flux about the new image
-      # - name: Trigger FluxCD Webhook image-updater
-      #   run: |
-      #     ENCODED_TOKEN="WThWYXIqV25oM1hvNnN4bXFqTTlGNHoqVjI4YXNG"
-      #     TOKEN=$(echo "$ENCODED_TOKEN" | base64 --decode)
-      #     WEBHOOK_URL="http://webhook-receiver.flux-system.svc/hook/fe04f819f6980c7e18aa388019af270a640234c15682b2324b1bb6a72442e825"
-      #     REQUEST_BODY='{"username": "testuser", "action": "login"}'
-      #     HMAC_HASH=$(echo -n "$REQUEST_BODY" | openssl dgst -sha1 -r -hmac "$TOKEN" | awk '{print $1}')
-      #     curl -X POST "$WEBHOOK_URL" -H "X-Signature: sha1=$HMAC_HASH" -d "$REQUEST_BODY"
+      - name: Trigger FluxCD Webhook image-updater with secret
+        run: |
+          ENCODED_TOKEN="M2VlOGEyYmRkZjE0ODg1MDY3ZGE3MGNmMzU2ZjY2OGE1N2JmNWMyZQ=="
+          TOKEN="$ENCODED_TOKEN"  # Use the token directly here
+          # FluxCD webhook URL
+          WEBHOOK_URL="http://webhook-receiver.flux-system.svc/hook/fe04f819f6980c7e18aa388019af270a640234c15682b2324b1bb6a72442e825"
+          # The request body (in JSON format)
+          REQUEST_BODY='{"username": "testuser", "action": "login"}'
+          # Generate HMAC hash using the plain text token and request body
+          HMAC_HASH=$(echo -n "$REQUEST_BODY" | openssl dgst -sha1 -r -hmac "$TOKEN" | awk '{print $1}')
+          # Send POST request to the FluxCD webhook with the HMAC hash as the X-Signature header
+          curl -X POST "$WEBHOOK_URL" \
+            -H "X-Signature: sha1=$HMAC_HASH" \
+            -d "$REQUEST_BODY"
