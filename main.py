@@ -536,11 +536,11 @@ class Bot(commands.Bot):
 
         runner = web.AppRunner(app)
         await runner.setup()
-        self.site = web.TCPSite(runner, '127.0.0.1', 3000)
+        self.site = web.TCPSite(runner, '0.0.0.0', 3000)
 
         await self.wait_until_ready()
         await self.site.start()
-        self.log.info("Health check endpoint started on http://127.0.0.1:3000/health")
+        self.log.info("Health check endpoint started on http://0.0.0.0:3000/health")
 
 
 if __name__ == "__main__":
