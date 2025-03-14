@@ -68,7 +68,7 @@ jobs:
           ENCODED_TOKEN="M2VlOGEyYmRkZjE0ODg1MDY3ZGE3MGNmMzU2ZjY2OGE1N2JmNWMyZQ=="
           TOKEN="$ENCODED_TOKEN"  # Use the token directly here
           # FluxCD webhook URL
-          WEBHOOK_URL="https://fluxcd-webhook.kube.ginsys.net/hook/7fdc0c756b0505dbca5b5f9d1be47fcdfaf35c96c1812828437f2d9d069added"
+          WEBHOOK_URL="https://fluxcd-webhook.kube.ginsys.net/hook/17731a1cb5da2f1456c324e30a41eb77ebba20710450711549d9c8d20c77d3b6"
           # The request body (in JSON format)
           REQUEST_BODY='{"username": "testuser", "action": "login"}'
           # Generate HMAC hash using the plain text token and request body
