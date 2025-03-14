@@ -65,8 +65,7 @@ jobs:
           labels: ${{ github.run_number }}
       - name: Trigger FluxCD Webhook image-updater with secret
         run: |
-          ENCODED_TOKEN="3ee8a2bddf14885067da70cf356f668a57bf5c2e"
-          TOKEN="$ENCODED_TOKEN"  # Use the token directly here
+          TOKEN="${{ secrets.HMAC_TOKEN }}"  # Use the token directly here
           # FluxCD webhook URL
           WEBHOOK_URL="https://fluxcd-webhook.kube.ginsys.net/hook/b856fb03f858c00a8d928649387018f5405039999a008a272418b6257d5fc9fc"
           # The request body (in JSON format)
