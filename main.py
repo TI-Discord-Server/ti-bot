@@ -16,6 +16,9 @@ from discord.interactions import Interaction
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from utils.thread import ThreadManager
+from utils.utils import truncate
+
 from env import (
     BOT_TOKEN,
     MONGODB_PASSWORD,
@@ -171,6 +174,8 @@ class Bot(commands.Bot):
         self.activity = discord.CustomActivity("DM mij om de staff te contacteren")
         self.status = discord.Status.online
 
+        self.threads = ThreadManager(self)
+
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
         bot_log.setLevel(logging.INFO)
@@ -260,15 +265,31 @@ class Bot(commands.Bot):
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
 
-    async def on_message(self, message: discord.Message) -> None:
-        if message.author.id not in self.owner_ids:
+    async def on_message(self, message):
+        if message.author.bot:
             return
+
+        if isinstance(message.channel, discord.DMChannel):
+            return await self.process_dm_modmail(message)
 
         with contextlib.suppress(Exception):
             ctx = await self.get_context(message)
-
             if ctx.valid:
                 await self.invoke(ctx)
+            elif ctx.invoked_with:
+                exc = commands.CommandNotFound('Command "{}" is not found'.format(ctx.invoked_with))
+                self.dispatch("command_error", ctx, exc)
+
+    async def process_dm_modmail(self, message: discord.Message) -> None:
+        """Processes messages sent to the bot."""
+        if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            return
+
+        thread = await self.threads.find(recipient=message.author)
+        if thread is None:
+            return
+        return
+
 
     def _format_cooldown(self, retry_after: float) -> str:
         m, s = divmod(retry_after, 60)
