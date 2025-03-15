@@ -6,6 +6,21 @@ from discord.ext import commands
 with open("reactionroles.json", "r", encoding="utf-8") as file:
     reactionroles = json.load(file)
 
+# Groepeer rollen voor een overzichtelijkere embed
+role_groups = {
+    "🏫 Campussen": [775716812465373212, 775714536459730944, 893431633527595038],
+    "📚 Studiejaren": [775720596498677812, 775724094166532117, 775724122147127327],
+    "🎓 Studentenrollen": [
+        776164204537315378,
+        776164549808226345,
+        1325394574067236864,
+        818440725989556235,
+        891324061697835048,
+    ],
+    "🎮 Fun Rollen": [771401922841411624, 773957739922718720, 778298504606646312],
+    "🔔 Updates": [860169723425194015],
+}
+
 
 class ReactionRoles(commands.Cog):
     def __init__(self, bot):
@@ -15,6 +30,9 @@ class ReactionRoles(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         if self.rr_message_id and payload.message_id == self.rr_message_id:
+            if payload.user_id == self.bot.user.id:
+                return  # Voorkomt dat de bot zijn eigen reacties verwijdert
+
             emoji = str(payload.emoji)
             role_id = reactionroles.get(emoji)
 
@@ -45,16 +63,20 @@ class ReactionRoles(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def createRR(self, ctx, channel: discord.TextChannel):
         embed = discord.Embed(title="🎭 Kies je rollen!", color=0x0076C5)
-        description = (
+        embed.description = (
             "React met de juiste emoji om een rol te krijgen of te verwijderen."
         )
 
-        for emoji, role_id in reactionroles.items():
-            role = ctx.guild.get_role(role_id)
-            if role:
-                description += f"\n{emoji} → {role.mention}"
+        for category, roles in role_groups.items():
+            group_text = ""
+            for emoji, role_id in reactionroles.items():
+                if role_id in roles:
+                    role = ctx.guild.get_role(role_id)
+                    if role:
+                        group_text += f"\n{emoji} → {role.mention}"
+            if group_text:
+                embed.add_field(name=category, value=group_text, inline=False)
 
-        embed.description = description
         message = await channel.send(embed=embed)
         self.rr_message_id = message.id  # Sla het message ID op
 
