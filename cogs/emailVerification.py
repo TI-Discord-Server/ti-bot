@@ -5,9 +5,10 @@ import discord, smtplib, threading
 from discord.ext import commands
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from funcs import checkIfAlreadyUsed, getLinkedUser, getUserCode, getLinkedEmailHash, genUserCode, getUserCodeHash, getVerifiedUsers, storeUserEmail, createHash
-
+from funcs import checkIfAlreadyUsed, getLinkedUser, getUserCode, getLinkedEmailHash, genUserCode, getUserCodeHash, \
+    getVerifiedUsers, storeUserEmail, createHash, deleteLinkedUser
 import hashlib
+from utils.KickUserView import KickUserView
 
 
 schoolEmail = "@student.hogent.be"
@@ -79,8 +80,30 @@ class EmailVerification(commands.Cog):
         else:
             await ctx.send("No luck, deze user is niet in onze server")
 
-    
-    
+    @commands.command()
+    @commands.has_role("Moderator")
+    async def deleteMail(self, ctx: commands.Context, *, email):
+        hash = createHash(email)
+        linkedUser = await getLinkedUser(hash)
+
+        if not linkedUser:
+            await ctx.send("No luck, deze email zit niet in onze DB")
+            return
+
+        deletedUser = await deleteLinkedUser(hash)
+        if deletedUser:
+            await ctx.send("Successvol verwijderd!")
+            user_id = linkedUser["_id"]
+            member = ctx.guild.get_member(user_id)
+            if member:
+                view = KickUserView(user_id)
+                await ctx.send(f"Wil je de gebruiker {member.mention} ook kicken van de server?", view=view, ephemeral=True, delete_after=True)
+            else:
+                await ctx.send("De gebruiker is niet aanwezig in deze server.")
+        else:
+            await ctx.send("Er is iets misgelopen!")
+
+
 async def worker(mailTo, discordID):
     sender_address = 'verificatie@mail.rmerens.com'
     receiver_address = mailTo

@@ -61,6 +61,9 @@ async def getLinkedUser(mailHash):
     data = await emailData.find_one({"emailHash": mailHash})
     return data
 
+async def deleteLinkedUser(mailHash):
+    return await emailData.delete_one({"emailHash": mailHash})
+
 async def getVerifiedUsers():
     alls = []
     for d in await emailData.find().to_list(length=None):
