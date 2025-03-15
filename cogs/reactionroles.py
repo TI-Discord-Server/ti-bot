@@ -1,7 +1,11 @@
-import discord, json
+import discord
+import json
 from discord.ext import commands
 
-reactionroles = json.load(open("reactionroles.json", "r+"))
+# Laad reaction roles JSON
+with open("reactionroles.json", "r", encoding="utf-8") as file:
+    reactionroles = json.load(file)
+
 
 class ReactionRoles(commands.Cog):
     def __init__(self, bot):
@@ -9,64 +13,73 @@ class ReactionRoles(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
-        messageID = payload.message_id
-        emoji = payload.emoji
+        message_id = str(payload.message_id)
+        emoji = str(payload.emoji)
+        role_id = get_role_id(emoji, message_id)
 
-        roleID = get_roleID(emoji, messageID)
-        if roleID != None:
-            userID = payload.user_id
-
-            guild = discord.utils.get(self.bot.guilds, id=payload.guild_id)
-            member = await guild.fetch_member(userID)
-            role = guild.get_role(int(roleID))
-
-            await member.add_roles(role)
+        if role_id:
+            guild = self.bot.get_guild(payload.guild_id)
+            member = guild.get_member(payload.user_id)
+            role = guild.get_role(int(role_id))
+            if member and role:
+                await member.add_roles(role)
+                channel = guild.get_channel(payload.channel_id)
+                message = await channel.fetch_message(message_id)
+                await message.remove_reaction(payload.emoji, member)
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
-        messageID = payload.message_id
-        emoji = payload.emoji
+        message_id = str(payload.message_id)
+        emoji = str(payload.emoji)
+        role_id = get_role_id(emoji, message_id)
 
-        roleID = get_roleID(emoji, messageID)
-        if roleID != None:
-            userID = payload.user_id
-
-            guild = discord.utils.get(self.bot.guilds, id=payload.guild_id)
-            member = await guild.fetch_member(userID)
-            role = guild.get_role(int(roleID))
-
-            await member.remove_roles(role)
+        if role_id:
+            guild = self.bot.get_guild(payload.guild_id)
+            member = guild.get_member(payload.user_id)
+            role = guild.get_role(int(role_id))
+            if member and role:
+                await member.remove_roles(role)
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def createRR(self, ctx, channel: discord.TextChannel, messageID, role: discord.Role, emoji):
-        msg = await channel.fetch_message(messageID)
+    async def createRR(
+        self,
+        ctx,
+        channel: discord.TextChannel,
+        message_id: int,
+        role: discord.Role,
+        emoji,
+    ):
+        msg = await channel.fetch_message(message_id)
         await msg.add_reaction(emoji)
 
-        
+        if str(message_id) not in reactionroles:
+            reactionroles[str(message_id)] = {}
 
-        if not str(messageID) in reactionroles:
-            reactionroles[str(messageID)] = {}
+        reactionroles[str(message_id)][str(emoji)] = role.id
+        with open("reactionroles.json", "w", encoding="utf-8") as file:
+            json.dump(reactionroles, file, indent=4)
 
-        reactionroles[str(messageID)][str(emoji)] = role.id
+        await ctx.send(f"✅ {emoji} is nu gekoppeld aan de rol {role.name}!")
 
-        json.dump(reactionroles, open("reactionroles.json", "w"), indent=4)
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def show_roles(self, ctx):
+        embed = discord.Embed(title="🎭 Reaction Roles", color=0x0076C5)
+        for message_id, reactions in reactionroles.items():
+            embed.add_field(
+                name=f"🔹 Message ID: {message_id}",
+                value="\n".join(
+                    [f"{emoji} → <@&{role_id}>" for emoji, role_id in reactions.items()]
+                ),
+                inline=False,
+            )
+        await ctx.send(embed=embed)
 
-        
-        await ctx.send("Done! %s will now give the %s role" % (emoji, role))
 
 async def setup(bot):
     await bot.add_cog(ReactionRoles(bot))
 
-def get_roleID(emoji, messageID):
-    out = None
-    if str(messageID) in reactionroles:
-        if str(emoji) in reactionroles[str(messageID)]:
-            out = reactionroles[str(messageID)][str(emoji)]
-    else:
-        out = None
 
-    if out != None:
-        return out
-    else: 
-        return None
+def get_role_id(emoji, message_id):
+    return reactionroles.get(str(message_id), {}).get(str(emoji))
