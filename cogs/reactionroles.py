@@ -1,5 +1,6 @@
 import discord
 import json
+import asyncio
 from discord.ext import commands
 
 # Laad reaction roles JSON
@@ -8,17 +9,21 @@ with open("reactionroles.json", "r", encoding="utf-8") as file:
 
 # Groepeer rollen voor een overzichtelijkere embed
 role_groups = {
-    "🏫 Campussen": [775716812465373212, 775714536459730944, 893431633527595038],
-    "📚 Studiejaren": [775720596498677812, 775724094166532117, 775724122147127327],
-    "🎓 Studentenrollen": [
+    "Campussen": [
+        775716812465373212,
+        775714536459730944,
+        893431633527595038,
         776164204537315378,
+    ],
+    "Studiejaren": [775720596498677812, 775724094166532117, 775724122147127327],
+    "Studentenrollen": [
         776164549808226345,
         1325394574067236864,
         818440725989556235,
         891324061697835048,
     ],
-    "🎮 Fun Rollen": [771401922841411624, 773957739922718720, 778298504606646312],
-    "🔔 Updates": [860169723425194015],
+    "Fun Rollen": [771401922841411624, 773957739922718720, 778298504606646312],
+    "Updates": [860169723425194015],
 }
 
 
@@ -41,23 +46,20 @@ class ReactionRoles(commands.Cog):
                 member = await guild.fetch_member(payload.user_id)
                 role = guild.get_role(int(role_id))
                 if member and role:
-                    await member.add_roles(role)
+                    if role in member.roles:
+                        await member.remove_roles(
+                            role
+                        )  # Verwijder rol als gebruiker deze al heeft
+                    else:
+                        await member.add_roles(
+                            role
+                        )  # Voeg rol toe als gebruiker deze nog niet heeft
+
                     channel = guild.get_channel(payload.channel_id)
                     message = await channel.fetch_message(payload.message_id)
-                    await message.remove_reaction(payload.emoji, member)
-
-    @commands.Cog.listener()
-    async def on_raw_reaction_remove(self, payload):
-        if self.rr_message_id and payload.message_id == self.rr_message_id:
-            emoji = str(payload.emoji)
-            role_id = reactionroles.get(emoji)
-
-            if role_id:
-                guild = self.bot.get_guild(payload.guild_id)
-                member = await guild.fetch_member(payload.user_id)
-                role = guild.get_role(int(role_id))
-                if member and role:
-                    await member.remove_roles(role)
+                    await message.remove_reaction(
+                        payload.emoji, member
+                    )  # Verwijder de reactie van de gebruiker
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -81,7 +83,11 @@ class ReactionRoles(commands.Cog):
         self.rr_message_id = message.id  # Sla het message ID op
 
         for emoji in reactionroles.keys():
-            await message.add_reaction(emoji)
+            try:
+                await message.add_reaction(emoji)
+                await asyncio.sleep(0.5)  # Prevent rate limits
+            except discord.HTTPException:
+                print(f"⚠️ Failed to add reaction: {emoji}")
 
         await ctx.send("✅ Reaction Role bericht aangemaakt!")
 
