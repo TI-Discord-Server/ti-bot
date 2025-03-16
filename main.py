@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import traceback
+import typing
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
 
@@ -146,12 +147,12 @@ class Bot(commands.Bot):
             voice_states=True,
             presences=True,
             guild_messages=True,
-            dm_messages=False,
+            dm_messages=True,
             guild_reactions=True,
-            dm_reactions=False,
+            dm_reactions=True,
             typing=False,
             guild_typing=False,
-            dm_typing=False,
+            dm_typing=True,
             guild_scheduled_events=False,
             emojis_and_stickers=True,
             message_content=True,
@@ -265,7 +266,27 @@ class Bot(commands.Bot):
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
 
-    async def on_message(self, message):
+    @property
+    def guild(self) -> typing.Optional[discord.Guild]:
+        """
+        The guild that the bot is serving
+        (the server where users message it from)
+        """
+        return discord.utils.get(self.guilds, id=self.guild_id)
+
+    @property
+    def guild_id(self) -> typing.Optional[int]:
+        guild_id = 1334456602324897792
+        if guild_id is not None:
+            try:
+                return int(str(guild_id))
+            except ValueError:
+                self.log.error("Invalid GUILD_ID set.")
+        else:
+            self.log.info("No GUILD_ID set.")
+        return None
+
+    async def on_message(self, message: discord.Message): #todo
         if message.author.bot:
             return
 
@@ -280,15 +301,78 @@ class Bot(commands.Bot):
                 exc = commands.CommandNotFound('Command "{}" is not found'.format(ctx.invoked_with))
                 self.dispatch("command_error", ctx, exc)
 
+
+
+    @staticmethod
+    async def add_reaction(self,
+            msg, reaction: typing.Union[discord.Emoji, discord.Reaction, discord.PartialEmoji, str]
+    ) -> bool:
+        if reaction != "disable":
+            try:
+                await msg.add_reaction(reaction)
+            except (discord.HTTPException, TypeError) as e:
+                self.bot.log.warning(f"Failed to add reaction to {reaction}: {e}") #TODO
+                return False
+        return True
+
     async def process_dm_modmail(self, message: discord.Message) -> None:
         """Processes messages sent to the bot."""
+        # blocked = await self._process_blocked(message)
+        # if blocked:
+        #     return
+        # sent_emoji, blocked_emoji = await self.retrieve_emoji()
+
         if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
             return
 
         thread = await self.threads.find(recipient=message.author)
         if thread is None:
-            return
-        return
+        #     delta = await self.get_thread_cooldown(message.author)
+        #     if delta:
+        #         await message.channel.send(
+        #             embed=discord.Embed(
+        #                 title=self.config["cooldown_thread_title"],
+        #                 description=self.config["cooldown_thread_response"].format(delta=delta),
+        #                 color=self.error_color,
+        #             )
+        #         )
+        #         return
+
+            # if self.config["dm_disabled"] in (DMDisabled.NEW_THREADS, DMDisabled.ALL_THREADS):
+            #     embed = discord.Embed(
+            #         title=self.config["disabled_new_thread_title"],
+            #         color=self.error_color,
+            #         description=self.config["disabled_new_thread_response"],
+            #     )
+            #     embed.set_footer(
+            #         text=self.config["disabled_new_thread_footer"],
+            #         icon_url=self.get_guild_icon(guild=message.guild, size=128),
+            #     )
+            #     logger.info("A new thread was blocked from %s due to disabled Modmail.", message.author)
+            #     await self.add_reaction(message, blocked_emoji)
+            #     return await message.channel.send(embed=embed)
+
+            thread = await self.threads.create(message.author, message=message)
+
+        if not thread.cancelled:
+            try:
+                await thread.send(message)
+            except Exception:
+                # logger.error("Failed to send message:", exc_info=True)
+                await self.add_reaction(self, message, "❌")
+            else:
+
+                # send to all other recipients
+                if thread.recipient != message.author:
+                    try:
+                        await thread.send(message, thread.recipient)
+                    except Exception:
+                        # silently ignore
+                        self.log.error("Failed to send message:", exc_info=True)
+                        # logger.error("Failed to send message:", exc_info=True)
+
+                await self.add_reaction(self, message, "✅")
+                self.dispatch("thread_reply", thread, False, message, False, False)
 
 
     def _format_cooldown(self, retry_after: float) -> str:
