@@ -132,7 +132,7 @@ class Thread:
         if recipient_id in manager.cache:
             thread = manager.cache[recipient_id]
         else:
-            recipient = await manager.bot.get_or_fetch_user(recipient_id)
+            recipient = manager.bot.get_user(recipient_id) or await manager.bot.fetch_user(recipient_id)
 
             thread = cls(manager, recipient or recipient_id, channel)
 
@@ -155,7 +155,7 @@ class Thread:
         # in case it creates a channel outside of category
         overwrites = {self.bot.guild.default_role: discord.PermissionOverwrite(read_messages=False)}
 
-        category = category or discord.utils.get(self.bot.guild.categories, id=int(1342592695540912199))
+        category = category or discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
 
         if category is not None:
             overwrites = {}
@@ -177,27 +177,30 @@ class Thread:
 
         self._channel = channel
 
-        try:
-            log_url, log_data = await asyncio.gather(
-                self.bot.api.create_log_entry(recipient, channel, creator or recipient),
-                self.bot.api.get_user_logs(recipient.id),
-            )
-
-            log_count = sum(1 for log in log_data if not log["open"])
-        except Exception:
-            self.bot.log.error("An error occurred while posting logs to the database.")
-            log_url = log_count = None
-            # ensure core functionality still works
+        # try:
+        #     log_url, log_data = await asyncio.gather(
+        #         self.bot.api.create_log_entry(recipient, channel, creator or recipient),
+        #         self.bot.api.get_user_logs(recipient.id),
+        #     )
+        #
+        #     log_count = sum(1 for log in log_data if not log["open"])
+        # except Exception:
+        #     self.bot.log.error("An error occurred while posting logs to the database.")
+        #     log_url = log_count = None
+        #     # ensure core functionality still works
 
         self.ready = True
 
         if creator is not None and creator != recipient:
             mention = None
         else:
-            mention = "@here"
+            mention = "@k0be_" #TODO: @here
 
         async def send_genesis_message():
-            info_embed = self._format_info_embed(recipient, log_url, log_count, self.bot.main_color)
+            info_embed = self._format_info_embed(recipient,
+                                                 # log_url,
+                                                 # log_count,
+                                                 discord.Color.blurple(),)
             try:
                 msg = await channel.send(mention, embed=info_embed)
                 self.bot.loop.create_task(msg.pin())
@@ -210,13 +213,13 @@ class Thread:
             thread_creation_response = "\"The staff team will get back to you as soon as possible.\""
 
             embed = discord.Embed(
-                color=self.bot.mod_color,
+                color=discord.Color.blurple(),
                 description=thread_creation_response,
                 timestamp=channel.created_at,
             )
 
             embed.set_footer(
-                text="\"Your message has been sent\"", icon_url=self.bot.get_guild_icon(guild=self.bot.modmail_guild, size=128)
+                text="\"Your message has been sent\"", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
             )
             embed.title = "\"Thread Created\""
 
@@ -262,20 +265,20 @@ class Thread:
             if initial_message:
                 message = DummyMessage(copy.copy(initial_message))
 
-                try:
-                    return await self.bot.trigger_auto_triggers(message, channel)
-                except RuntimeError:
-                    pass
+                # try:
+                #     # return await self.bot.trigger_auto_triggers(message, channel) #TODO:
+                # except RuntimeError:
+                #     pass
 
         await asyncio.gather(
             send_genesis_message(),
             send_recipient_genesis_message(),
             activate_auto_triggers(),
-            send_persistent_notes(),
+            # send_persistent_notes(),
         )
         self.bot.dispatch("thread_ready", self, creator, category, initial_message)
 
-    def _format_info_embed(self, user, log_url, log_count, color):
+    def _format_info_embed(self, user,color, log_url=None, log_count=None, ): #TODO: COLOR last when log is fixed
         """Get information about a member of a server
         supports users from the guild or not."""
         member = self.bot.guild.get_member(user.id)
@@ -285,7 +288,7 @@ class Thread:
 
         role_names = ""
         if member is not None:
-            sep_server = self.bot.using_multiple_server_setup
+            sep_server = False #werkt enkel in TI server
             separator = ", " if sep_server else " "
 
             roles = []
@@ -398,27 +401,27 @@ class Thread:
 
         await self.cancel_closure(all=True)
 
-        # Logging
-        if self.channel:
-            log_data = await self.bot.api.post_log(
-                self.channel.id,
-                {
-                    "open": False,
-                    "title": match_title(self.channel.topic),
-                    "closed_at": str(discord.utils.utcnow()),
-                    "nsfw": self.channel.nsfw,
-                    "close_message": message,
-                    "closer": {
-                        "id": str(closer.id),
-                        "name": closer.name,
-                        "discriminator": closer.discriminator,
-                        "avatar_url": closer.display_avatar.url,
-                        "mod": True,
-                    },
-                },
-            )
-        else:
-            log_data = None
+        # # Logging
+        # if self.channel:
+        #     log_data = await self.bot.api.post_log(
+        #         self.channel.id,
+        #         {
+        #             "open": False,
+        #             "title": match_title(self.channel.topic),
+        #             "closed_at": str(discord.utils.utcnow()),
+        #             "nsfw": self.channel.nsfw,
+        #             "close_message": message,
+        #             "closer": {
+        #                 "id": str(closer.id),
+        #                 "name": closer.name,
+        #                 "discriminator": closer.discriminator,
+        #                 "avatar_url": closer.display_avatar.url,
+        #                 "mod": True,
+        #             },
+        #         },
+        #     )
+        # else:
+        log_data = None
 
 #TODO: logging wordt anders
         if isinstance(log_data, dict):
@@ -709,7 +712,7 @@ class Thread:
                 return linked_messages
 
         for user in self.recipients:
-            if user.dm_channel == message.channel:
+            if self.recipient.dm_channel == message.channel:
                 continue
             async for other_msg in user.history():
                 if either_direction:
@@ -879,8 +882,8 @@ class Thread:
         if not self.ready:
             await self.wait_until_ready()
 
-        if not from_mod and not note:
-            self.bot.loop.create_task(self.bot.api.append_log(message, channel_id=self.channel.id))
+        # if not from_mod and not note:
+        #     self.bot.loop.create_task(self.bot.api.append_log(message, channel_id=self.channel.id))
 
         destination = destination or self.channel
 
@@ -1056,7 +1059,7 @@ class Thread:
             embed.colour = self.bot.main_color
         else:
             embed.set_footer(text=f"Message ID: {message.id}")
-            embed.colour = self.bot.recipient_color
+            embed.colour = discord.Colour.green()
 
         if (from_mod or note) and not thread_creation:
             delete_message = not bool(message.attachments)
@@ -1072,10 +1075,8 @@ class Thread:
             self.bot.log.warning("Channel not found.")
             raise
 
-        if not from_mod and not note:
-            mentions = await self.get_notifications()
-        else:
-            mentions = None
+
+        mentions = "@Kobe" #TODO @HERE
 
         if plain:
             if from_mod and not isinstance(destination, discord.TextChannel):
@@ -1238,13 +1239,18 @@ class ThreadManager:
         else:
 
             def check(topic):
-                _, user_id, other_ids = parse_channel_topic(topic)
-                return recipient_id == user_id or recipient_id in other_ids
+                _, user_id = parse_channel_topic(topic)
+                return recipient_id == user_id
 
-            channel = discord.utils.find(
-                lambda x: (check(x.topic)) if x.topic else False,
-                self.bot.guild.text_channels,
-                )
+            # channel = discord.utils.find(
+            #     lambda x: (check(x.topic)) if x.topic else False,
+            #     self.bot.guild.text_channels,
+            #     )
+
+            channel = next(
+                (x for x in self.bot.guild.text_channels if x.topic and check(x.topic)),
+                None
+            )
 
             if channel:
                 thread = await Thread.from_channel(self, channel)
@@ -1256,7 +1262,7 @@ class ThreadManager:
                     self.cache[thread.id] = thread
                 thread.ready = True
 
-        if thread and recipient_id not in [x.id for x in thread.recipients]:
+        if thread and recipient_id != recipient.id:
             self.cache.pop(recipient_id)
             thread = None
 
@@ -1358,7 +1364,7 @@ class ThreadManager:
                         embed=discord.Embed(
                             title="\"Cancelled\"",
                             description="Timed out",
-                            color=self.bot.error_color,
+                            color=discord.Color.red(),
                         )
                     )
                 )
@@ -1368,7 +1374,7 @@ class ThreadManager:
                 self.bot.loop.create_task(
                     destination.send(
                         embed=discord.Embed(
-                            title="\"Cancelled\"", color=self.bot.error_color
+                            title="\"Cancelled\"", color=discord.Color.red()
                         )
                     )
                 )

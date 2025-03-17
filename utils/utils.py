@@ -96,14 +96,13 @@ def human_join(seq: typing.Sequence[str], delim: str = ", ", final: str = "or") 
 
 TOPIC_REGEX = re.compile(
     r"(?:\bTitle:\s*(?P<title>.*)\n)?"
-    r"\bUser ID:\s*(?P<user_id>\d{17,21})\b"
-    r"(?:\nOther Recipients:\s*(?P<other_ids>\d{17,21}(?:(?:\s*,\s*)\d{17,21})*)\b)?",
+    r"\bUser ID:\s*(?P<user_id>\d{17,21})\b",
     flags=re.IGNORECASE | re.DOTALL,
 )
 UID_REGEX = re.compile(r"\bUser ID:\s*(\d{17,21})\b", flags=re.IGNORECASE)
 
 
-def parse_channel_topic(text: str) -> typing.Tuple[typing.Optional[str], int, typing.List[int]]:
+def parse_channel_topic(text: str) -> typing.Tuple[typing.Optional[str], int]:
     """
     A helper to parse channel topics and respectivefully returns all the required values
     at once.
@@ -118,7 +117,7 @@ def parse_channel_topic(text: str) -> typing.Tuple[typing.Optional[str], int, ty
     Tuple[Optional[str], int, List[int]]
         A tuple of title, user ID, and other recipients IDs.
     """
-    title, user_id, other_ids = None, -1, []
+    title, user_id = None, -1
     if isinstance(text, str):
         match = TOPIC_REGEX.search(text)
     else:
@@ -132,11 +131,7 @@ def parse_channel_topic(text: str) -> typing.Tuple[typing.Optional[str], int, ty
         # the value of this won't be None
         user_id = int(groupdict["user_id"])
 
-        oth_ids = groupdict["other_ids"]
-        if oth_ids:
-            other_ids = list(map(int, oth_ids.split(",")))
-
-    return title, user_id, other_ids
+    return title, user_id
 
 
 def match_title(text: str) -> str:
@@ -191,12 +186,13 @@ def get_top_role(member: discord.Member, hoisted=True):
         if role.hoist:
             return role
 
+
 async def create_thread_channel(bot, recipient, category, overwrites, *, name=None, errors_raised=None):
-    name = name or bot.format_channel_name(recipient)
+    name = name or recipient.name
     errors_raised = errors_raised or []
 
     try:
-        channel = await bot.modmail_guild.create_text_channel(
+        channel = await bot.guild.create_text_channel(
             name=name,
             category=category,
             overwrites=overwrites,

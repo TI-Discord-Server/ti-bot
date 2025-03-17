@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 import typing
+from logging import exception
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
 
@@ -286,12 +287,23 @@ class Bot(commands.Bot):
             self.log.info("No GUILD_ID set.")
         return None
 
-    async def on_message(self, message: discord.Message): #todo
+    def get_guild_icon(
+            self, guild: typing.Optional[discord.Guild], *, size: typing.Optional[int] = None
+    ) -> str:
+        if guild is None:
+            guild = self.guild
+        if guild.icon is None:
+            return "https://cdn.discordapp.com/embed/avatars/0.png"
+        if size is None:
+            return guild.icon.url
+        return guild.icon.with_size(size).url
+
+    async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
 
         if isinstance(message.channel, discord.DMChannel):
-            return await self.process_dm_modmail(message)
+            return await self.process_dm_modmail(message) #TODO: error when channel already exists
 
         with contextlib.suppress(Exception):
             ctx = await self.get_context(message)
@@ -357,7 +369,8 @@ class Bot(commands.Bot):
         if not thread.cancelled:
             try:
                 await thread.send(message)
-            except Exception:
+            except Exception as e:
+                self.log.info(f"Failed to send message ({message.content}) to thread ({thread.channel}): {e}", exc_info=True)
                 # logger.error("Failed to send message:", exc_info=True)
                 await self.add_reaction(self, message, "❌")
             else:

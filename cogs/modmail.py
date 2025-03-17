@@ -5,18 +5,22 @@ from itertools import zip_longest
 from typing import Optional, Union, List, Tuple, Literal
 
 
+
 import discord
 from discord.ext import commands
+from discord.app_commands import (
+    command,
+)
 
 from utils.thread import Thread
-from utils.time import UserFriendlyTime, human_timedelta
+from utils.time import UserFriendlyTime, human_timedelta, HumanTime
 from utils.utils import *
 from utils.has_role import has_role
 from utils import checks
 
 
 class Modmail(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
 
     async def send_scheduled_close_message(self, ctx, after, silent=False):
@@ -36,15 +40,15 @@ class Modmail(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(usage="[after] [close message]")
+    # @commands.command(usage="[after] [close message]")
+    @command(name="close", description="Close the thread")
     @has_role("Moderator")
     @checks.thread_only()
     async def close(
             self,
             ctx,
             option: Optional[Literal["silent", "silently", "cancel"]] = "",
-            *,
-            after: UserFriendlyTime = None,
+            after: str="",
     ):
         """
         Close the current thread.
@@ -64,6 +68,7 @@ class Modmail(commands.Cog):
         Stop a thread from closing:
         - `{prefix}close cancel`
         """
+        after = HumanTime(after)
 
         thread = ctx.thread
 
@@ -103,7 +108,7 @@ class Modmail(commands.Cog):
             mention = "@" + user_or_role.lstrip("@")
         return mention
 
-    @commands.command()
+    @command(name="nsfw", description="Changes Modmail-thread to NSFW status")
     @has_role("Moderator")
     @checks.thread_only()
     async def nsfw(self, ctx):
@@ -111,7 +116,7 @@ class Modmail(commands.Cog):
         await ctx.channel.edit(nsfw=True)
         await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
-    @commands.command()
+    @command(name="sfw", description="Changes Modmail-thread to SFW status")
     @has_role("Moderator")
     @checks.thread_only()
     async def sfw(self, ctx):
@@ -119,7 +124,7 @@ class Modmail(commands.Cog):
         await ctx.channel.edit(nsfw=False)
         await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
-    @commands.command()
+    @commands.command(name="reply", description="Replies to a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
     async def reply(self, ctx, *, msg: str = ""):
@@ -135,7 +140,7 @@ class Modmail(commands.Cog):
         async with ctx.typing():
             await ctx.thread.reply(ctx.message)
 
-    @commands.command(aliases=["anonreply", "anonymousreply"])
+    @command(name="areply", description="Replies anonymous to a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
     async def areply(self, ctx, *, msg: str = ""):
@@ -152,21 +157,21 @@ class Modmail(commands.Cog):
         async with ctx.typing():
             await ctx.thread.reply(ctx.message, anonymous=True)
 
-    @commands.group(invoke_without_command=True)
-    @has_role("Moderator")
-    @checks.thread_only()
-    async def note(self, ctx, *, msg: str = ""):
-        """
-        Take a note about the current thread.
+    # @commands.group(invoke_without_command=True)
+    # @has_role("Moderator")
+    # @checks.thread_only()
+    # async def note(self, ctx, *, msg: str = ""):
+    #     """
+    #     Take a note about the current thread.
+    #
+    #     Useful for noting context.
+    #     """
+    #     ctx.message.content = msg
+    #     async with ctx.typing():
+    #         msg = await ctx.thread.note(ctx.message)
+    #         await msg.pin()
 
-        Useful for noting context.
-        """
-        ctx.message.content = msg
-        async with ctx.typing():
-            msg = await ctx.thread.note(ctx.message)
-            await msg.pin()
-
-    @commands.command()
+    @command(name="edit", description="Edits a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
     async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
@@ -193,68 +198,40 @@ class Modmail(commands.Cog):
 
         await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
-    @commands.command(usage="<user> [category] [options]")
+    # @commands.command(usage="<user> [category] [options]")
+    @command(name="contact", description="Opens a modmail ticket")
     @has_role("Moderator")
     async def contact(
             self,
             ctx,
-            users: commands.Greedy[
-                Union[Literal["silent", "silently"], discord.Member, discord.User, discord.Role]
-            ],
+            user: discord.Member | discord.User,
             *,
-            category: None,
-            manual_trigger=True,
+            manual_trigger: bool=True,
     ):
         """
         Create a thread with a specified member.
-
-        If `category` is specified, the thread
-        will be created in that specified category.
 
         `category`, if specified, may be a category ID, mention, or name.
         `users` may be a user ID, mention, or name. If multiple users are specified, a group thread will start.
         A maximum of 5 users are allowed.
         `options` can be `silent` or `silently`.
         """
-        silent = any(x in users for x in ("silent", "silently"))
-        if silent:
-            try:
-                users.remove("silent")
-            except ValueError:
-                pass
-
-            try:
-                users.remove("silently")
-            except ValueError:
-                pass
-
-        if isinstance(category, str):
-                category = None
-
+        category = discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
         errors = []
-        for u in list(users):
-            if isinstance(u, discord.Role):
-                users += u.members
-                users.remove(u)
 
-        for u in list(users):
-            exists = await self.bot.threads.find(recipient=u)
-            if exists:
-                errors.append(f"A thread for {u} already exists.")
-                if exists.channel:
-                    errors[-1] += f" in {exists.channel.mention}"
-                errors[-1] += "."
-                users.remove(u)
-            elif u.bot:
-                errors.append(f"{u} is a bot, cannot add to thread.")
-                users.remove(u)
 
-        if len(users) > 5:
-            errors.append("Group conversations only support 5 users.")
-            users = []
+        exists = await self.bot.threads.find(recipient=user)
+        if exists:
+            errors.append(f"A thread for {user} already exists.")
+            if exists.channel:
+                errors[-1] += f" in {exists.channel.mention}"
+            errors[-1] += "."
+        elif user.bot:
+            errors.append(f"{user} is a bot, cannot add to thread.")
 
-        if errors or not users:
-            if not users:
+
+        if errors or not user:
+            if not user:
                 # no users left
                 title = "Thread not created"
             else:
@@ -264,14 +241,14 @@ class Modmail(commands.Cog):
                 embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
                 await ctx.send(embed=embed, delete_after=10)
 
-            if not users:
+            if not user:
                 # end
                 return
 
-        creator = ctx.author if manual_trigger else users[0]
+        creator = ctx.author if manual_trigger else user
 
         thread = await self.bot.threads.create(
-            recipient=users[0],
+            recipient=user,
             creator=creator,
             category=category,
             manual_trigger=manual_trigger,
@@ -280,33 +257,28 @@ class Modmail(commands.Cog):
         if thread.cancelled:
             return
 
-        if not silent:
-            if creator.id == users[0].id:
-                description = "\"You have opened a Modmail thread.\""
-            else:
-                description = "\"Staff have opened a Modmail thread.\""
+        if creator.id == user.id:
+            description = "\"You have opened a Modmail thread.\""
+        else:
+            description = "\"Staff have opened a Modmail thread.\""
 
-            em = discord.Embed(
-                title="\"New Thread\"",
-                description=description,
-                color=discord.Color.blurple(),
-            )
+        em = discord.Embed(
+            title="\"New Thread\"",
+            description=description,
+            color=discord.Color.blurple(),
+        )
 
-            em.timestamp = discord.utils.utcnow()
-            em.set_footer(text=f"{creator}", icon_url=creator.display_avatar.url)
+        em.timestamp = discord.utils.utcnow()
+        em.set_footer(text=f"{creator}", icon_url=creator.display_avatar.url)
 
-            for u in users:
-                await u.send(embed=em)
+        await user.send(embed=em)
 
         embed = discord.Embed(
             title="Created Thread",
-            description=f"Thread started by {creator.mention} for {', '.join(u.mention for u in users)}.",
+            description=f"Thread started by {creator.mention} for {user.mention}.",
             color=discord.Color.blurple(),
         )
         await thread.wait_until_ready()
-
-        if users[1:]:
-            await thread.add_users(users[1:])
 
         await thread.channel.send(embed=embed)
 
@@ -315,7 +287,7 @@ class Modmail(commands.Cog):
             await asyncio.sleep(5)
             await ctx.message.delete()
 
-    @commands.command()
+    @command(name="delete", description="Deletes a modmail message.")
     @has_role("Moderator")
     @checks.thread_only()
     async def delete(self, ctx, message_id: int = None):
