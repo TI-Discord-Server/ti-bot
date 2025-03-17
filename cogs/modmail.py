@@ -7,13 +7,14 @@ from typing import Optional, Union, List, Tuple, Literal
 
 
 import discord
+from click import DateTime
 from discord.ext import commands
 from discord.app_commands import (
     command,
 )
 
 from utils.thread import Thread
-from utils.time import UserFriendlyTime, human_timedelta, HumanTime
+from utils.time import UserFriendlyTime, human_timedelta, HumanTime, FriendlyTimeResult, Time, TimeTransformer
 from utils.utils import *
 from utils.has_role import has_role
 from utils import checks
@@ -48,7 +49,8 @@ class Modmail(commands.Cog):
             self,
             ctx,
             option: Optional[Literal["silent", "silently", "cancel"]] = "",
-            after: str="",
+            *,
+            after: str="now",
     ):
         """
         Close the current thread.
@@ -68,9 +70,13 @@ class Modmail(commands.Cog):
         Stop a thread from closing:
         - `{prefix}close cancel`
         """
-        after = HumanTime(after)
-
-        thread = ctx.thread
+        self.bot.log.info("---------------------") #TODO
+        dt = await TimeTransformer().transform(interaction=ctx, value=after)
+        self.bot.log.info(f"dt={dt}")
+        after = FriendlyTimeResult(dt, now=ctx.created_at)
+        self.bot.log.info(f"after={after}")
+        thread = ctx.channel
+        self.bot.log.info(f"thread={thread}")
 
         close_after = (after.dt - after.now).total_seconds() if after else 0
         silent = any(x == option for x in {"silent", "silently"})
@@ -114,7 +120,7 @@ class Modmail(commands.Cog):
     async def nsfw(self, ctx):
         """Flags a Modmail thread as NSFW (not safe for work)."""
         await ctx.channel.edit(nsfw=True)
-        await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+        await ctx.response.send_message("🔞 Set Channel to NSFW")
 
     @command(name="sfw", description="Changes Modmail-thread to SFW status")
     @has_role("Moderator")
@@ -122,7 +128,7 @@ class Modmail(commands.Cog):
     async def sfw(self, ctx):
         """Flags a Modmail thread as SFW (safe for work)."""
         await ctx.channel.edit(nsfw=False)
-        await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+        await ctx.response.send_message("⚠️ Set Channel to SFW")
 
     @commands.command(name="reply", description="Replies to a Modmail-message")
     @has_role("Moderator")

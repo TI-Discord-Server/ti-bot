@@ -90,6 +90,7 @@ class HumanTime:
             # replace it with the current time
             dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
 
+        self.now = now
         self.dt: datetime.datetime = dt
         self._past: bool = dt < now
 
