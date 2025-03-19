@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import re
 from datetime import datetime, timezone
 from itertools import zip_longest
@@ -13,33 +14,59 @@ from discord.app_commands import (
     command,
 )
 
-from utils.thread import Thread
+from utils.thread import Thread, ThreadManager
 from utils.time import UserFriendlyTime, human_timedelta, HumanTime, FriendlyTimeResult, Time, TimeTransformer
 from utils.utils import *
 from utils.has_role import has_role
 from utils import checks
 
 
-class Modmail(commands.Cog):
+class Modmail(commands.Cog, name="modmail"):
     def __init__(self, bot):
         self.bot = bot
+        self.db = bot.db
+        self.settings_id = "modmail_settings"
+        self.modmail_logs_channel_id = 1342592695540912199
 
-    async def send_scheduled_close_message(self, ctx, after, silent=False):
-        human_delta = human_timedelta(after.dt)
+    async def get_modmail_logs_channel_id(self):
+        settings = await self.db.settings.find_one({"_id": self.settings_id})
+        if settings and "modmail_channel_id" in settings:
+            return settings["modmail_channel_id"]
+        return self.modmail_logs_channel_id
 
-        embed = discord.Embed(
-            title="Scheduled close",
-            description=f"This thread will{' silently' if silent else ''} close in {human_delta}.",
-            color=discord.Color.red(),
+    @command(
+        name="set_modmail_log_channel",
+        description="Set the channel where modmail logs should be sent (Moderators only).",
+    )
+    @has_role("Moderator")
+    async def set_modmail_log_channel(
+            self, interaction: discord.Interaction, channel: discord.TextChannel
+    ):
+        """
+        Set the channel where modmail logs should be sent.
+        """
+        await self.db.settings.update_one(
+            {"_id": self.settings_id},
+            {"$set": {"modmail_channel_id": channel.id}},
+            upsert=True,
         )
 
-        if after.arg and not silent:
-            embed.add_field(name="Message", value=after.arg)
+        await interaction.response.send_message(
+            f"Modmail-logs channel has been set to {channel.mention}."
+        )
 
-        embed.set_footer(text="Closing will be cancelled if a thread message is sent.")
-        embed.timestamp = after.dt
-
-        await ctx.send(embed=embed)
+    @set_modmail_log_channel.error
+    async def set_modmail_log_channel_error(
+        self, interaction: discord.Interaction, error
+    ):
+        if isinstance(error, commands.CheckFailure):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.", ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                f"An error occurred: {str(error)}", ephemeral=True
+            )
 
     # @commands.command(usage="[after] [close message]")
     @command(name="close", description="Close the thread")
@@ -48,60 +75,18 @@ class Modmail(commands.Cog):
     async def close(
             self,
             ctx,
-            option: Optional[Literal["silent", "silently", "cancel"]] = "",
-            *,
-            after: str="now",
+            option: Optional[Literal["silent"]] = "",
+            reason: str = None
     ):
         """
         Close the current thread.
-
-        Close after a period of time:
-        - `{prefix}close in 5 hours`
-        - `{prefix}close 2m30s`
-
-        Custom close messages:
-        - `{prefix}close 2 hours The issue has been resolved.`
-        - `{prefix}close We will contact you once we find out more.`
-
-        Silently close a thread (no message)
-        - `{prefix}close silently`
-        - `{prefix}close silently in 10m`
-
-        Stop a thread from closing:
-        - `{prefix}close cancel`
         """
-        self.bot.log.info("---------------------") #TODO
-        dt = await TimeTransformer().transform(interaction=ctx, value=after)
-        self.bot.log.info(f"dt={dt}")
-        after = FriendlyTimeResult(dt, now=ctx.created_at)
-        self.bot.log.info(f"after={after}")
-        thread = ctx.channel
-        self.bot.log.info(f"thread={thread}")
+        thread = await ThreadManager.find(self.bot.threads, channel=ctx.channel)
+        modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
 
-        close_after = (after.dt - after.now).total_seconds() if after else 0
-        silent = any(x == option for x in {"silent", "silently"})
-        cancel = option == "cancel"
+        silent = any(x == option for x in {"silent"})
 
-        if cancel:
-            if thread.close_task is not None or thread.auto_close_task is not None:
-                await thread.cancel_closure(all=True)
-                embed = discord.Embed(
-                    color=discord.Color.red(), description="Scheduled close has been cancelled."
-                )
-            else:
-                embed = discord.Embed(
-                    color=discord.Color.red(),
-                    description="This thread has not already been scheduled to close.",
-                )
-
-            return await ctx.send(embed=embed)
-
-        message = after.arg if after else None
-
-        if after and after.dt > after.now:
-            await self.send_scheduled_close_message(ctx, after, silent)
-
-        await thread.close(closer=ctx.author, after=close_after, message=message, silent=silent)
+        await thread.close(closer=ctx.user, message=reason, silent=silent, log_channel= modmail_logs_channel)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):

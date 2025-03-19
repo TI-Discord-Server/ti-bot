@@ -359,47 +359,16 @@ class Thread:
         self,
         *,
         closer: typing.Union[discord.Member, discord.User],
-        after: int = 0,
         silent: bool = False,
-        delete_channel: bool = True,
         message: str = None,
-        auto_close: bool = False,
+        log_channel: discord.TextChannel,
     ) -> None:
         """Close a thread now or after a set time in seconds"""
-
-        # restarts the after timer
-        await self.cancel_closure(auto_close)
-
-        if after > 0:
-            # TODO: Add somewhere to clean up broken closures
-            #  (when channel is already deleted)
-            now = discord.utils.utcnow()
-            items = {
-                # 'initiation_time': now.isoformat(),
-                "time": (now + timedelta(seconds=after)).isoformat(),
-                "closer_id": closer.id,
-                "silent": silent,
-                "delete_channel": delete_channel,
-                "message": message,
-                "auto_close": auto_close,
-            }
-            task = asyncio.create_task(self._close_after(after, closer, silent, delete_channel, message))
-
-            if auto_close:
-                self.auto_close_task = task
-            else:
-                self.close_task = task
-        else:
-            await self._close(closer, silent, delete_channel, message)
-
-    async def _close(self, closer, silent=False, delete_channel=True, message=None, scheduled=False):
         try:
             self.manager.cache.pop(self.id)
         except KeyError as e:
             self.bot.log.error("Thread already closed: %s",e)
             return
-
-        await self.cancel_closure(all=True)
 
         # # Logging
         # if self.channel:
@@ -421,87 +390,32 @@ class Thread:
         #         },
         #     )
         # else:
-        log_data = None
 
-#TODO: logging wordt anders
-        if isinstance(log_data, dict):
-            prefix = self.bot.config["log_url_prefix"].strip("/")
-            if prefix == "NONE":
-                prefix = ""
-            log_url = (
-                f"{self.bot.config['log_url'].strip('/')}{'/' + prefix if prefix else ''}/{log_data['key']}"
+        #TODO: logging wordt anders
+        if self.channel.nsfw:
+            nsfw = "NSFW-"
+        else:
+            nsfw = ""
+
+        datetime = discord.utils.utcnow()
+        await log_channel.send(f"{nsfw}Transcript from log {self.id} to {self.recipient} closed by {closer} at {datetime}")
+
+        #No notification to user
+        if not silent:
+            embed = discord.Embed(
+                title="Modmail Closed",
+                color=discord.Color.red(),
             )
+            embed.timestamp = discord.utils.utcnow()
+            if not message:
+                message = "\"Staff has closed this Modmail thread\""
+            embed.description = message
+            embed.set_footer(text="Replying will create a new modmail chat", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
 
-            if log_data["title"]:
-                sneak_peak = log_data["title"]
-            elif log_data["messages"]:
-                content = str(log_data["messages"][0]["content"])
-                sneak_peak = content.replace("\n", "")
-            else:
-                sneak_peak = "No content"
+            await self.recipient.dm_channel.send(embed=embed)
 
-            if self.channel.nsfw:
-                _nsfw = "NSFW-"
-            else:
-                _nsfw = ""
-
-            desc = f"[`{_nsfw}{log_data['key']}`]({log_url}): "
-            desc += truncate(sneak_peak, max=75 - 13)
-        else:
-            desc = "Could not resolve log url."
-            log_url = None
-
-        embed = discord.Embed(description=desc, color=self.bot.error_color)
-
-        if self.recipient is not None:
-            user = f"{self.recipient} (`{self.id}`)"
-        else:
-            user = f"`{self.id}`"
-
-        if self.id == closer.id:
-            _closer = "the Recipient"
-        else:
-            _closer = f"{closer} ({closer.id})"
-
-        embed.title = user
-
-        event = "Thread Closed as Scheduled" if scheduled else "Thread Closed"
-        # embed.set_author(name=f"Event: {event}", url=log_url)
-        embed.set_footer(text=f"{event} by {_closer}", icon_url=closer.display_avatar.url)
-        embed.timestamp = discord.utils.utcnow()
-
-        tasks = [self.bot.config.update()]
-
-        if self.bot.log_channel is not None and self.channel is not None:
-            view = discord.ui.View()
-            view.add_item(discord.ui.Button(label="Log link", url=log_url, style=discord.ButtonStyle.url))
-
-            tasks.append(self.bot.log_channel.send(embed=embed, view=view))
-
-        # Thread closed message
-
-        embed = discord.Embed(
-            title="\"Thread Created\"",
-            color=self.bot.error_color,
-        )
-
-        embed.timestamp = discord.utils.utcnow()
-
-        if not message:
-            message = "\"Staff has closed this Modmail thread\""
-
-        message = self.bot.formatter.format(
-            message, closer=closer, loglink=log_url, logkey=log_data["key"] if log_data else None
-        )
-
-        embed.description = message
-        embed.set_footer(text="\"Replying will create a new thread\"", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
-
-        if delete_channel:
-            tasks.append(self.channel.delete())
-
-        await asyncio.gather(*tasks)
-        self.bot.dispatch("thread_close", self, closer, silent, delete_channel, message, scheduled)
+        await self.channel.delete()
+        self.bot.dispatch("thread_close", self, closer, silent, message)
 
     async def cancel_closure(self, auto_close: bool = False, all: bool = False) -> None:
         if self.close_task is not None and (not auto_close or all):
@@ -1219,6 +1133,7 @@ class ThreadManager:
                     await channel.edit(topic=f"User ID: {user_id}")
             return thread
 
+
         if recipient:
             recipient_id = recipient.id
 
@@ -1279,7 +1194,7 @@ class ThreadManager:
         if not channel.topic:
             return None
 
-        _, user_id, other_ids = parse_channel_topic(channel.topic)
+        _, user_id = parse_channel_topic(channel.topic)
 
         if user_id == -1:
             return None
@@ -1288,17 +1203,17 @@ class ThreadManager:
             return self.cache[user_id]
 
         try:
-            recipient = await self.bot.get_or_fetch_user(user_id)
+            recipient = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
         except discord.NotFound:
             recipient = None
 
-        other_recipients = []
-        for uid in other_ids:
-            try:
-                other_recipient = await self.bot.get_or_fetch_user(uid)
-            except discord.NotFound:
-                continue
-            other_recipients.append(other_recipient)
+        # other_recipients = []
+        # for uid in other_ids:
+        #     try:
+        #         other_recipient = await self.bot.get_or_fetch_user(uid)
+        #     except discord.NotFound:
+        #         continue
+        #     other_recipients.append(other_recipient)
 
         if recipient is None:
             thread = Thread(self, user_id, channel)
@@ -1340,7 +1255,7 @@ class ThreadManager:
 
         self.cache[recipient.id] = thread
 
-        if (message or not manual_trigger):
+        if message or not manual_trigger:
             if not manual_trigger:
                 destination = recipient
             else:

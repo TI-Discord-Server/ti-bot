@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from utils.thread import ThreadManager
-from utils.utils import truncate
 
 from env import (
     BOT_TOKEN,
@@ -280,7 +279,7 @@ class Bot(commands.Bot):
         guild_id = 1334456602324897792
         if guild_id is not None:
             try:
-                return int(str(guild_id))
+                return int(guild_id)
             except ValueError:
                 self.log.error("Invalid GUILD_ID set.")
         else:
@@ -329,41 +328,11 @@ class Bot(commands.Bot):
 
     async def process_dm_modmail(self, message: discord.Message) -> None:
         """Processes messages sent to the bot."""
-        # blocked = await self._process_blocked(message)
-        # if blocked:
-        #     return
-        # sent_emoji, blocked_emoji = await self.retrieve_emoji()
-
         if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
             return
 
         thread = await self.threads.find(recipient=message.author)
         if thread is None:
-        #     delta = await self.get_thread_cooldown(message.author)
-        #     if delta:
-        #         await message.channel.send(
-        #             embed=discord.Embed(
-        #                 title=self.config["cooldown_thread_title"],
-        #                 description=self.config["cooldown_thread_response"].format(delta=delta),
-        #                 color=self.error_color,
-        #             )
-        #         )
-        #         return
-
-            # if self.config["dm_disabled"] in (DMDisabled.NEW_THREADS, DMDisabled.ALL_THREADS):
-            #     embed = discord.Embed(
-            #         title=self.config["disabled_new_thread_title"],
-            #         color=self.error_color,
-            #         description=self.config["disabled_new_thread_response"],
-            #     )
-            #     embed.set_footer(
-            #         text=self.config["disabled_new_thread_footer"],
-            #         icon_url=self.get_guild_icon(guild=message.guild, size=128),
-            #     )
-            #     logger.info("A new thread was blocked from %s due to disabled Modmail.", message.author)
-            #     await self.add_reaction(message, blocked_emoji)
-            #     return await message.channel.send(embed=embed)
-
             thread = await self.threads.create(message.author, message=message)
 
         if not thread.cancelled:
