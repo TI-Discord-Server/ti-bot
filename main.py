@@ -312,8 +312,6 @@ class Bot(commands.Bot):
                 exc = commands.CommandNotFound('Command "{}" is not found'.format(ctx.invoked_with))
                 self.dispatch("command_error", ctx, exc)
 
-
-
     @staticmethod
     async def add_reaction(self,
             msg, reaction: typing.Union[discord.Emoji, discord.Reaction, discord.PartialEmoji, str]

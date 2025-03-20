@@ -761,9 +761,8 @@ class Thread:
         destination = destination or self.channel
 
         author = message.author
-        member = self.bot.guild.get_member(author.id)
-        if member:
-            avatar_url = member.display_avatar.url
+        if anonymous:
+            avatar_url = self.bot.user.avatar.url
         else:
             avatar_url = author.display_avatar.url
 
@@ -773,7 +772,7 @@ class Thread:
         system_avatar_url = "https://discordapp.com/assets/f78426a064bc9dd24847519259bc42af.png"
 
         if not note:
-            if anonymous and from_mod and not isinstance(destination, discord.TextChannel):
+            if anonymous and from_mod:
                 # Anonymously sending to the user.
                 embed.set_author(
                     name="Staff Team",
@@ -921,15 +920,16 @@ class Thread:
         if from_mod:
             embed.colour = discord.Color.yellow()
             # Anonymous reply sent in thread channel
-            # if anonymous and isinstance(destination, discord.TextChannel):
-                # embed.set_footer(text="Anonymous Reply")
+            if anonymous and isinstance(destination, discord.TextChannel):
+                footer = f"Anonymous Reply: {message.author}"
+                embed.set_footer(text=footer)
             # Normal messages
             # elif not anonymous:
             #     mod_tag = str(get_top_role(message.author, True))
             #     embed.set_footer(text=mod_tag)  # Normal messages
-            # else:
-            embed.set_footer(text="Response")
-        elif note:
+            else:
+                embed.set_footer(text="Response")
+        # elif note:
             embed.colour = discord.Color.blurple()
         else:
             embed.set_footer(text=f"Message ID: {message.id}")

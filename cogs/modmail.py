@@ -9,6 +9,7 @@ from typing import Optional, Union, List, Tuple, Literal
 
 import discord
 from click import DateTime
+from discord import reaction
 from discord.ext import commands
 from discord.app_commands import (
     command,
@@ -26,7 +27,32 @@ class Modmail(commands.Cog, name="modmail"):
         self.bot = bot
         self.db = bot.db
         self.settings_id = "modmail_settings"
+        self.modmail_category_id = 1344777249991426078
         self.modmail_logs_channel_id = 1342592695540912199
+
+    async def get_modmail_category_id(self):
+        settings = await self.db.settings.find_one({"_id": self.settings_id})
+        if settings and "modmail_category_id" in settings:
+            return settings["modmail_category_id"]
+        return self.modmail_logs_channel_id
+
+    @command(
+        name="set_modmail_category",
+        description="Set the category where modmail-channels should be made (Moderators only).",
+    )
+    @has_role("Moderator")
+    async def set_modmail_category(
+            self, interaction: discord.Interaction, category: discord.CategoryChannel
+    ):
+        await self.db.settings.update_one(
+            {"_id": self.settings_id},
+            {"$set": {"modmail_category_id": category.id}},
+            upsert=True,
+        )
+
+        await interaction.response.send_message(
+            f"Modmail category has been set to {category.mention}."
+        )
 
     async def get_modmail_logs_channel_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
@@ -140,6 +166,7 @@ class Modmail(commands.Cog, name="modmail"):
         """
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         sent_message = await interaction.channel.send(msg)
+        sent_message.author = interaction.user
 
         async with interaction.channel.typing():
             await thread.reply(sent_message, anonymous=True)
@@ -186,93 +213,87 @@ class Modmail(commands.Cog, name="modmail"):
     #     await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
     # @commands.command(usage="<user> [category] [options]")
-    # @command(name="contact", description="Opens a modmail ticket")
-    # @has_role("Moderator")
-    # async def contact(
-    #         self,
-    #         ctx,
-    #         user: discord.Member | discord.User,
-    #         *,
-    #         manual_trigger: bool=True,
-    # ):
-    #     """
-    #     Create a thread with a specified member.
-    #
-    #     `category`, if specified, may be a category ID, mention, or name.
-    #     `users` may be a user ID, mention, or name. If multiple users are specified, a group thread will start.
-    #     A maximum of 5 users are allowed.
-    #     `options` can be `silent` or `silently`.
-    #     """
-    #     category = discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
-    #     errors = []
-    #
-    #
-    #     exists = await self.bot.threads.find(recipient=user)
-    #     if exists:
-    #         errors.append(f"A thread for {user} already exists.")
-    #         if exists.channel:
-    #             errors[-1] += f" in {exists.channel.mention}"
-    #         errors[-1] += "."
-    #     elif user.bot:
-    #         errors.append(f"{user} is a bot, cannot add to thread.")
-    #
-    #
-    #     if errors or not user:
-    #         if not user:
-    #             # no users left
-    #             title = "Thread not created"
-    #         else:
-    #             title = None
-    #
-    #         if manual_trigger:  # not react to contact
-    #             embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
-    #             await ctx.send(embed=embed, delete_after=10)
-    #
-    #         if not user:
-    #             # end
-    #             return
-    #
-    #     creator = ctx.author if manual_trigger else user
-    #
-    #     thread = await self.bot.threads.create(
-    #         recipient=user,
-    #         creator=creator,
-    #         category=category,
-    #         manual_trigger=manual_trigger,
-    #     )
-    #
-    #     if thread.cancelled:
-    #         return
-    #
-    #     if creator.id == user.id:
-    #         description = "\"You have opened a Modmail thread.\""
-    #     else:
-    #         description = "\"Staff have opened a Modmail thread.\""
-    #
-    #     em = discord.Embed(
-    #         title="\"New Thread\"",
-    #         description=description,
-    #         color=discord.Color.blurple(),
-    #     )
-    #
-    #     em.timestamp = discord.utils.utcnow()
-    #     em.set_footer(text=f"{creator}", icon_url=creator.display_avatar.url)
-    #
-    #     await user.send(embed=em)
-    #
-    #     embed = discord.Embed(
-    #         title="Created Thread",
-    #         description=f"Thread started by {creator.mention} for {user.mention}.",
-    #         color=discord.Color.blurple(),
-    #     )
-    #     await thread.wait_until_ready()
-    #
-    #     await thread.channel.send(embed=embed)
-    #
-    #     if manual_trigger:
-    #         await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
-    #         await asyncio.sleep(5)
-    #         await ctx.message.delete()
+    @command(name="contact", description="Opens a modmail ticket")
+    @has_role("Moderator")
+    async def contact(
+            self,
+            interaction: discord.Interaction,
+            user: discord.Member | discord.User
+    ):
+        """
+        Create a thread with a specified member.
+        """
+        manual_trigger = True
+        category = discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
+        errors = []
+
+
+        exists = await self.bot.threads.find(recipient=user)
+        if exists:
+            errors.append(f"A thread for {user} already exists.")
+            if exists.channel:
+                errors[-1] += f" in {exists.channel.mention}"
+            errors[-1] += "."
+        elif user.bot:
+            errors.append(f"{user} is a bot, cannot add to thread.")
+
+
+        if errors or not user:
+            if not user:
+                # no users left
+                title = "Thread not created"
+            else:
+                title = None
+
+            if manual_trigger:  # not react to contact
+                embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
+                await interaction.response.send_message(embed=embed, delete_after=10)
+
+            if not user:
+                # end
+                return
+
+        creator = interaction.user
+
+        thread = await self.bot.threads.create(
+            recipient=user,
+            creator=creator,
+            category=category,
+            manual_trigger=manual_trigger,
+        )
+
+        if thread.cancelled:
+            return
+
+        if creator.id == user.id:
+            description = "\"You have opened a Modmail thread.\""
+        else:
+            description = "\"Staff have opened a Modmail thread.\""
+
+        em = discord.Embed(
+            title="\"New Thread\"",
+            description=description,
+            color=discord.Color.blurple(),
+        )
+
+        em.timestamp = discord.utils.utcnow()
+        em.set_footer(text=f"{creator}", icon_url=self.bot.user.avatar.url)
+
+        await user.send(embed=em)
+
+        embed = discord.Embed(
+            title="Created Thread",
+            description=f"Thread started by {creator.mention} for {user.mention}.",
+            color=discord.Color.blurple(),
+        )
+        await thread.wait_until_ready()
+
+        await thread.channel.send(embed=embed)
+
+        if manual_trigger:
+            await interaction.response.send_message("✅ Modmail channel made!")
+            await asyncio.sleep(5)
+            await interaction.delete_original_response()
 
     # @command(name="delete", description="Deletes a modmail message.")
     # @has_role("Moderator")
