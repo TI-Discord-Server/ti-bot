@@ -134,13 +134,15 @@ class Modmail(commands.Cog, name="modmail"):
     @command(name="areply", description="Replies anonymous to a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
-    async def areply(self, ctx, *, msg: str):
+    async def areply(self, interaction: discord.Interaction, msg: str):
         """
         Reply to a thread anonymously.
         """
-        ctx.message.content = msg
-        async with ctx.typing():
-            await ctx.thread.reply(ctx.message, anonymous=True)
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        sent_message = await interaction.channel.send(msg)
+
+        async with interaction.channel.typing():
+            await thread.reply(sent_message, anonymous=True)
 
     # @commands.group(invoke_without_command=True)
     # @has_role("Moderator")

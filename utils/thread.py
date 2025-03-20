@@ -755,30 +755,11 @@ class Thread:
         persistent_note: bool = False,
         thread_creation: bool = False,
     ) -> None:
-        # if not note and from_mod:
-        #     self.bot.loop.create_task(self._restart_close_timer())  # Start or restart thread auto close
-        #
-        # if self.close_task is not None:
-        #     # cancel closing if a thread message is sent.
-        #     self.bot.loop.create_task(self.cancel_closure())
-        #     self.bot.loop.create_task(
-        #         self.channel.send(
-        #             embed=discord.Embed(
-        #                 color=discord.Color.red(),
-        #                 description="Scheduled close has been cancelled.",
-        #             )
-        #         )
-        #     )
-
         if not self.ready:
             await self.wait_until_ready()
 
-        # if not from_mod and not note:
-        #     self.bot.loop.create_task(self.bot.api.append_log(message, channel_id=self.channel.id))
-
         destination = destination or self.channel
 
-        self.bot.log.info(f"Sending message from {message.author}") #TODO
         author = message.author
         member = self.bot.guild.get_member(author.id)
         if member:
@@ -795,16 +776,14 @@ class Thread:
             if anonymous and from_mod and not isinstance(destination, discord.TextChannel):
                 # Anonymously sending to the user.
                 embed.set_author(
-                    name=str(get_top_role(author, True)),
-                    icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128),
-                    url=f"https://discordapp.com/channels/{self.bot.guild.id}#{message.id}",
+                    name="Staff Team",
+                    icon_url=avatar_url,
                 )
             else:
                 # Normal message
                 embed.set_author(
                     name=str(author),
                     icon_url=avatar_url,
-                    url=f"https://discordapp.com/users/{author.id}#{message.id}",
                 )
         else:
             # Special note messages
@@ -942,16 +921,16 @@ class Thread:
         if from_mod:
             embed.colour = discord.Color.yellow()
             # Anonymous reply sent in thread channel
-            if anonymous and isinstance(destination, discord.TextChannel):
-                embed.set_footer(text="Anonymous Reply")
+            # if anonymous and isinstance(destination, discord.TextChannel):
+                # embed.set_footer(text="Anonymous Reply")
             # Normal messages
-            elif not anonymous:
-                mod_tag = str(get_top_role(message.author, True))
-                embed.set_footer(text=mod_tag)  # Normal messages
-            else:
-                embed.set_footer(text="Response")
+            # elif not anonymous:
+            #     mod_tag = str(get_top_role(message.author, True))
+            #     embed.set_footer(text=mod_tag)  # Normal messages
+            # else:
+            embed.set_footer(text="Response")
         elif note:
-            embed.colour = self.bot.main_color
+            embed.colour = discord.Color.blurple()
         else:
             embed.set_footer(text=f"Message ID: {message.id}")
             embed.colour = discord.Colour.green()
@@ -971,7 +950,11 @@ class Thread:
             raise
 
 
-        mentions = "@Kobe" #TODO @HERE
+        # mentions = "@Kobe" #TODO @HERE
+        if isinstance(destination, discord.TextChannel):
+            mentions = "@Kobe"
+        else:
+            mentions = ""
 
         if plain:
             if from_mod and not isinstance(destination, discord.TextChannel):
