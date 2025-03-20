@@ -115,34 +115,28 @@ class Modmail(commands.Cog, name="modmail"):
         await ctx.channel.edit(nsfw=False)
         await ctx.response.send_message("⚠️ Set Channel to SFW")
 
-    @commands.command(name="reply", description="Replies to a Modmail-message")
+    @command(name="reply", description="Replies to a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
-    async def reply(self, ctx, *, msg: str = ""):
+    async def reply(self, interaction: discord.Interaction, msg: str):
         """
         Reply to a Modmail thread.
-
         Supports attachments and images as well as
         automatically embedding image URLs.
         """
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        sent_message = await interaction.channel.send(msg)
+        sent_message.author = interaction.user
 
-        ctx.message.content = msg
-
-        async with ctx.typing():
-            await ctx.thread.reply(ctx.message)
+        async with interaction.channel.typing():
+            await thread.reply(sent_message)
 
     @command(name="areply", description="Replies anonymous to a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
-    async def areply(self, ctx, *, msg: str = ""):
+    async def areply(self, ctx, *, msg: str):
         """
         Reply to a thread anonymously.
-
-        You can edit the anonymous user's name,
-        avatar and tag using the config command.
-
-        Edit the `anon_username`, `anon_avatar_url`
-        and `anon_tag` config variables to do so.
         """
         ctx.message.content = msg
         async with ctx.typing():
@@ -162,149 +156,149 @@ class Modmail(commands.Cog, name="modmail"):
     #         msg = await ctx.thread.note(ctx.message)
     #         await msg.pin()
 
-    @command(name="edit", description="Edits a Modmail-message")
-    @has_role("Moderator")
-    @checks.thread_only()
-    async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
-        """
-        Edit a message that was sent using the reply or anonreply command.
-
-        If no `message_id` is provided,
-        the last message sent by a staff will be edited.
-
-        Note: attachments **cannot** be edited.
-        """
-        thread = ctx.thread
-
-        try:
-            await thread.edit_message(message_id, message)
-        except ValueError:
-            return await ctx.send(
-                embed=discord.Embed(
-                    title="Failed",
-                    description="Cannot find a message to edit. Plain messages are not supported.",
-                    color=discord.Color.red(),
-                )
-            )
-
-        await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+    # @command(name="edit", description="Edits a Modmail-message")
+    # @has_role("Moderator")
+    # @checks.thread_only()
+    # async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
+    #     """
+    #     Edit a message that was sent using the reply or anonreply command.
+    #
+    #     If no `message_id` is provided,
+    #     the last message sent by a staff will be edited.
+    #
+    #     Note: attachments **cannot** be edited.
+    #     """
+    #     thread = ctx.thread
+    #
+    #     try:
+    #         await thread.edit_message(message_id, message)
+    #     except ValueError:
+    #         return await ctx.send(
+    #             embed=discord.Embed(
+    #                 title="Failed",
+    #                 description="Cannot find a message to edit. Plain messages are not supported.",
+    #                 color=discord.Color.red(),
+    #             )
+    #         )
+    #
+    #     await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
     # @commands.command(usage="<user> [category] [options]")
-    @command(name="contact", description="Opens a modmail ticket")
-    @has_role("Moderator")
-    async def contact(
-            self,
-            ctx,
-            user: discord.Member | discord.User,
-            *,
-            manual_trigger: bool=True,
-    ):
-        """
-        Create a thread with a specified member.
+    # @command(name="contact", description="Opens a modmail ticket")
+    # @has_role("Moderator")
+    # async def contact(
+    #         self,
+    #         ctx,
+    #         user: discord.Member | discord.User,
+    #         *,
+    #         manual_trigger: bool=True,
+    # ):
+    #     """
+    #     Create a thread with a specified member.
+    #
+    #     `category`, if specified, may be a category ID, mention, or name.
+    #     `users` may be a user ID, mention, or name. If multiple users are specified, a group thread will start.
+    #     A maximum of 5 users are allowed.
+    #     `options` can be `silent` or `silently`.
+    #     """
+    #     category = discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
+    #     errors = []
+    #
+    #
+    #     exists = await self.bot.threads.find(recipient=user)
+    #     if exists:
+    #         errors.append(f"A thread for {user} already exists.")
+    #         if exists.channel:
+    #             errors[-1] += f" in {exists.channel.mention}"
+    #         errors[-1] += "."
+    #     elif user.bot:
+    #         errors.append(f"{user} is a bot, cannot add to thread.")
+    #
+    #
+    #     if errors or not user:
+    #         if not user:
+    #             # no users left
+    #             title = "Thread not created"
+    #         else:
+    #             title = None
+    #
+    #         if manual_trigger:  # not react to contact
+    #             embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
+    #             await ctx.send(embed=embed, delete_after=10)
+    #
+    #         if not user:
+    #             # end
+    #             return
+    #
+    #     creator = ctx.author if manual_trigger else user
+    #
+    #     thread = await self.bot.threads.create(
+    #         recipient=user,
+    #         creator=creator,
+    #         category=category,
+    #         manual_trigger=manual_trigger,
+    #     )
+    #
+    #     if thread.cancelled:
+    #         return
+    #
+    #     if creator.id == user.id:
+    #         description = "\"You have opened a Modmail thread.\""
+    #     else:
+    #         description = "\"Staff have opened a Modmail thread.\""
+    #
+    #     em = discord.Embed(
+    #         title="\"New Thread\"",
+    #         description=description,
+    #         color=discord.Color.blurple(),
+    #     )
+    #
+    #     em.timestamp = discord.utils.utcnow()
+    #     em.set_footer(text=f"{creator}", icon_url=creator.display_avatar.url)
+    #
+    #     await user.send(embed=em)
+    #
+    #     embed = discord.Embed(
+    #         title="Created Thread",
+    #         description=f"Thread started by {creator.mention} for {user.mention}.",
+    #         color=discord.Color.blurple(),
+    #     )
+    #     await thread.wait_until_ready()
+    #
+    #     await thread.channel.send(embed=embed)
+    #
+    #     if manual_trigger:
+    #         await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+    #         await asyncio.sleep(5)
+    #         await ctx.message.delete()
 
-        `category`, if specified, may be a category ID, mention, or name.
-        `users` may be a user ID, mention, or name. If multiple users are specified, a group thread will start.
-        A maximum of 5 users are allowed.
-        `options` can be `silent` or `silently`.
-        """
-        category = discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
-        errors = []
-
-
-        exists = await self.bot.threads.find(recipient=user)
-        if exists:
-            errors.append(f"A thread for {user} already exists.")
-            if exists.channel:
-                errors[-1] += f" in {exists.channel.mention}"
-            errors[-1] += "."
-        elif user.bot:
-            errors.append(f"{user} is a bot, cannot add to thread.")
-
-
-        if errors or not user:
-            if not user:
-                # no users left
-                title = "Thread not created"
-            else:
-                title = None
-
-            if manual_trigger:  # not react to contact
-                embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
-                await ctx.send(embed=embed, delete_after=10)
-
-            if not user:
-                # end
-                return
-
-        creator = ctx.author if manual_trigger else user
-
-        thread = await self.bot.threads.create(
-            recipient=user,
-            creator=creator,
-            category=category,
-            manual_trigger=manual_trigger,
-        )
-
-        if thread.cancelled:
-            return
-
-        if creator.id == user.id:
-            description = "\"You have opened a Modmail thread.\""
-        else:
-            description = "\"Staff have opened a Modmail thread.\""
-
-        em = discord.Embed(
-            title="\"New Thread\"",
-            description=description,
-            color=discord.Color.blurple(),
-        )
-
-        em.timestamp = discord.utils.utcnow()
-        em.set_footer(text=f"{creator}", icon_url=creator.display_avatar.url)
-
-        await user.send(embed=em)
-
-        embed = discord.Embed(
-            title="Created Thread",
-            description=f"Thread started by {creator.mention} for {user.mention}.",
-            color=discord.Color.blurple(),
-        )
-        await thread.wait_until_ready()
-
-        await thread.channel.send(embed=embed)
-
-        if manual_trigger:
-            await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
-            await asyncio.sleep(5)
-            await ctx.message.delete()
-
-    @command(name="delete", description="Deletes a modmail message.")
-    @has_role("Moderator")
-    @checks.thread_only()
-    async def delete(self, ctx, message_id: int = None):
-        """
-        Delete a message that was sent using the reply command or a note.
-
-        Deletes the previous message, unless a message ID is provided,
-        which in that case, deletes the message with that message ID.
-
-        Notes can only be deleted when a note ID is provided.
-        """
-        thread = ctx.thread
-
-        try:
-            await thread.delete_message(message_id, note=True)
-        except ValueError as e:
-            self.bot.log.warning("Failed to delete message: %s.", e)
-            return await ctx.send(
-                embed=discord.Embed(
-                    title="Failed",
-                    description="Cannot find a message to delete. Plain messages are not supported.",
-                    color=discord.Color.red(),
-                )
-            )
-
-        await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+    # @command(name="delete", description="Deletes a modmail message.")
+    # @has_role("Moderator")
+    # @checks.thread_only()
+    # async def delete(self, ctx, message_id: int = None):
+    #     """
+    #     Delete a message that was sent using the reply command or a note.
+    #
+    #     Deletes the previous message, unless a message ID is provided,
+    #     which in that case, deletes the message with that message ID.
+    #
+    #     Notes can only be deleted when a note ID is provided.
+    #     """
+    #     thread = ctx.thread
+    #
+    #     try:
+    #         await thread.delete_message(message_id, note=True)
+    #     except ValueError as e:
+    #         self.bot.log.warning("Failed to delete message: %s.", e)
+    #         return await ctx.send(
+    #             embed=discord.Embed(
+    #                 title="Failed",
+    #                 description="Cannot find a message to delete. Plain messages are not supported.",
+    #                 color=discord.Color.red(),
+    #             )
+    #         )
+    #
+    #     await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
 
 
 

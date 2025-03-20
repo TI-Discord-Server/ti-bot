@@ -390,8 +390,6 @@ class Thread:
         #         },
         #     )
         # else:
-
-        #TODO: logging wordt anders
         if self.channel.nsfw:
             nsfw = "NSFW-"
         else:
@@ -492,7 +490,7 @@ class Thread:
                     raise ValueError("Thread message not found.")
                 return message1, None
 
-            if message1.embeds[0].color.value != self.bot.mod_color and not (
+            if message1.embeds[0].color.value != discord.Color.yellow() and not (
                 either_direction and message1.embeds[0].color.value == self.bot.recipient_color
             ):
                 raise ValueError("Thread message not found.")
@@ -503,7 +501,7 @@ class Thread:
                     and message1.embeds[0].author.url
                     and message1.embeds[0].color
                     and (
-                        message1.embeds[0].color.value == self.bot.mod_color
+                        message1.embeds[0].color.value == discord.Color.yellow()
                         or (either_direction and message1.embeds[0].color.value == self.bot.recipient_color)
                     )
                     and message1.embeds[0].author.url.split("#")[-1].isdigit()
@@ -687,10 +685,11 @@ class Thread:
         """Returns List[user_dm_msg] and thread_channel_msg"""
         if not message.content and not message.attachments and not message.stickers:
             raise MissingRequiredArgument(DummyParam("msg"))
+
         if not any(g.get_member(self.id) for g in self.bot.guilds):
             return await message.channel.send(
                 embed=discord.Embed(
-                    color=self.bot.error_color,
+                    color=discord.Color.red(),
                     description="Your message could not be delivered since "
                     "the recipient shares no servers with the bot.",
                 )
@@ -699,21 +698,21 @@ class Thread:
         user_msg_tasks = []
         tasks = []
 
-        for user in self.recipients:
-            user_msg_tasks.append(
-                self.send(
-                    message,
-                    destination=user,
-                    from_mod=True,
-                    anonymous=anonymous,
-                    plain=plain,
-                )
-            )
+
+        user_msg_tasks.append(
+            self.send(
+                message,
+                destination=self.recipient,
+                from_mod=True,
+                anonymous=anonymous,
+                plain=plain,
+        ))
+
 
         try:
             user_msg = await asyncio.gather(*user_msg_tasks)
         except Exception as e:
-            self.bot.log.error("Message delivery failed:")
+            self.bot.log.error(f"Message delivery failed: {e}")
             user_msg = None
             if isinstance(e, discord.Forbidden):
                 description = (
@@ -725,12 +724,11 @@ class Thread:
             else:
                 description = (
                     "Your message could not be delivered due "
-                    "to an unknown error. Check `?debug` for "
-                    "more information"
+                    "to an unknown error."
                 )
             msg = await message.channel.send(
                 embed=discord.Embed(
-                    color=self.bot.error_color,
+                    color=discord.Color.red(),
                     description=description,
                 )
             )
@@ -739,27 +737,6 @@ class Thread:
             msg = await self.send(
                 message, destination=self.channel, from_mod=True, anonymous=anonymous, plain=plain
             )
-
-            tasks.append(
-                self.bot.api.append_log(
-                    message,
-                    message_id=msg.id,
-                    channel_id=self.channel.id,
-                    type_="anonymous" if anonymous else "thread_message",
-                )
-            )
-
-            # Cancel closing if a thread message is sent.
-            if self.close_task is not None:
-                await self.cancel_closure()
-                tasks.append(
-                    self.channel.send(
-                        embed=discord.Embed(
-                            color=self.bot.error_color,
-                            description="Scheduled close has been cancelled.",
-                        )
-                    )
-                )
 
         await asyncio.gather(*tasks)
         self.bot.dispatch("thread_reply", self, True, message, anonymous, plain)
@@ -778,20 +755,20 @@ class Thread:
         persistent_note: bool = False,
         thread_creation: bool = False,
     ) -> None:
-        if not note and from_mod:
-            self.bot.loop.create_task(self._restart_close_timer())  # Start or restart thread auto close
-
-        if self.close_task is not None:
-            # cancel closing if a thread message is sent.
-            self.bot.loop.create_task(self.cancel_closure())
-            self.bot.loop.create_task(
-                self.channel.send(
-                    embed=discord.Embed(
-                        color=self.bot.error_color,
-                        description="Scheduled close has been cancelled.",
-                    )
-                )
-            )
+        # if not note and from_mod:
+        #     self.bot.loop.create_task(self._restart_close_timer())  # Start or restart thread auto close
+        #
+        # if self.close_task is not None:
+        #     # cancel closing if a thread message is sent.
+        #     self.bot.loop.create_task(self.cancel_closure())
+        #     self.bot.loop.create_task(
+        #         self.channel.send(
+        #             embed=discord.Embed(
+        #                 color=discord.Color.red(),
+        #                 description="Scheduled close has been cancelled.",
+        #             )
+        #         )
+        #     )
 
         if not self.ready:
             await self.wait_until_ready()
@@ -801,6 +778,7 @@ class Thread:
 
         destination = destination or self.channel
 
+        self.bot.log.info(f"Sending message from {message.author}") #TODO
         author = message.author
         member = self.bot.guild.get_member(author.id)
         if member:
@@ -934,11 +912,14 @@ class Thread:
                 embedded_image = True
             else:
                 if note:
-                    color = self.bot.main_color
+                    color = discord.Color.blurple()
+                    #color = self.bot.main_color
                 elif from_mod:
-                    color = self.bot.mod_color
+                    color = discord.Color.yellow()
+                    #color = self.bot.mod_color
                 else:
-                    color = self.bot.recipient_color
+                    color = discord.Color.green()
+                    #color = self.bot.recipient_color
 
                 img_embed = discord.Embed(color=color)
 
@@ -959,7 +940,7 @@ class Thread:
             file_upload_count += 1
 
         if from_mod:
-            embed.colour = self.bot.mod_color
+            embed.colour = discord.Color.yellow()
             # Anonymous reply sent in thread channel
             if anonymous and isinstance(destination, discord.TextChannel):
                 embed.set_footer(text="Anonymous Reply")
