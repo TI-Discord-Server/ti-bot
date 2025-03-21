@@ -3,6 +3,7 @@ thread by modmail-dev
 Source:
 https://github.com/modmail-dev/Modmail/blob/master/core/thread.py
 """
+import inspect
 import asyncio
 import base64
 import copy
@@ -466,76 +467,47 @@ class Thread:
     ) -> typing.Tuple[discord.Message, typing.List[typing.Optional[discord.Message]]]:
         if message1 is not None:
             if not message1.embeds or not message1.embeds[0].author.url or message1.author != self.bot.user:
-                raise ValueError("Malformed thread message.")
+                raise ValueError("Malformed thread message. 1")
 
         elif message_id is not None:
+            self.bot.log.info("searching message with id %s", str(message_id))
             try:
                 message1 = await self.channel.fetch_message(message_id)
             except discord.NotFound:
-                raise ValueError("Thread message not found.")
+                raise ValueError("Thread message not found. 1")
 
             if not (
                 message1.embeds
-                and message1.embeds[0].author.url
                 and message1.embeds[0].color
                 and message1.author == self.bot.user
             ):
-                raise ValueError("Thread message not found.")
+                raise ValueError("Thread message not found. 2")
 
-            if message1.embeds[0].color.value == self.bot.main_color and (
+            if message1.embeds[0].color and (
                 message1.embeds[0].author.name.startswith("Note")
                 or message1.embeds[0].author.name.startswith("Persistent Note")
             ):
                 if not note:
-                    raise ValueError("Thread message not found.")
+                    raise ValueError("Thread message not found. 3")
                 return message1, None
 
-            if message1.embeds[0].color.value != discord.Color.yellow() and not (
-                either_direction and message1.embeds[0].color.value == self.bot.recipient_color
-            ):
-                raise ValueError("Thread message not found.")
+            if message1.embeds[0]  and not either_direction:
+                raise ValueError("Thread message not found. 4")
         else:
             async for message1 in self.channel.history():
                 if (
                     message1.embeds
-                    and message1.embeds[0].author.url
                     and message1.embeds[0].color
-                    and (
-                        message1.embeds[0].color.value == discord.Color.yellow()
-                        or (either_direction and message1.embeds[0].color.value == self.bot.recipient_color)
-                    )
-                    and message1.embeds[0].author.url.split("#")[-1].isdigit()
                     and message1.author == self.bot.user
                 ):
                     break
             else:
-                raise ValueError("Thread message not found.")
+                raise ValueError("Thread message not found. 5")
 
-        try:
-            joint_id = int(message1.embeds[0].author.url.split("#")[-1])
-        except ValueError:
-            raise ValueError("Malformed thread message.")
+        async for msg in self.recipient.history():
+            return message1, msg
 
-        messages = [message1]
-        for user in self.recipients:
-            async for msg in user.history():
-                if either_direction:
-                    if msg.id == joint_id:
-                        return message1, msg
-
-                if not (msg.embeds and msg.embeds[0].author.url):
-                    continue
-                try:
-                    if int(msg.embeds[0].author.url.split("#")[-1]) == joint_id:
-                        messages.append(msg)
-                        break
-                except ValueError:
-                    continue
-
-        if len(messages) > 1:
-            return messages
-
-        raise ValueError("DM message not found.")
+        raise ValueError("DM message not found. 1")
 
     async def edit_message(self, message_id: typing.Optional[int], message: str) -> None:
         try:
@@ -560,12 +532,10 @@ class Thread:
         await asyncio.gather(*tasks)
 
     async def delete_message(
-        self, message: typing.Union[int, discord.Message] = None, note: bool = True
+        self, message = None, note: bool = True
     ) -> None:
-        if isinstance(message, discord.Message):
-            message1, *message2 = await self.find_linked_messages(message1=message, note=note)
-        else:
-            message1, *message2 = await self.find_linked_messages(message, note=note)
+
+        message1, *message2 = await self.find_linked_messages(message_id=message, note=note)
         tasks = []
 
         if not isinstance(message, discord.Message):
@@ -574,9 +544,6 @@ class Thread:
         for m2 in message2:
             if m2 is not None:
                 tasks += [m2.delete()]
-
-        if message1.embeds[0].author.name.startswith("Persistent Note"):
-            tasks += [self.bot.api.delete_note(message1.id)]
 
         if tasks:
             await asyncio.gather(*tasks)

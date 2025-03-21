@@ -136,10 +136,10 @@ class Modmail(commands.Cog, name="modmail"):
     @command(name="sfw", description="Changes Modmail-thread to SFW status")
     @has_role("Moderator")
     @checks.thread_only()
-    async def sfw(self, ctx):
+    async def sfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as SFW (safe for work)."""
-        await ctx.channel.edit(nsfw=False)
-        await ctx.response.send_message("⚠️ Set Channel to SFW")
+        await interaction.channel.edit(nsfw=False)
+        await interaction.response.send_message("⚠️ Set Channel to SFW")
 
     @command(name="reply", description="Replies to a Modmail-message")
     @has_role("Moderator")
@@ -185,32 +185,32 @@ class Modmail(commands.Cog, name="modmail"):
     #         msg = await ctx.thread.note(ctx.message)
     #         await msg.pin()
 
-    # @command(name="edit", description="Edits a Modmail-message")
-    # @has_role("Moderator")
-    # @checks.thread_only()
-    # async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
-    #     """
-    #     Edit a message that was sent using the reply or anonreply command.
-    #
-    #     If no `message_id` is provided,
-    #     the last message sent by a staff will be edited.
-    #
-    #     Note: attachments **cannot** be edited.
-    #     """
-    #     thread = ctx.thread
-    #
-    #     try:
-    #         await thread.edit_message(message_id, message)
-    #     except ValueError:
-    #         return await ctx.send(
-    #             embed=discord.Embed(
-    #                 title="Failed",
-    #                 description="Cannot find a message to edit. Plain messages are not supported.",
-    #                 color=discord.Color.red(),
-    #             )
-    #         )
-    #
-    #     await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+    @command(name="edit", description="Edits a Modmail-message")
+    @has_role("Moderator")
+    @checks.thread_only()
+    async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
+        """
+        Edit a message that was sent using the reply or anonreply command.
+
+        If no `message_id` is provided,
+        the last message sent by a staff will be edited.
+
+        Note: attachments **cannot** be edited.
+        """
+        thread = ctx.thread
+
+        try:
+            await thread.edit_message(message_id, message)
+        except ValueError:
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Failed",
+                    description="Cannot find a message to edit. Plain messages are not supported.",
+                    color=discord.Color.red(),
+                )
+            )
+
+        await self.bot.add_reaction(ctx.message, "✅")
 
     # @commands.command(usage="<user> [category] [options]")
     @command(name="contact", description="Opens a modmail ticket")
@@ -295,33 +295,31 @@ class Modmail(commands.Cog, name="modmail"):
             await asyncio.sleep(5)
             await interaction.delete_original_response()
 
-    # @command(name="delete", description="Deletes a modmail message.")
-    # @has_role("Moderator")
-    # @checks.thread_only()
-    # async def delete(self, ctx, message_id: int = None):
-    #     """
-    #     Delete a message that was sent using the reply command or a note.
-    #
-    #     Deletes the previous message, unless a message ID is provided,
-    #     which in that case, deletes the message with that message ID.
-    #
-    #     Notes can only be deleted when a note ID is provided.
-    #     """
-    #     thread = ctx.thread
-    #
-    #     try:
-    #         await thread.delete_message(message_id, note=True)
-    #     except ValueError as e:
-    #         self.bot.log.warning("Failed to delete message: %s.", e)
-    #         return await ctx.send(
-    #             embed=discord.Embed(
-    #                 title="Failed",
-    #                 description="Cannot find a message to delete. Plain messages are not supported.",
-    #                 color=discord.Color.red(),
-    #             )
-    #         )
-    #
-    #     await self.bot.add_reaction(ctx.message, "\N{WHITE HEAVY CHECK MARK}")
+    @command(name="delete", description="Deletes a modmail message.")
+    @has_role("Moderator")
+    @checks.thread_only()
+    async def delete(self, interaction: discord.Interaction):
+        """
+        Delete a message that was sent using the reply command
+        Deletes the previous message
+        """
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+
+        try:
+            await thread.delete_message()
+        except ValueError as e:
+            self.bot.log.warning("Failed to delete message: %s.", e)
+            return await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="Failed",
+                    description="Cannot find a message to delete. Plain messages are not supported.",
+                    color=discord.Color.red(),
+                )
+            )
+
+        await interaction.response.send_message("🗑️ Last message deleted.!")
+        await asyncio.sleep(5)
+        await interaction.delete_original_response()
 
 
 
