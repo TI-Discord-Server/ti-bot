@@ -1,7 +1,7 @@
 import discord
 from discord.ext import tasks, commands
 import datetime
-from cogs.confessions import ConfessionView
+from cogs.confessions.confession_view import ConfessionView
 
 
 class ConfessionTasks(commands.Cog):
