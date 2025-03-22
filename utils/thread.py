@@ -461,12 +461,12 @@ class Thread:
     async def find_linked_messages(
         self,
         message_id: typing.Optional[int] = None,
-        either_direction: bool = False,
         message1: discord.Message = None,
         note: bool = True,
     ) -> typing.Tuple[discord.Message, typing.List[typing.Optional[discord.Message]]]:
         if message1 is not None:
             if not message1.embeds or not message1.embeds[0].author.url or message1.author != self.bot.user:
+                self.bot.log.warning("1")
                 raise ValueError("Malformed thread message. 1")
 
         elif message_id is not None:
@@ -474,13 +474,15 @@ class Thread:
             try:
                 message1 = await self.channel.fetch_message(message_id)
             except discord.NotFound:
+                self.bot.log.warning("2")
                 raise ValueError("Thread message not found. 1")
 
             if not (
                 message1.embeds
-                and message1.embeds[0].color
+                # and message1.embeds[0].color
                 and message1.author == self.bot.user
             ):
+                self.bot.log.warning("3")
                 raise ValueError("Thread message not found. 2")
 
             if message1.embeds[0].color and (
@@ -488,11 +490,9 @@ class Thread:
                 or message1.embeds[0].author.name.startswith("Persistent Note")
             ):
                 if not note:
+                    self.bot.log.warning("4")
                     raise ValueError("Thread message not found. 3")
                 return message1, None
-
-            if message1.embeds[0]  and not either_direction:
-                raise ValueError("Thread message not found. 4")
         else:
             async for message1 in self.channel.history():
                 if (
@@ -502,12 +502,31 @@ class Thread:
                 ):
                     break
             else:
+                self.bot.log.warning("6")
                 raise ValueError("Thread message not found. 5")
 
-        async for msg in self.recipient.history():
-            return message1, msg
+        try:
+            sender = message1.embeds[0].author
+            desc = message1.embeds[0].description
+            time = message1.embeds[0].timestamp
+        except ValueError:
+            raise ValueError("Malformed thread message.")
 
-        raise ValueError("DM message not found. 1")
+        messages = [message1]
+        async for msg in self.recipient.history():
+            if not (msg.embeds and msg.embeds[0].author):
+                continue
+            try:
+                if msg.embeds[0].author == sender and msg.embeds[0].description == desc and message1.embeds[0].timestamp == time :
+                    messages.append(msg)
+                    break
+            except ValueError:
+                continue
+
+        if len(messages) > 1:
+            return messages
+
+        raise ValueError("DM message not found.")
 
     async def edit_message(self, message_id: typing.Optional[int], message: str) -> None:
         try:
@@ -519,15 +538,13 @@ class Thread:
         embed1 = message1.embeds[0]
         embed1.description = message
 
-        tasks = [self.bot.api.edit_message(message1.id, message), message1.edit(embed=embed1)]
-        if message1.embeds[0].author.name.startswith("Persistent Note"):
-            tasks += [self.bot.api.edit_note(message1.id, message)]
-        else:
-            for m2 in message2:
-                if m2 is not None:
-                    embed2 = m2.embeds[0]
-                    embed2.description = message
-                    tasks += [m2.edit(embed=embed2)]
+        tasks = [message1.edit(embed=embed1)]
+
+        for m2 in message2:
+            if m2 is not None:
+                embed2 = m2.embeds[0]
+                embed2.description = message
+                tasks += [m2.edit(embed=embed2)]
 
         await asyncio.gather(*tasks)
 
@@ -640,10 +657,6 @@ class Thread:
             thread_creation=thread_creation,
         )
 
-        self.bot.loop.create_task(
-            self.bot.api.append_log(message, message_id=msg.id, channel_id=self.channel.id, type_="system")
-        )
-
         return msg
 
     async def reply(
@@ -736,8 +749,6 @@ class Thread:
         embed = discord.Embed(description=message.content)
         embed.timestamp = message.created_at
 
-        system_avatar_url = "https://discordapp.com/assets/f78426a064bc9dd24847519259bc42af.png"
-
         if not note:
             if anonymous and from_mod:
                 # Anonymously sending to the user.
@@ -752,11 +763,10 @@ class Thread:
                     icon_url=avatar_url,
                 )
         else:
-            # Special note messages
+            #Notes
             embed.set_author(
-                name=f"{'Persistent' if persistent_note else ''} Note ({author.name})",
-                icon_url=system_avatar_url,
-                url=f"https://discordapp.com/users/{author.id}#{message.id}",
+                name=f"{'Persistent' if persistent_note else ''} Note by {author.name}",
+                icon_url=self.bot.user.avatar.url
             )
 
         ext = [(a.url, a.filename, False) for a in message.attachments]
@@ -886,20 +896,13 @@ class Thread:
 
         if from_mod:
             embed.colour = discord.Color.yellow()
-            # Anonymous reply sent in thread channel
             if anonymous and isinstance(destination, discord.TextChannel):
                 footer = f"Anonymous Reply: {message.author}"
                 embed.set_footer(text=footer)
-            # Normal messages
-            # elif not anonymous:
-            #     mod_tag = str(get_top_role(message.author, True))
-            #     embed.set_footer(text=mod_tag)  # Normal messages
             else:
                 embed.set_footer(text="Response")
-        # elif note:
             embed.colour = discord.Color.blurple()
         else:
-            embed.set_footer(text=f"Message ID: {message.id}")
             embed.colour = discord.Colour.green()
 
         if (from_mod or note) and not thread_creation:

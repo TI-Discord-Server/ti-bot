@@ -36,24 +36,6 @@ class Modmail(commands.Cog, name="modmail"):
             return settings["modmail_category_id"]
         return self.modmail_logs_channel_id
 
-    @command(
-        name="set_modmail_category",
-        description="Set the category where modmail-channels should be made (Moderators only).",
-    )
-    @has_role("Moderator")
-    async def set_modmail_category(
-            self, interaction: discord.Interaction, category: discord.CategoryChannel
-    ):
-        await self.db.settings.update_one(
-            {"_id": self.settings_id},
-            {"$set": {"modmail_category_id": category.id}},
-            upsert=True,
-        )
-
-        await interaction.response.send_message(
-            f"Modmail category has been set to {category.mention}."
-        )
-
     async def get_modmail_logs_channel_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
         if settings and "modmail_channel_id" in settings:
@@ -61,28 +43,34 @@ class Modmail(commands.Cog, name="modmail"):
         return self.modmail_logs_channel_id
 
     @command(
-        name="set_modmail_log_channel",
-        description="Set the channel where modmail logs should be sent (Moderators only).",
+        name="set_modmail_settings",
+        description="Set modmail category and / or logs channel",
     )
     @has_role("Moderator")
-    async def set_modmail_log_channel(
-            self, interaction: discord.Interaction, channel: discord.TextChannel
+    async def set_modmail_settings(
+            self, interaction: discord.Interaction, category: discord.CategoryChannel = None, channel: discord.TextChannel = None
     ):
-        """
-        Set the channel where modmail logs should be sent.
-        """
-        await self.db.settings.update_one(
-            {"_id": self.settings_id},
-            {"$set": {"modmail_channel_id": channel.id}},
-            upsert=True,
-        )
+        if category is not None:
+            await self.db.settings.update_one(
+                {"_id": self.settings_id},
+                {"$set": {"modmail_category_id": category.id}},
+                upsert=True,
+            )
+            await interaction.response.send_message(
+                f"Modmail category has been set to {category.mention}."
+            )
+        if channel is not None:
+            await self.db.settings.update_one(
+                {"_id": self.settings_id},
+                {"$set": {"modmail_channel_id": channel.id}},
+                upsert=True,
+            )
+            await interaction.response.send_message(
+                f"Modmail-logs channel has been set to {channel.mention}."
+            )
 
-        await interaction.response.send_message(
-            f"Modmail-logs channel has been set to {channel.mention}."
-        )
-
-    @set_modmail_log_channel.error
-    async def set_modmail_log_channel_error(
+    @set_modmail_settings.error
+    async def set_modmail_settings_error(
         self, interaction: discord.Interaction, error
     ):
         if isinstance(error, commands.CheckFailure):
@@ -100,19 +88,19 @@ class Modmail(commands.Cog, name="modmail"):
     @checks.thread_only()
     async def close(
             self,
-            ctx,
+            interaction: discord.Interaction,
             option: Optional[Literal["silent"]] = "",
             reason: str = None
     ):
         """
         Close the current thread.
         """
-        thread = await ThreadManager.find(self.bot.threads, channel=ctx.channel)
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
 
         silent = any(x == option for x in {"silent"})
 
-        await thread.close(closer=ctx.user, message=reason, silent=silent, log_channel= modmail_logs_channel)
+        await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel= modmail_logs_channel)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
@@ -128,10 +116,10 @@ class Modmail(commands.Cog, name="modmail"):
     @command(name="nsfw", description="Changes Modmail-thread to NSFW status")
     @has_role("Moderator")
     @checks.thread_only()
-    async def nsfw(self, ctx):
+    async def nsfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as NSFW (not safe for work)."""
-        await ctx.channel.edit(nsfw=True)
-        await ctx.response.send_message("🔞 Set Channel to NSFW")
+        await interaction.channel.edit(nsfw=True)
+        await interaction.response.send_message("🔞 Set Channel to NSFW")
 
     @command(name="sfw", description="Changes Modmail-thread to SFW status")
     @has_role("Moderator")
@@ -172,23 +160,26 @@ class Modmail(commands.Cog, name="modmail"):
             await thread.reply(sent_message, anonymous=True)
 
     # @commands.group(invoke_without_command=True)
-    # @has_role("Moderator")
-    # @checks.thread_only()
-    # async def note(self, ctx, *, msg: str = ""):
-    #     """
-    #     Take a note about the current thread.
-    #
-    #     Useful for noting context.
-    #     """
-    #     ctx.message.content = msg
-    #     async with ctx.typing():
-    #         msg = await ctx.thread.note(ctx.message)
-    #         await msg.pin()
+    @command(name="note", description="Clarification of modmail")
+    @has_role("Moderator")
+    @checks.thread_only()
+    async def note(self, interaction: discord.Interaction, msg: str):
+        """
+        Take a note about the current thread.
+        Useful for noting context.
+        """
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        sent_message = await interaction.channel.send(msg)
+        sent_message.author = interaction.user
+
+        async with interaction.channel.typing():
+            msg = await thread.note(sent_message)
+            await msg.pin()
 
     @command(name="edit", description="Edits a Modmail-message")
     @has_role("Moderator")
     @checks.thread_only()
-    async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
+    async def edit(self, interaction: discord.Interaction, message: str, message_id: Optional[str] = "" ):
         """
         Edit a message that was sent using the reply or anonreply command.
 
@@ -197,12 +188,15 @@ class Modmail(commands.Cog, name="modmail"):
 
         Note: attachments **cannot** be edited.
         """
-        thread = ctx.thread
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+
+        message_id = int(message_id) if message_id.isdigit() and 17 <= len(message_id) <= 19 else None
+
 
         try:
             await thread.edit_message(message_id, message)
         except ValueError:
-            return await ctx.send(
+            return await interaction.response.send_message(
                 embed=discord.Embed(
                     title="Failed",
                     description="Cannot find a message to edit. Plain messages are not supported.",
@@ -210,7 +204,9 @@ class Modmail(commands.Cog, name="modmail"):
                 )
             )
 
-        await self.bot.add_reaction(ctx.message, "✅")
+        await interaction.response.send_message("📝 Message edited successfully")
+        # await asyncio.sleep(5)
+        # await interaction.delete_original_response()
 
     # @commands.command(usage="<user> [category] [options]")
     @command(name="contact", description="Opens a modmail ticket")
@@ -224,7 +220,7 @@ class Modmail(commands.Cog, name="modmail"):
         Create a thread with a specified member.
         """
         manual_trigger = True
-        category = discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
+        category = await discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
         errors = []
 
 
@@ -318,8 +314,8 @@ class Modmail(commands.Cog, name="modmail"):
             )
 
         await interaction.response.send_message("🗑️ Last message deleted.!")
-        await asyncio.sleep(5)
-        await interaction.delete_original_response()
+        # await asyncio.sleep(5)
+        # await interaction.delete_original_response()
 
 
 

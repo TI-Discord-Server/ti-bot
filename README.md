@@ -114,8 +114,9 @@ Jaak:
 
 Kobe:
 
-- Modmail
-- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando
+- ~~Modmail~~
+- Modmail testen & debuggen
+- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando (/transcript [user_id])
 
 Warre:
 
