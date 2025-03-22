@@ -1,6 +1,7 @@
 import discord
 from discord.ext import tasks, commands
 import datetime
+from cogs.confessions import ConfessionView
 
 
 class ConfessionTasks(commands.Cog):
@@ -176,7 +177,7 @@ class ConfessionTasks(commands.Cog):
                 description=confession["content"],
                 color=discord.Color.green(),
             )
-            await public_channel.send(embed=embed)
+            await public_channel.send(embed=embed, view=ConfessionView(self.bot))
 
             await self.bot.db.confessions.update_one(
                 {"_id": confession["_id"]},
