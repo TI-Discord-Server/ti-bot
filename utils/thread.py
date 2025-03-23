@@ -195,7 +195,7 @@ class Thread:
         if creator is not None and creator != recipient:
             mention = None
         else:
-            mention = "@k0be_" #TODO: @here
+            mention = "@here"
 
         async def send_genesis_message():
             info_embed = self._format_info_embed(recipient,
@@ -211,7 +211,7 @@ class Thread:
 
         async def send_recipient_genesis_message():
             # Once thread is ready, tell the recipient (don't send if using contact on others)
-            thread_creation_response = "\"The staff team will get back to you as soon as possible.\""
+            thread_creation_response = "The staff team will get back to you as soon as possible."
 
             embed = discord.Embed(
                 color=discord.Color.blurple(),
@@ -220,9 +220,9 @@ class Thread:
             )
 
             embed.set_footer(
-                text="\"Your message has been sent\"", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
+                text="Your message has been sent", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
             )
-            embed.title = "\"Thread Created\""
+            embed.title = "Modmail Created"
 
             if creator is None or creator == recipient:
                 msg = await recipient.send(embed=embed)
@@ -279,7 +279,7 @@ class Thread:
         )
         self.bot.dispatch("thread_ready", self, creator, category, initial_message)
 
-    def _format_info_embed(self, user,color, log_url=None, log_count=None, ): #TODO: COLOR last when log is fixed
+    def _format_info_embed(self, user,color, log_url=None, log_count=None, ):
         """Get information about a member of a server
         supports users from the guild or not."""
         member = self.bot.guild.get_member(user.id)
@@ -407,7 +407,7 @@ class Thread:
             )
             embed.timestamp = discord.utils.utcnow()
             if not message:
-                message = "\"Staff has closed this Modmail thread\""
+                message = "Staff has closed this Modmail chat"
             embed.description = message
             embed.set_footer(text="Replying will create a new modmail chat", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
 
@@ -890,9 +890,8 @@ class Thread:
             raise
 
 
-        # mentions = "@Kobe" #TODO @HERE
         if isinstance(destination, discord.TextChannel):
-            mentions = "@Kobe"
+            mentions = "@here"
         else:
             mentions = ""
 
@@ -960,42 +959,6 @@ class Thread:
                 embed.remove_field(index)
 
         await genesis_message.edit(embed=embed)
-
-    async def add_users(self, users: typing.List[typing.Union[discord.Member, discord.User]]) -> None:
-        topic = ""
-        title, _, _ = parse_channel_topic(self.channel.topic)
-        if title is not None:
-            topic += f"Title: {title}\n"
-
-        topic += f"User ID: {self._id}"
-
-        self._other_recipients += users
-        self._other_recipients = list(set(self._other_recipients))
-
-        ids = ",".join(str(i.id) for i in self._other_recipients)
-
-        topic += f"\nOther Recipients: {ids}"
-
-        await self.channel.edit(topic=topic)
-        await self._update_users_genesis()
-
-    async def remove_users(self, users: typing.List[typing.Union[discord.Member, discord.User]]) -> None:
-        topic = ""
-        title, user_id, _ = parse_channel_topic(self.channel.topic)
-        if title is not None:
-            topic += f"Title: {title}\n"
-
-        topic += f"User ID: {user_id}"
-
-        for u in users:
-            self._other_recipients.remove(u)
-
-        if self._other_recipients:
-            ids = ",".join(str(i.id) for i in self._other_recipients)
-            topic += f"\nOther Recipients: {ids}"
-
-        await self.channel.edit(topic=topic)
-        await self._update_users_genesis()
 
 
 class ThreadManager:
@@ -1169,8 +1132,8 @@ class ThreadManager:
             view.add_item(DenyButton("\uD83D\uDEAB"))
             confirm = await destination.send(
                 embed=discord.Embed(
-                    title="Confirm thread creation",
-                    description="Click the button to confirm thread creation which will directly contact our Staff.",
+                    title="Confirm modmail creation",
+                    description="Click the button to confirm modmail creation which will directly contact our Staff.",
                     color=discord.Color.blurple(),
                 ),
                 view=view,
@@ -1181,7 +1144,7 @@ class ThreadManager:
                 self.bot.loop.create_task(
                     destination.send(
                         embed=discord.Embed(
-                            title="\"Cancelled\"",
+                            title="Cancelled",
                             description="Timed out",
                             color=discord.Color.red(),
                         )
@@ -1193,7 +1156,7 @@ class ThreadManager:
                 self.bot.loop.create_task(
                     destination.send(
                         embed=discord.Embed(
-                            title="\"Cancelled\"", color=discord.Color.red()
+                            title="Cancelled", color=discord.Color.red()
                         )
                     )
                 )

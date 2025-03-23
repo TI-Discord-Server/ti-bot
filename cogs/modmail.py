@@ -34,7 +34,7 @@ class Modmail(commands.Cog, name="modmail"):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
         if settings and "modmail_category_id" in settings:
             return settings["modmail_category_id"]
-        return self.modmail_logs_channel_id
+        return self.modmail_category_id
 
     async def get_modmail_logs_channel_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
@@ -100,7 +100,7 @@ class Modmail(commands.Cog, name="modmail"):
 
         silent = any(x == option for x in {"silent"})
 
-        await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel= modmail_logs_channel)
+        await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
@@ -220,7 +220,7 @@ class Modmail(commands.Cog, name="modmail"):
         Create a thread with a specified member.
         """
         manual_trigger = True
-        category = await discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
+        category = discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
         errors = []
 
 
@@ -262,12 +262,12 @@ class Modmail(commands.Cog, name="modmail"):
             return
 
         if creator.id == user.id:
-            description = "\"You have opened a Modmail thread.\""
+            description = "You have opened a Modmail chat."
         else:
-            description = "\"Staff have opened a Modmail thread.\""
+            description = "Staff have opened a Modmail thread."
 
         em = discord.Embed(
-            title="\"New Thread\"",
+            title="New Modmail",
             description=description,
             color=discord.Color.blurple(),
         )
@@ -278,8 +278,8 @@ class Modmail(commands.Cog, name="modmail"):
         await user.send(embed=em)
 
         embed = discord.Embed(
-            title="Created Thread",
-            description=f"Thread started by {creator.mention} for {user.mention}.",
+            title="Created Modmail",
+            description=f"Modmail started by {creator.mention} for {user.mention}.",
             color=discord.Color.blurple(),
         )
         await thread.wait_until_ready()
@@ -294,15 +294,17 @@ class Modmail(commands.Cog, name="modmail"):
     @command(name="delete", description="Deletes a modmail message.")
     @has_role("Moderator")
     @checks.thread_only()
-    async def delete(self, interaction: discord.Interaction):
+    async def delete(self, interaction: discord.Interaction, message_id: Optional[str] = ""):
         """
         Delete a message that was sent using the reply command
         Deletes the previous message
         """
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
 
+        message_id = int(message_id) if message_id.isdigit() and 17 <= len(message_id) <= 19 else None
+
         try:
-            await thread.delete_message()
+            await thread.delete_message(message=message_id)
         except ValueError as e:
             self.bot.log.warning("Failed to delete message: %s.", e)
             return await interaction.response.send_message(
