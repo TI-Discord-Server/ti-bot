@@ -354,6 +354,78 @@ class Bot(commands.Bot):
                 await self.add_reaction(self, message, "✅")
                 self.dispatch("thread_reply", thread, False, message, False, False)
 
+    async def on_message_delete(self, message):
+        """Support for deleting linked messages"""
+
+        if message.is_system():
+            return
+
+        if isinstance(message.channel, discord.DMChannel):
+            if message.author == self.user:
+                return
+            thread = await self.threads.find(recipient=message.author)
+            if not thread:
+                return
+            try:
+                message = await thread.find_linked_message_from_dm(message, get_thread_channel=True)
+            except ValueError as e:
+                if str(e) != "Thread channel message not found.":
+                    self.log.info(f"Failed to find linked message to delete: {e}")
+                return
+            message = message[0]
+            embed = message.embeds[0]
+
+            if embed.footer.icon:
+                icon_url = embed.footer.icon.url
+            else:
+                icon_url = None
+
+            embed.set_footer(text="(deleted)", icon_url=icon_url)
+            await message.edit(embed=embed)
+            return
+
+        if message.author != self.user:
+            return
+
+        thread = await self.threads.find(channel=message.channel)
+        if not thread:
+            return
+
+        try:
+            await thread.delete_message(message, note=False)
+            embed = discord.Embed(description="Successfully deleted message.", color=discord.Color.blurple())
+        except ValueError as e:
+            if str(e) not in {"DM message not found.", "Malformed thread message."}:
+                self.log.info(f"Failed to delete linked message to delete: {e}")
+                embed = discord.Embed(description="Failed to delete message.", color=discord.Color.red())
+            else:
+                return
+        except discord.NotFound:
+            return
+        embed.set_footer(text=f"Message ID: {message.id} from {message.author}.")
+        return await message.channel.send(embed=embed)
+
+    async def on_message_edit(self, before, after):
+        if after.author.bot:
+            return
+        if before.content == after.content:
+            return
+
+        if isinstance(after.channel, discord.DMChannel):
+            thread = await self.threads.find(recipient=before.author)
+            if not thread:
+                return
+
+            try:
+                await thread.edit_dm_message(before, after.content)
+            except ValueError:
+                await self.add_reaction(self, after, "❌")
+            else:
+                embed = discord.Embed(description="Successfully Edited Message", color=discord.Color.blurple())
+                embed.set_footer(text=f"Message ID: {after.id}")
+                await after.channel.send(embed=embed)
+
+
 
     def _format_cooldown(self, retry_after: float) -> str:
         m, s = divmod(retry_after, 60)

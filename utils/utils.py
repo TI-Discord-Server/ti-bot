@@ -256,7 +256,7 @@ def get_joint_id(message: discord.Message) -> typing.Optional[int]:
             if url:
                 return int(url.split("#")[-1])
         except ValueError:
-            pass
+            raise ValueError
     return None
 
 class AcceptButton(discord.ui.Button):

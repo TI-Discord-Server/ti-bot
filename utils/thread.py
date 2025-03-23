@@ -517,7 +517,7 @@ class Thread:
             if not (msg.embeds and msg.embeds[0].author):
                 continue
             try:
-                if msg.embeds[0].author == sender and msg.embeds[0].description == desc and message1.embeds[0].timestamp == time :
+                if msg.embeds[0].author == sender and msg.embeds[0].description == desc and msg.embeds[0].timestamp == time :
                     messages.append(msg)
                     break
             except ValueError:
@@ -566,31 +566,27 @@ class Thread:
             await asyncio.gather(*tasks)
 
     async def find_linked_message_from_dm(
-        self, message, either_direction=False, get_thread_channel=False
+        self, message: discord.Message, either_direction=False, get_thread_channel=False
     ) -> typing.List[discord.Message]:
-        joint_id = None
-        if either_direction:
-            joint_id = get_joint_id(message)
-            # could be None too, if that's the case we'll reassign this variable from
-            # thread message we fetch in the next step
+        self.bot.log.info("searching message with id %s", str(message.id))
+
+        try:
+            sender = message.author
+            desc = message.content
+        except ValueError:
+            raise ValueError("Malformed thread message.")
 
         linked_messages = []
         if self.channel is not None:
             async for msg in self.channel.history():
                 if not msg.embeds:
                     continue
-
-                msg_joint_id = get_joint_id(msg)
-                if msg_joint_id is None:
+                try:
+                    if msg.channel.name == sender.name and msg.embeds[0].description == desc:
+                        linked_messages.append(msg)
+                        break
+                except ValueError:
                     continue
-
-                if msg_joint_id == message.id:
-                    linked_messages.append(msg)
-                    break
-
-                if joint_id is not None and msg_joint_id == joint_id:
-                    linked_messages.append(msg)
-                    break
             else:
                 raise ValueError("Thread channel message not found.")
         else:
@@ -599,32 +595,6 @@ class Thread:
         if get_thread_channel:
             # end early as we only want the main message from thread channel
             return linked_messages
-
-        if joint_id is None:
-            joint_id = get_joint_id(linked_messages[0])
-            if joint_id is None:
-                # still None, supress this and return the thread message
-                self.bot.log.error("Malformed thread message.")
-                return linked_messages
-
-        for user in self.recipients:
-            if self.recipient.dm_channel == message.channel:
-                continue
-            async for other_msg in user.history():
-                if either_direction:
-                    if other_msg.id == joint_id:
-                        linked_messages.append(other_msg)
-                        break
-
-                if not other_msg.embeds:
-                    continue
-
-                other_joint_id = get_joint_id(other_msg)
-                if other_joint_id is not None and other_joint_id == joint_id:
-                    linked_messages.append(other_msg)
-                    break
-            else:
-                self.bot.log.error("Linked message from recipient %s not found.", user)
 
         return linked_messages
 
@@ -641,7 +611,7 @@ class Thread:
                 # just for thread channel, we put the old message in embed field
                 embed.add_field(name="**Edited, former message:**", value=embed.description)
             embed.description = content
-            await asyncio.gather(self.bot.api.edit_message(message.id, content), msg.edit(embed=embed))
+            await asyncio.gather(msg.edit(embed=embed))
 
     async def note(
         self, message: discord.Message, persistent=False, thread_creation=False
