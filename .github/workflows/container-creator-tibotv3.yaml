@@ -67,7 +67,7 @@ jobs:
         run: |
           TOKEN="${{ secrets.HMAC_TOKEN }}"  # Use the token directly here
           # FluxCD webhook URL
-          WEBHOOK_URL="https://fluxcd-webhook.kube.ginsys.net/hook/ed7ae3ae030a837061e662d797da8c37bc0a6362cbc13f36aa90faae34a9fbc0"
+          WEBHOOK_URL="https://fluxcd-webhook.kube.ginsys.net/hook/c6f9e0a6450b525346bf491f0e52e3c57ebc15047e7a90cccb72202dd8c5e09a"
           # The request body (in JSON format)
           REQUEST_BODY='{"username": "testuser", "action": "login"}'
           # Generate HMAC hash using the plain text token and request body
