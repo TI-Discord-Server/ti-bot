@@ -1,22 +1,12 @@
 import asyncio
-import inspect
-import re
-from datetime import datetime, timezone
-from itertools import zip_longest
-from typing import Optional, Union, List, Tuple, Literal
+from typing import Optional, Literal
 
-
-
-import discord
-from click import DateTime
-from discord import reaction
 from discord.ext import commands
 from discord.app_commands import (
     command,
 )
 
-from utils.thread import Thread, ThreadManager
-from utils.time import UserFriendlyTime, human_timedelta, HumanTime, FriendlyTimeResult, Time, TimeTransformer
+from utils.thread import ThreadManager
 from utils.utils import *
 from utils.has_role import has_role
 from utils import checks
@@ -138,12 +128,18 @@ class Modmail(commands.Cog, name="modmail"):
         Supports attachments and images as well as
         automatically embedding image URLs.
         """
+        await interaction.response.defer(thinking=False)
+
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
 
         async with interaction.channel.typing():
             await thread.reply(sent_message)
+
+        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        await asyncio.sleep(3)
+        await confirmation.delete()
 
     @command(name="areply", description="Replies anonymous to a Modmail-message")
     @has_role("Moderator")
@@ -152,12 +148,18 @@ class Modmail(commands.Cog, name="modmail"):
         """
         Reply to a thread anonymously.
         """
+        await interaction.response.defer(thinking=False)
+
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
 
         async with interaction.channel.typing():
             await thread.reply(sent_message, anonymous=True)
+
+        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        await asyncio.sleep(3)
+        await confirmation.delete()
 
     # @commands.group(invoke_without_command=True)
     @command(name="note", description="Clarification of modmail")
@@ -220,7 +222,7 @@ class Modmail(commands.Cog, name="modmail"):
         Create a thread with a specified member.
         """
         manual_trigger = True
-        category = discord.utils.get(self.bot.guild.categories, id=self.get_modmail_category_id())
+        category = discord.utils.get(self.bot.guild.categories, id=await self.get_modmail_category_id())
         errors = []
 
 
@@ -244,6 +246,7 @@ class Modmail(commands.Cog, name="modmail"):
             if manual_trigger:  # not react to contact
                 embed = discord.Embed(title=title, color=discord.Color.red(), description="\n".join(errors))
                 await interaction.response.send_message(embed=embed, delete_after=10)
+                return
 
             if not user:
                 # end
@@ -273,7 +276,7 @@ class Modmail(commands.Cog, name="modmail"):
         )
 
         em.timestamp = discord.utils.utcnow()
-        em.set_footer(text=f"{creator}", icon_url=self.bot.user.avatar.url)
+        em.set_footer(icon_url=self.bot.user.avatar.url)
 
         await user.send(embed=em)
 
@@ -315,12 +318,7 @@ class Modmail(commands.Cog, name="modmail"):
                 )
             )
 
-        await interaction.response.send_message("🗑️ Last message deleted.!")
-        # await asyncio.sleep(5)
-        # await interaction.delete_original_response()
-
-
-
+        await interaction.response.send_message("🗑️ Message deleted.!")
 
 async def setup(bot):
     await bot.add_cog(Modmail(bot))

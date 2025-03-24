@@ -3,7 +3,6 @@ thread by modmail-dev
 Source:
 https://github.com/modmail-dev/Modmail/blob/master/core/thread.py
 """
-import inspect
 import asyncio
 import base64
 import copy
@@ -16,8 +15,6 @@ import typing
 import warnings
 from datetime import timedelta
 from types import SimpleNamespace
-import logging
-from logging.handlers import RotatingFileHandler
 
 import isodate
 
@@ -26,17 +23,12 @@ from discord.ext.commands import MissingRequiredArgument, CommandError
 from lottie.importers import importers as l_importers
 from lottie.exporters import exporters as l_exporters
 
-from utils.time import human_timedelta
 from utils.models import DummyMessage
 from utils.utils import (
     is_image_url,
     parse_channel_topic,
-    match_title,
     match_user_id,
-    truncate,
-    get_top_role,
     create_thread_channel,
-    get_joint_id,
     AcceptButton,
     DenyButton,
     ConfirmThreadCreationView,
@@ -178,18 +170,6 @@ class Thread:
 
         self._channel = channel
 
-        # try:
-        #     log_url, log_data = await asyncio.gather(
-        #         self.bot.api.create_log_entry(recipient, channel, creator or recipient),
-        #         self.bot.api.get_user_logs(recipient.id),
-        #     )
-        #
-        #     log_count = sum(1 for log in log_data if not log["open"])
-        # except Exception:
-        #     self.bot.log.error("An error occurred while posting logs to the database.")
-        #     log_url = log_count = None
-        #     # ensure core functionality still works
-
         self.ready = True
 
         if creator is not None and creator != recipient:
@@ -198,10 +178,7 @@ class Thread:
             mention = "@here"
 
         async def send_genesis_message():
-            info_embed = self._format_info_embed(recipient,
-                                                 # log_url,
-                                                 # log_count,
-                                                 discord.Color.blurple(),)
+            info_embed = self._format_info_embed(recipient, discord.Color.blurple(),)
             try:
                 msg = await channel.send(mention, embed=info_embed)
                 self.bot.loop.create_task(msg.pin())
@@ -227,55 +204,9 @@ class Thread:
             if creator is None or creator == recipient:
                 msg = await recipient.send(embed=embed)
 
-
-        async def send_persistent_notes():
-            notes = await self.bot.api.find_notes(self.recipient)
-            ids = {}
-
-            class State:
-                def store_user(self, user, cache):
-                    return user
-
-            for note in notes:
-                author = note["author"]
-
-                class Author:
-                    name = author["name"]
-                    id = author["id"]
-                    discriminator = author["discriminator"]
-                    display_avatar = SimpleNamespace(url=author["avatar_url"])
-
-                data = {
-                    "id": round(time.time() * 1000 - discord.utils.DISCORD_EPOCH) << 22,
-                    "attachments": {},
-                    "embeds": {},
-                    "edited_timestamp": None,
-                    "type": None,
-                    "pinned": None,
-                    "mention_everyone": None,
-                    "tts": None,
-                    "content": note["message"],
-                    "author": Author(),
-                }
-                message = discord.Message(state=State(), channel=self.channel, data=data)
-                ids[note["_id"]] = str((await self.note(message, persistent=True, thread_creation=True)).id)
-
-            await self.bot.api.update_note_ids(ids)
-
-        async def activate_auto_triggers():
-            if initial_message:
-                message = DummyMessage(copy.copy(initial_message))
-
-                # try:
-                #     # return await self.bot.trigger_auto_triggers(message, channel) #TODO:
-                # except RuntimeError:
-                #     pass
-
         await asyncio.gather(
             send_genesis_message(),
             send_recipient_genesis_message(),
-            activate_auto_triggers(),
-            # send_persistent_notes(),
         )
         self.bot.dispatch("thread_ready", self, creator, category, initial_message)
 
@@ -285,11 +216,9 @@ class Thread:
         member = self.bot.guild.get_member(user.id)
         time = discord.utils.utcnow()
 
-        # key = log_url.split('/')[-1]
-
         role_names = ""
         if member is not None:
-            sep_server = False #werkt enkel in TI server
+            sep_server = False
             separator = ", " if sep_server else " "
 
             roles = []
@@ -371,7 +300,7 @@ class Thread:
             self.bot.log.error("Thread already closed: %s",e)
             return
 
-        # # Logging
+        # # TODO: Logging
         # if self.channel:
         #     log_data = await self.bot.api.post_log(
         #         self.channel.id,
@@ -424,10 +353,6 @@ class Thread:
             self.auto_close_task.cancel()
             self.auto_close_task = None
 
-        # to_update = self.bot.config["closures"].pop(str(self.id), None)
-        # if to_update is not None:
-        #     await self.bot.config.update()
-
     async def _restart_close_timer(self):
         """
         This will create or restart a timer to automatically close this
@@ -470,7 +395,6 @@ class Thread:
                 raise ValueError("Malformed thread message. 1")
 
         elif message_id is not None:
-            self.bot.log.info("searching message with id %s", str(message_id))
             try:
                 message1 = await self.channel.fetch_message(message_id)
             except discord.NotFound:
@@ -568,8 +492,6 @@ class Thread:
     async def find_linked_message_from_dm(
         self, message: discord.Message, either_direction=False, get_thread_channel=False
     ) -> typing.List[discord.Message]:
-        self.bot.log.info("searching message with id %s", str(message.id))
-
         try:
             sender = message.author
             desc = message.content
@@ -648,7 +570,6 @@ class Thread:
         user_msg_tasks = []
         tasks = []
 
-
         user_msg_tasks.append(
             self.send(
                 message,
@@ -657,7 +578,6 @@ class Thread:
                 anonymous=anonymous,
                 plain=plain,
         ))
-
 
         try:
             user_msg = await asyncio.gather(*user_msg_tasks)
@@ -838,13 +758,10 @@ class Thread:
             else:
                 if note:
                     color = discord.Color.blurple()
-                    #color = self.bot.main_color
                 elif from_mod:
                     color = discord.Color.yellow()
-                    #color = self.bot.mod_color
                 else:
                     color = discord.Color.green()
-                    #color = self.bot.recipient_color
 
                 img_embed = discord.Embed(color=color)
 
@@ -889,12 +806,6 @@ class Thread:
             self.bot.log.warning("Channel not found.")
             raise
 
-
-        if isinstance(destination, discord.TextChannel):
-            mentions = "@here"
-        else:
-            mentions = ""
-
         if plain:
             if from_mod and not isinstance(destination, discord.TextChannel):
                 # Plain to user
@@ -916,10 +827,10 @@ class Thread:
             else:
                 # Plain to mods
                 embed.set_footer(text="[PLAIN] " + embed.footer.text)
-                msg = await destination.send(mentions, embed=embed)
+                msg = await destination.send(embed=embed)
 
         else:
-            msg = await destination.send(mentions, embed=embed)
+            msg = await destination.send(embed=embed)
 
         if additional_images:
             self.ready = False
@@ -933,10 +844,6 @@ class Thread:
 
         user_id = match_user_id(self.channel.topic)
         topic += f"User ID: {user_id}"
-
-        if self._other_recipients:
-            ids = ",".join(str(i.id) for i in self._other_recipients)
-            topic += f"\nOther Recipients: {ids}"
 
         await self.channel.edit(topic=topic)
 
@@ -1024,11 +931,6 @@ class ThreadManager:
                 _, user_id = parse_channel_topic(topic)
                 return recipient_id == user_id
 
-            # channel = discord.utils.find(
-            #     lambda x: (check(x.topic)) if x.topic else False,
-            #     self.bot.guild.text_channels,
-            #     )
-
             channel = next(
                 (x for x in self.bot.guild.text_channels if x.topic and check(x.topic)),
                 None
@@ -1057,7 +959,6 @@ class ThreadManager:
         searching channel history for genesis embed and
         extracts user_id from that.
         """
-
         if not channel.topic:
             return None
 
@@ -1073,14 +974,6 @@ class ThreadManager:
             recipient = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
         except discord.NotFound:
             recipient = None
-
-        # other_recipients = []
-        # for uid in other_ids:
-        #     try:
-        #         other_recipient = await self.bot.get_or_fetch_user(uid)
-        #     except discord.NotFound:
-        #         continue
-        #     other_recipients.append(other_recipient)
 
         if recipient is None:
             thread = Thread(self, user_id, channel)
@@ -1100,7 +993,6 @@ class ThreadManager:
         manual_trigger: bool = True,
     ) -> Thread:
         """Creates a Modmail thread"""
-
         # checks for existing thread in cache
         thread = self.cache.get(recipient.id)
         if thread:

@@ -6,7 +6,6 @@ import os
 import sys
 import traceback
 import typing
-from logging import exception
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
 
@@ -302,7 +301,7 @@ class Bot(commands.Bot):
             return
 
         if isinstance(message.channel, discord.DMChannel):
-            return await self.process_dm_modmail(message) #TODO: error when channel already exists
+            return await self.process_dm_modmail(message)
 
         with contextlib.suppress(Exception):
             ctx = await self.get_context(message)
