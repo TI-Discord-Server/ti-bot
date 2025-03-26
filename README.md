@@ -114,8 +114,8 @@ Jaak:
 
 Kobe:
 
-- Modmail
-- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando
+- ~~Modmail~~ (stickers kunnen niet verstuurd worden.)
+- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando (/transcript [user_id])
 
 Warre:
 

@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import traceback
+import typing
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
 
@@ -16,6 +17,8 @@ from discord.ext import commands
 from discord.interactions import Interaction
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+
+from utils.thread import ThreadManager
 
 from env import (
     BOT_TOKEN,
@@ -144,12 +147,12 @@ class Bot(commands.Bot):
             voice_states=True,
             presences=True,
             guild_messages=True,
-            dm_messages=False,
+            dm_messages=True,
             guild_reactions=True,
-            dm_reactions=False,
+            dm_reactions=True,
             typing=False,
             guild_typing=False,
-            dm_typing=False,
+            dm_typing=True,
             guild_scheduled_events=False,
             emojis_and_stickers=True,
             message_content=True,
@@ -169,8 +172,10 @@ class Bot(commands.Bot):
         self.session = aiohttp.ClientSession(loop=loop)
         self.uptime = datetime.datetime.now()
 
-        self.activity = discord.CustomActivity("Oil up Warre")
+        self.activity = discord.CustomActivity("DM mij om de staff te contacteren")
         self.status = discord.Status.online
+
+        self.threads = ThreadManager(self)
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
@@ -261,15 +266,166 @@ class Bot(commands.Bot):
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
 
-    async def on_message(self, message: discord.Message) -> None:
-        if message.author.id not in self.owner_ids:
+    @property
+    def guild(self) -> typing.Optional[discord.Guild]:
+        """
+        The guild that the bot is serving
+        (the server where users message it from)
+        """
+        return discord.utils.get(self.guilds, id=self.guild_id)
+
+    @property
+    def guild_id(self) -> typing.Optional[int]:
+        guild_id = 1334456602324897792
+        if guild_id is not None:
+            try:
+                return int(guild_id)
+            except ValueError:
+                self.log.error("Invalid GUILD_ID set.")
+        else:
+            self.log.info("No GUILD_ID set.")
+        return None
+
+    def get_guild_icon(
+            self, guild: typing.Optional[discord.Guild], *, size: typing.Optional[int] = None
+    ) -> str:
+        if guild is None:
+            guild = self.guild
+        if guild.icon is None:
+            return "https://cdn.discordapp.com/embed/avatars/0.png"
+        if size is None:
+            return guild.icon.url
+        return guild.icon.with_size(size).url
+
+    async def on_message(self, message: discord.Message):
+        if message.author.bot:
             return
+
+        if isinstance(message.channel, discord.DMChannel):
+            return await self.process_dm_modmail(message)
 
         with contextlib.suppress(Exception):
             ctx = await self.get_context(message)
-
             if ctx.valid:
                 await self.invoke(ctx)
+            elif ctx.invoked_with:
+                exc = commands.CommandNotFound('Command "{}" is not found'.format(ctx.invoked_with))
+                self.dispatch("command_error", ctx, exc)
+
+    @staticmethod
+    async def add_reaction(self,
+            msg, reaction: typing.Union[discord.Emoji, discord.Reaction, discord.PartialEmoji, str]
+    ) -> bool:
+        if reaction != "disable":
+            try:
+                await msg.add_reaction(reaction)
+            except (discord.HTTPException, TypeError) as e:
+                self.bot.log.warning(f"Failed to add reaction to {reaction}: {e}") #TODO
+                return False
+        return True
+
+    async def process_dm_modmail(self, message: discord.Message) -> None:
+        """Processes messages sent to the bot."""
+        if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            return
+
+        thread = await self.threads.find(recipient=message.author)
+        if thread is None:
+            thread = await self.threads.create(message.author, message=message)
+
+        if not thread.cancelled:
+            try:
+                await thread.send(message)
+            except Exception as e:
+                self.log.info(f"Failed to send message ({message.content}) to thread ({thread.channel}): {e}", exc_info=True)
+                # logger.error("Failed to send message:", exc_info=True)
+                await self.add_reaction(self, message, "❌")
+            else:
+
+                # send to all other recipients
+                if thread.recipient != message.author:
+                    try:
+                        await thread.send(message, thread.recipient)
+                    except Exception:
+                        # silently ignore
+                        self.log.error("Failed to send message:", exc_info=True)
+                        # logger.error("Failed to send message:", exc_info=True)
+
+                await self.add_reaction(self, message, "✅")
+                self.dispatch("thread_reply", thread, False, message, False, False)
+
+    async def on_message_delete(self, message):
+        """Support for deleting linked messages"""
+
+        if message.is_system():
+            return
+
+        if isinstance(message.channel, discord.DMChannel):
+            if message.author == self.user:
+                return
+            thread = await self.threads.find(recipient=message.author)
+            if not thread:
+                return
+            try:
+                message = await thread.find_linked_message_from_dm(message, get_thread_channel=True)
+            except ValueError as e:
+                if str(e) != "Thread channel message not found.":
+                    self.log.info(f"Failed to find linked message to delete: {e}")
+                return
+            message = message[0]
+            embed = message.embeds[0]
+
+            if embed.footer.icon:
+                icon_url = embed.footer.icon.url
+            else:
+                icon_url = None
+
+            embed.set_footer(text="(deleted)", icon_url=icon_url)
+            await message.edit(embed=embed)
+            return
+
+        if message.author != self.user:
+            return
+
+        thread = await self.threads.find(channel=message.channel)
+        if not thread:
+            return
+
+        # try:
+        #     await thread.delete_message(message, note=False)
+        #     embed = discord.Embed(description="Successfully deleted message.", color=discord.Color.blurple())
+        # except ValueError as e:
+        #     if str(e) not in {"DM message not found.", "Malformed thread message."}:
+        #         self.log.info(f"Failed to delete linked message to delete: {e}")
+        #         embed = discord.Embed(description="Failed to delete message.", color=discord.Color.red())
+        #     else:
+        #         return
+        # except discord.NotFound:
+        #     return
+        # embed.set_footer(text=f"Message ID: {message.id} from {message.author}.")
+        # return await message.channel.send(embed=embed)
+
+    async def on_message_edit(self, before, after):
+        if after.author.bot:
+            return
+        if before.content == after.content:
+            return
+
+        if isinstance(after.channel, discord.DMChannel):
+            thread = await self.threads.find(recipient=before.author)
+            if not thread:
+                return
+
+            try:
+                await thread.edit_dm_message(before, after.content)
+            except ValueError:
+                await self.add_reaction(self, after, "❌")
+            else:
+                embed = discord.Embed(description="Successfully Edited Message", color=discord.Color.blurple())
+                embed.set_footer(text=f"Message ID: {after.id}")
+                await after.channel.send(embed=embed)
+
+
 
     def _format_cooldown(self, retry_after: float) -> str:
         m, s = divmod(retry_after, 60)
