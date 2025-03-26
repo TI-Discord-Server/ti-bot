@@ -9,12 +9,10 @@ import copy
 import functools
 import io
 import re
-import time
 import traceback
 import typing
 import warnings
-from datetime import timedelta
-from types import SimpleNamespace
+from datetime import timedelta, datetime
 
 import isodate
 
@@ -285,6 +283,167 @@ class Thread:
         await asyncio.sleep(after)
         return self.bot.loop.create_task(self._close(closer, silent, delete_channel, message, True))
 
+    async def store_and_send_log(self,
+                                 closer: typing.Union[discord.Member, discord.User],
+                                 log_channel: discord.TextChannel):
+
+        def format_discord_timestamp(text):
+            """Convert Discord timestamps (<t:1234567890:R>) into human-readable format."""
+            matches = re.findall(r"<t:(\d+):R>", text)
+            for match in matches:
+                timestamp = datetime.utcfromtimestamp(int(match)).strftime('%Y-%m-%d %H:%M:%S')
+                text = text.replace(f"<t:{match}:R>", f"<span class='timestamp'>{timestamp}</span>")
+            return text
+
+        def replace_mentions(text, guild):
+            """ Replaces user, role, and channel mentions with readable names. """
+            if not text:
+                return ""
+
+            # Replace role mentions
+            if "<@&" in text:  # Only process if a role mention exists
+                role_mention_pattern = re.compile(r"<@&(\d+)>")
+                text = role_mention_pattern.sub(
+                    lambda m: f"@{guild.get_role(int(m.group(1))).name if guild.get_role(int(m.group(1))) else 'Unknown Role'}",
+                    text
+                )
+
+            # Replace channel mentions
+            if "<#" in text:  # Only process if a channel mention exists
+                channel_mention_pattern = re.compile(r"<#(\d+)>")
+                text = channel_mention_pattern.sub(
+                    lambda m: f"#{guild.get_channel(int(m.group(1))).name if guild.get_channel(int(m.group(1))) else 'Unknown Channel'}",
+                    text
+                )
+
+            # Replace user mentions
+            if "<@" in text:  # Only process if a user mention exists
+                user_mention_pattern = re.compile(r"<@(\d+)>")
+                text = user_mention_pattern.sub(
+                    lambda m: f"@{guild.get_member(int(m.group(1))).display_name if guild.get_member(int(m.group(1))) else 'Unknown User'}",
+                    text
+                )
+
+            return text
+
+        # Determine NSFW status
+        nsfw = "NSFW-" if self.channel.nsfw else ""
+
+        channel = self.channel
+        messages = []
+
+        async for msg in channel.history(limit=None, oldest_first=True):
+            timestamp = msg.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            author_name = msg.author.display_name
+            content = msg.content or ""
+
+            # Replace mentions with actual names
+            for mention in msg.mentions:
+                content = content.replace(f"<@{mention.id}>", f"<span class='mention'>@{mention.display_name}</span>")
+            for role in msg.role_mentions:
+                content = content.replace(f"<@&{role.id}>", f"<span class='role'>@{role.name}</span>")
+            for channel_mention in msg.channel_mentions:
+                content = content.replace(f"<#{channel_mention.id}>", f"<span class='channel'>#{channel_mention.name}</span>")
+
+            # Convert timestamps
+            content = format_discord_timestamp(content)
+
+            message_html = (
+                f"<div class='message'>"
+                f"<span class='author'>{author_name}</span> <span class='timestamp'>{timestamp}</span><br>"
+                f"<p class='content'>{content}</p>"
+            )
+
+            # Process embeds
+            if msg.embeds:
+                for embed in msg.embeds:
+                    embed_content = f"<div class='embed' style='border-left: 5px solid {embed.color}; padding: 10px;'>"
+
+                    if embed.author:
+                        embed_content += f"<div class='embed-author'><img src='{embed.author.icon_url}' class='embed-author-icon'> {embed.author.name}</div>"
+
+                    if embed.title:
+                        embed_content += f"<h3>{replace_mentions(embed.title, msg.guild)}</h3>"
+
+                    if embed.description:
+                        desc = embed.description
+
+                        desc = replace_mentions(desc, msg.guild)
+                        desc = format_discord_timestamp(desc)
+
+                        embed_content += f"<p>{desc}</p>"
+
+                    if embed.fields:
+                        for field in embed.fields:
+                            embed_content += f"<p><strong>{replace_mentions(field.name, msg.guild)}:</strong> {replace_mentions(field.value, msg.guild)}</p>"
+
+                    if embed.thumbnail:
+                        embed_content += f'<img src="{embed.thumbnail.url}" class="embed-thumbnail">'
+
+                    if embed.image:
+                        embed_content += f'<img src="{embed.image.url}" class="embed-image">'
+
+                    if embed.footer:
+                        embed_content += f"<p class='footer'>"
+                        timestamp_str = embed.timestamp.strftime('%Y-%m-%d %H:%M') if embed.timestamp else ""
+                        if embed.footer.text:
+                            embed_content += f"{embed.footer.text} "
+                        embed_content += f"{timestamp_str}</p>"
+
+                    embed_content += "</div>"
+                    message_html += embed_content
+
+            message_html += "</div>"
+            messages.append(message_html)
+
+            # Create the HTML log
+        log_html = f"""<html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; background-color: #36393F; color: #DCDDDE; padding: 20px; }}
+            .container {{ max-width: 800px; margin: auto; background: #2F3136; padding: 20px; border-radius: 5px; }}
+            .user-info {{ padding: 10px; background: #23272A; border-radius: 5px; margin-bottom: 10px; }}
+            .message {{ padding: 10px; margin: 5px 0; border-radius: 5px; background: #40444B; }}
+            .author {{ font-weight: bold; color: #FFFFFF; }}
+            .timestamp {{ font-size: 0.8em; color: #B9BBBE; }}
+            .mention {{ color: #7289DA; font-weight: bold; }}
+            .role {{ color: #FAA61A; font-weight: bold; }}
+            .channel {{ color: #43B581; font-weight: bold; }}
+            .embed {{ background: #202225; padding: 10px; margin-top: 10px; border-radius: 5px; }}
+            .embed-author {{ font-weight: bold; margin-bottom: 5px; }}
+            .embed-author-icon {{ width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; }}
+            .embed-thumbnail {{ max-width: 100px; float: right; }}
+            .embed-image {{ max-width: 100%; margin-top: 5px; }}
+            .footer {{ font-size: 0.9em; color: #B9BBBE; }}
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <h2>Modmail Log - {channel.name}</h2>
+                {' '.join(messages)}
+        </div>
+    </body>
+</html>"""
+
+        # Create an HTML file
+        file = discord.File(io.BytesIO(log_html.encode()), filename=f"modmail_{channel.id}.html")
+
+        # Send to log channel
+        if log_channel:
+            await log_channel.send(f"{nsfw}Transcript for {channel.name} (closed by {closer.mention}):", file=file)
+
+        # Store in MongoDB
+        _, recipient_id = parse_channel_topic(channel.topic)
+        log_entry = {
+            "recipient_id": recipient_id,
+            "ticket_id": channel.id,
+            "closed_by": closer.id,
+            "timestamp": datetime.utcnow(),
+            "log_html": log_html
+        }
+        await self.bot.db.logs.insert_one(log_entry)
+
+
     async def close(
         self,
         *,
@@ -300,33 +459,8 @@ class Thread:
             self.bot.log.error("Thread already closed: %s",e)
             return
 
-        # # TODO: Logging
-        # if self.channel:
-        #     log_data = await self.bot.api.post_log(
-        #         self.channel.id,
-        #         {
-        #             "open": False,
-        #             "title": match_title(self.channel.topic),
-        #             "closed_at": str(discord.utils.utcnow()),
-        #             "nsfw": self.channel.nsfw,
-        #             "close_message": message,
-        #             "closer": {
-        #                 "id": str(closer.id),
-        #                 "name": closer.name,
-        #                 "discriminator": closer.discriminator,
-        #                 "avatar_url": closer.display_avatar.url,
-        #                 "mod": True,
-        #             },
-        #         },
-        #     )
-        # else:
-        if self.channel.nsfw:
-            nsfw = "NSFW-"
-        else:
-            nsfw = ""
-
-        datetime = discord.utils.utcnow()
-        await log_channel.send(f"{nsfw}Transcript from log {self.id} to {self.recipient} closed by {closer} at {datetime}")
+        #Logging
+        await self.store_and_send_log(closer, log_channel)
 
         #No notification to user
         if not silent:

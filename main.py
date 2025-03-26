@@ -390,19 +390,19 @@ class Bot(commands.Bot):
         if not thread:
             return
 
-        try:
-            await thread.delete_message(message, note=False)
-            embed = discord.Embed(description="Successfully deleted message.", color=discord.Color.blurple())
-        except ValueError as e:
-            if str(e) not in {"DM message not found.", "Malformed thread message."}:
-                self.log.info(f"Failed to delete linked message to delete: {e}")
-                embed = discord.Embed(description="Failed to delete message.", color=discord.Color.red())
-            else:
-                return
-        except discord.NotFound:
-            return
-        embed.set_footer(text=f"Message ID: {message.id} from {message.author}.")
-        return await message.channel.send(embed=embed)
+        # try:
+        #     await thread.delete_message(message, note=False)
+        #     embed = discord.Embed(description="Successfully deleted message.", color=discord.Color.blurple())
+        # except ValueError as e:
+        #     if str(e) not in {"DM message not found.", "Malformed thread message."}:
+        #         self.log.info(f"Failed to delete linked message to delete: {e}")
+        #         embed = discord.Embed(description="Failed to delete message.", color=discord.Color.red())
+        #     else:
+        #         return
+        # except discord.NotFound:
+        #     return
+        # embed.set_footer(text=f"Message ID: {message.id} from {message.author}.")
+        # return await message.channel.send(embed=embed)
 
     async def on_message_edit(self, before, after):
         if after.author.bot:

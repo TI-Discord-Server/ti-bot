@@ -1,5 +1,6 @@
 import asyncio
 from typing import Optional, Literal
+import io
 
 from discord.ext import commands
 from discord.app_commands import (
@@ -92,6 +93,72 @@ class Modmail(commands.Cog, name="modmail"):
 
         await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
 
+    @command(name="generate_transcript", description="Makes a transcript and sends it in log_channel")
+    @has_role("Moderator")
+    @checks.thread_only()
+    async def generate_transcript(
+            self,
+            interaction: discord.Interaction,
+    ):
+        await interaction.response.defer(thinking=False)
+
+        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        await thread.store_and_send_log(closer=interaction.user, log_channel=interaction.channel)
+
+        confirmation = await interaction.followup.send("📝 Transcript generated", ephemeral=True)
+        await asyncio.sleep(2)
+        await confirmation.delete()
+
+    @command(name="transcripts", description="Gives transcripts with certain person")
+    @has_role("Moderator")
+    @checks.thread_only()
+    async def transcripts(
+            self,
+            interaction: discord.Interaction,
+            recipient_id: str,
+    ):
+        await interaction.response.defer()  # Acknowledge command (avoids timeout)
+        recipient_id = int(recipient_id)
+
+        # Fetch files from MongoDB
+        cursor = self.db.logs.find({"recipient_id": recipient_id})
+        files_list = await cursor.to_list(length=None)  # Convert cursor to a list
+
+        if not files_list:
+            await interaction.followup.send(f"No transcripts found for recipient {recipient_id}.")
+            return
+
+        amount = len(files_list)
+        file_batches = []
+        current_batch = []
+
+        counter = 0
+        for file in files_list:
+            counter += 1
+
+            content = file.get('log_html', 'No content available')
+            file_id = file['ticket_id']
+            timestamp = file['timestamp']
+
+            # Create a virtual file using io.BytesIO
+            file_data = io.BytesIO(content.encode('utf-8'))
+            file_data.seek(0)  # Reset pointer to start
+            discord_file = discord.File(file_data, filename=f"{counter}_transcript_{file_id}_{timestamp.strftime('%Y-%m-%d_%H:%M')}.html")
+
+            current_batch.append(discord_file)
+
+            # Send in batches of 10 files
+            if len(current_batch) == 10:
+                file_batches.append(current_batch)
+                current_batch = []
+
+        if current_batch:
+            file_batches.append(current_batch)  # Append any remaining files
+
+        # Send each batch separately
+        for batch in file_batches:
+            await interaction.followup.send(f"{amount} transcripts found for recipient {recipient_id}:", files=batch)
+
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
         mention = None
@@ -170,6 +237,8 @@ class Modmail(commands.Cog, name="modmail"):
         Take a note about the current thread.
         Useful for noting context.
         """
+        await interaction.response.defer(thinking=False)
+
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
@@ -177,6 +246,10 @@ class Modmail(commands.Cog, name="modmail"):
         async with interaction.channel.typing():
             msg = await thread.note(sent_message)
             await msg.pin()
+
+        confirmation = await interaction.followup.send("📝 Noted", ephemeral=True)
+        await asyncio.sleep(3)
+        await confirmation.delete()
 
     @command(name="edit", description="Edits a Modmail-message")
     @has_role("Moderator")
