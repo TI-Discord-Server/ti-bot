@@ -43,13 +43,9 @@ load_dotenv()
 DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset(
     [
         123468845749895170,  # Quinten - @quintenvw
-        406131690742743050,  # Amber - @annanas
         402102269509894144,  # Kobe - @k0be_
         329293977494880257,  # Arthur - @arthurvg
         925002667502239784,  # Jaak - @princessakina
-        251334912576192513,  # Maxime - @tailstm
-        203245885608558592,  # Roan - @littlebladed
-        304989265518133249,  # Sterre - @clustarz
         337521371414396928,  # Warre - @warru
     ]
 )
