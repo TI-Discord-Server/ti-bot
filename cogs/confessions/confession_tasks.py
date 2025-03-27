@@ -9,34 +9,32 @@ class ConfessionTasks(commands.Cog):
         self.bot = bot
         self.review_channel_id = 1348669180840251465
         self.public_channel_id = 1342592622224605345
-        self.daily_review = None  # De taak wordt pas later geïnitialiseerd
-        self.post_approved = None  # Zelfde voor post_approved
+        self.daily_review = None
+        self.post_approved = None
 
-        self.bot.loop.create_task(
-            self.init_tasks()
-        )  # Start taken pas na database-initialisatie
+        self.bot.loop.create_task(self.init_tasks())
 
     async def init_tasks(self):
-        """Laadt de instellingen en start taken."""
         await self.update_review_schedule()
         await self.update_post_schedule()
 
     async def get_settings(self):
-        """Haalt de confession settings op uit de database."""
         settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
         if not settings:
             settings = {
                 "daily_review_limit": 2,
-                "review_time": "17:00",  # Standaard review tijd
-                "post_times": ["9:00", "12:00"],  # Standaard 1 post tijd
+                "review_time": "17:00",
+                "post_times": ["9:00", "12:00"],
             }
             await self.bot.db.settings.insert_one(
                 {"_id": "confession_settings", **settings}
             )
+            self.bot.log.info(
+                "Standaard confession instellingen aangemaakt in de database."
+            )
         return settings
 
     async def update_review_schedule(self):
-        """Update het tijdstip waarop confessions naar het reviewkanaal worden gestuurd."""
         settings = await self.get_settings()
         review_time_str = settings["review_time"]
 
@@ -44,25 +42,24 @@ class ConfessionTasks(commands.Cog):
             hour, minute = map(int, review_time_str.split(":"))
             review_time = datetime.time(hour=hour, minute=minute, tzinfo=datetime.UTC)
 
-            # ✅ Stop de oude taak als deze draait
             if self.daily_review and self.daily_review.is_running():
                 self.daily_review.cancel()
-                print(f"🔄 Review taak gestopt, update naar {review_time}")
+                self.bot.log.info(
+                    f"Review-taak gestopt voor update naar {review_time} UTC."
+                )
 
-            # ✅ Start de taak opnieuw met de nieuwe tijd
             @tasks.loop(time=[review_time])
             async def daily_review_task():
                 await self._daily_review_task()
 
             self.daily_review = daily_review_task
             self.daily_review.start()
-            print(f"✅ Review taak gestart met nieuwe tijd: {review_time}")
+            self.bot.log.info(f"Review-taak gestart op tijdstip: {review_time} UTC.")
 
         except ValueError:
-            print("❌ Error: Ongeldige review-tijd in de settings.")
+            self.bot.log.error("Ongeldige review-tijd opgegeven in settings.")
 
     async def _daily_review_task(self):
-        """Taak die confessions in het reviewkanaal plaatst."""
         settings = await self.get_settings()
         confessions = await self.bot.db.confessions.find({"status": "pending"}).to_list(
             settings["daily_review_limit"]
@@ -70,7 +67,11 @@ class ConfessionTasks(commands.Cog):
 
         review_channel = self.bot.get_channel(self.review_channel_id)
         if not review_channel:
-            print("Review channel niet gevonden.")
+            self.bot.log.error("Reviewkanaal niet gevonden.")
+            return
+
+        if not confessions:
+            self.bot.log.info("Geen nieuwe confessions om te reviewen.")
             return
 
         for confession in confessions:
@@ -85,14 +86,16 @@ class ConfessionTasks(commands.Cog):
                 {"_id": confession["_id"]},
                 {"$set": {"status": "under_review", "message_id": message.id}},
             )
+            self.bot.log.debug(f"Confession {confession['_id']} geplaatst voor review.")
 
     async def update_post_schedule(self):
-        """Update de post-tijden voor goedgekeurde confessions."""
         settings = await self.get_settings()
         post_times = settings["post_times"]
 
         if not post_times:
-            print("⚠️ Geen post-tijden ingesteld. Post-taak wordt niet gestart.")
+            self.bot.log.warning(
+                "Geen post-tijden ingesteld. Post-taak wordt niet gestart."
+            )
             return
 
         try:
@@ -105,51 +108,47 @@ class ConfessionTasks(commands.Cog):
                 for t in post_times
             ]
 
-            # ✅ Stop de oude taak als deze draait
             if self.post_approved and self.post_approved.is_running():
                 self.post_approved.cancel()
-                print(f"🔄 Post-taak gestopt, update naar {times}")
+                self.bot.log.info(f"Post-taak gestopt voor update naar tijden: {times}")
 
-            # ✅ Start de taak opnieuw met de nieuwe tijden
             @tasks.loop(time=times)
             async def post_approved_task():
                 await self._post_approved_task()
 
             self.post_approved = post_approved_task
             self.post_approved.start()
-            print(f"✅ Post-taak gestart met nieuwe tijden: {times}")
+            self.bot.log.info(f"Post-taak gestart met tijden: {times}")
 
         except ValueError:
-            print("❌ Error: Ongeldige post-tijden in de settings.")
+            self.bot.log.error("Ongeldige post-tijden in de settings.")
 
     async def _post_approved_task(self):
-        """Achtergrondtaak die goedgekeurde confessions post."""
         await self.run_post_approved()
 
     async def run_post_approved(self):
-        """Verwerkt en post exact **één** confession per geplande post-tijd."""
         review_channel = self.bot.get_channel(self.review_channel_id)
         public_channel = self.bot.get_channel(self.public_channel_id)
 
         if not review_channel or not public_channel:
-            print("Error: Review of public channel niet gevonden.")
+            self.bot.log.error("Review- of public-channel niet gevonden.")
             return
 
         messages = [msg async for msg in review_channel.history(limit=100)]
         message_dict = {str(msg.id): msg for msg in messages}
 
-        # ✅ Haal **slechts 1 confession** op die nog in review staat
         confession = await self.bot.db.confessions.find_one({"status": "under_review"})
-
         if not confession:
-            print("⚠️ Geen confessions beschikbaar om te posten.")
+            self.bot.log.info("Geen confessions beschikbaar om te posten.")
             return
 
         message_id = str(confession.get("message_id"))
-        matching_message = message_dict.get(message_id, None)
+        matching_message = message_dict.get(message_id)
 
         if not matching_message:
-            print(f"Geen match gevonden voor confession {confession['_id']}")
+            self.bot.log.warning(
+                f"Geen matching message gevonden voor confession {confession['_id']}"
+            )
             return
 
         allow_votes = 0
@@ -163,8 +162,8 @@ class ConfessionTasks(commands.Cog):
             elif reaction.emoji == "❌":
                 deny_votes = len(non_bot_users)
 
-        print(
-            f"Confession {confession['_id']} heeft {allow_votes} stemmen voor en {deny_votes} stemmen tegen."
+        self.bot.log.debug(
+            f"Confession {confession['_id']} - ✅ {allow_votes}, ❌ {deny_votes}"
         )
 
         if allow_votes > deny_votes:
@@ -183,24 +182,26 @@ class ConfessionTasks(commands.Cog):
                 {"_id": confession["_id"]},
                 {"$set": {"status": "posted", "confession_number": posted_count}},
             )
-
             await matching_message.delete()
+
+            self.bot.log.info(f"Confession #{posted_count} gepost.")
 
         elif allow_votes < deny_votes:
             await self.bot.db.confessions.update_one(
                 {"_id": confession["_id"]}, {"$set": {"status": "rejected"}}
             )
             await matching_message.delete()
+            self.bot.log.info(f"Confession {confession['_id']} werd verworpen.")
 
         else:
-            print(
-                f"Confession {confession['_id']} blijft onder review vanwege gelijke stemmen."
-            )
             await self.bot.db.confessions.update_one(
                 {"_id": confession["_id"]},
                 {"$set": {"status": "pending", "message_id": None}},
             )
             await matching_message.delete()
+            self.bot.log.info(
+                f"Confession {confession['_id']} blijft onder review vanwege gelijke stemmen."
+            )
 
 
 async def setup(bot):
