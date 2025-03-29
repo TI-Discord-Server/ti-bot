@@ -441,7 +441,7 @@ class Thread:
             "timestamp": datetime.utcnow(),
             "log_html": log_html
         }
-        await self.bot.db.logs.insert_one(log_entry)
+        await self.bot.db.modmail_logs.insert_one(log_entry)
 
 
     async def close(
