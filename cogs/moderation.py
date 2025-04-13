@@ -5,14 +5,27 @@ import datetime
 import re
 from typing import Optional
 import pymongo
+import time
+import pytz  # Importeer de pytz library
 
-MOD_ID = 1348716664333795398
-UNBAN_REQUEST_URL = "https://discord.gg/98swM2fgjW"
+# Definieer de gewenste timezone (GMT+1)
+TIMEZONE = pytz.timezone('Europe/Amsterdam')
+
 
 def is_moderator():
+    """
+    Controleert of de gebruiker een moderator is. Een moderator is de bot owner of iemand met 'manage_guild' permissies.
+    """
+
     async def predicate(interaction: discord.Interaction):
+        """Predicate om te controleren of de user een moderator is."""
+        settings = await interaction.client.db.settings.find_one({"_id": "mod_settings"})
+        if not settings:
+            print("Geen mod settings gevonden in de database! De 'is_moderator' check zal falen.")
+            return False
+        moderator_id = settings.get("moderator_id")
         return (
-            interaction.user.id == MOD_ID
+            interaction.user.id == moderator_id
             or interaction.user.guild_permissions.manage_guild
         )
 
@@ -20,33 +33,45 @@ def is_moderator():
 
 
 class ModCommands(commands.Cog, name="ModCommands"):
+    """
+    Commands voor server moderatie.
+    """
+
     def __init__(self, bot):
+        """Initialiseert de ModCommands cog."""
         self.bot = bot
         self.infractions_collection = self.bot.db["infractions"]
+        self.settings_collection = self.bot.db["settings"]
 
     async def send_dm_embed(self, member: discord.Member, embed: discord.Embed):
+        """
+        Stuurt een DM naar een gebruiker met een embedded message.
+        Retourneert True als de DM succesvol is verzonden, False anders.
+        """
         try:
             await member.send(embed=embed)
             return True
         except (discord.errors.Forbidden, discord.errors.HTTPException):
             return False
 
-    @app_commands.command(name="kick", description="Kick a member from the server.")
+    @app_commands.command(name="kick", description="Kick een member van de server.")
     @is_moderator()
     async def kick(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
+        """Kickt een member van de server met een optionele reden."""
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been kicked from {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"⚠️ | Je bent gekickt.",
+            description=f"Reden: {reason}",
             color=discord.Color.orange(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -55,44 +80,48 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             await member.kick(reason=reason)
             embed = discord.Embed(
-                title="Member Kicked",
-                description=f"{member.mention} has been kicked. Reason: {reason}",
+                title="Member gekickt",
+                description=f"{member.mention} is gekickt. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "kick", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "kick", reason
+            )
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to kick this member.",
+                description="Ik heb geen permissie om deze member te kicken.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Error",
-                description="Kick failed.",
+                description="Kicken mislukt.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="ban", description="Ban a member from the server.")
+    @app_commands.command(name="ban", description="Ban een member van de server.")
     @is_moderator()
     async def ban(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
+        """Bant een member van de server met een optionele reden."""
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been banned from {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"⚠️ | Je bent gebanned.",
+            description=f"Reden: {reason}",
             color=discord.Color.dark_red(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -102,15 +131,17 @@ class ModCommands(commands.Cog, name="ModCommands"):
             try:
                 channel = await member.create_dm()
                 view = discord.ui.View()
+                settings = await self.settings_collection.find_one({"_id": "mod_settings"})
+                unban_request_url = settings.get("unban_request_url", "https://example.com/unban_request")
                 button = discord.ui.Button(
-                    label="Request Unban", style=discord.ButtonStyle.link, url=UNBAN_REQUEST_URL
+                    label="Request Unban", style=discord.ButtonStyle.link, url=unban_request_url
                 )
                 view.add_item(button)
 
                 await channel.send(
                     embed=discord.Embed(
-                        title="Unban Request",
-                        description=f"You have been banned from {interaction.guild.name} with reason: {reason} \n\n If you would like to request an unban, please click the link below.",
+                        title="⚠️ | Je bent gebanned.",
+                        description=f"Je bent gebanned van {interaction.guild.name} met reden: {reason} \n\n Als je een unban wilt aanvragen, klik dan op de link hieronder.",
                         color=discord.Color.gold(),
                     ),
                     view=view,
@@ -118,54 +149,56 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
                 dm_success = True
             except discord.errors.Forbidden:
-                print(f"Could not send DM to {member.name}.")
+                print(f"Kon geen DM sturen naar {member.name}.")
                 dm_success = False
 
             await member.ban(reason=reason)
 
             embed = discord.Embed(
-                title="Member Banned",
-                description=f"{member.mention} has been banned. Reason: {reason}",
+                title="Member gebanned",
+                description=f"{member.mention} is gebanned. Reden: {reason}",
                 color=discord.Color.green(),
             )
 
             if dm_success:
-                embed.set_footer(text="User was notified via DM.")
+                embed.set_footer(text="Gebruiker is via DM geïnformeerd.")
             else:
-                embed.set_footer(text="Failed to notify user via DM.")
+                embed.set_footer(text="Kon gebruiker niet via DM informeren.")
 
             await interaction.followup.send(embed=embed, ephemeral=False)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "ban", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "ban", reason
+            )
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to ban this member.",
+                description="Ik heb geen permissie om deze member te bannen.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Error",
-                description="Ban failed.",
+                description="Bannen mislukt.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="mute", description="Mute a member in the server")
+    @app_commands.command(name="mute", description="Mute een member in de server")
     @is_moderator()
     async def mute(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided",
+        reason: str = "Geen reden opgegeven",
     ):
         guild = interaction.guild
         muted_role = discord.utils.get(guild.roles, name="Muted")
 
         if not muted_role:
             muted_role = await guild.create_role(
-                name="Muted", reason="Created Muted role for muting"
+                name="Muted", reason="Muted role aangemaakt voor muting"
             )
 
             for channel in guild.channels:
@@ -182,11 +215,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been muted in {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"⚠️| Je bent gemute.",
+            description=f"Reden: {reason}",
             color=discord.Color.dark_gray(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -194,37 +228,39 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             await member.add_roles(muted_role, reason=reason)
             embed = discord.Embed(
-                title="Member Muted",
-                description=f"{member.mention} has been muted. Reason: {reason}",
+                title="Member gemute",
+                description=f"{member.mention} is gemute. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "mute", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "mute", reason
+            )
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to manage roles for this member.",
+                description="Ik heb geen permissie om rollen te beheren voor deze member.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Error",
-                description="Mute failed.",
+                description="Muten mislukt.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name="unmute", description="Unmute a member in the server."
+        name="unmute", description="Unmute een member in de server."
     )
     @is_moderator()
     async def unmute(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
         guild = interaction.guild
         muted_role = discord.utils.get(guild.roles, name="Muted")
@@ -232,7 +268,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         if not muted_role:
             embed = discord.Embed(
                 title="Error",
-                description="No 'Muted' role found.  Cannot unmute.",
+                description="Geen 'Muted' role gevonden. Kan niet unmuten.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -241,11 +277,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been unmuted in {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"⚠️ | Je bent geunmute.",
+            description=f"Reden: {reason}",
             color=discord.Color.green(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -253,65 +290,70 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             await member.remove_roles(muted_role, reason=reason)
             embed = discord.Embed(
-                title="Member Unmuted",
-                description=f"{member.mention} has been unmuted. Reason: {reason}",
+                title="Member geunmute",
+                description=f"{member.mention} is geunmute. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "unmute", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "unmute", reason
+            )
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to manage roles for this member.",
+                description="Ik heb geen permissie om rollen te beheren voor deze member.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Error",
-                description="Unmute failed.",
+                description="Unmuten mislukt.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="warn", description="Warn a user")
+    @app_commands.command(name="warn", description="Waarschuw een user")
     @is_moderator()
     async def warn(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been warned in {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"⚠️ | Je bent gewaarschuwd.",
+            description=f"Reden: {reason}",
             color=discord.Color.yellow(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
         dm_sent = await self.send_dm_embed(member, dm_embed)
         if not dm_sent:
             embed = discord.Embed(
-                title="Warning",
-                description=f"Could not send warning to {member.mention}.",
+                title="Waarschuwing",
+                description=f"Kon geen waarschuwing sturen naar {member.mention}.",
                 color=discord.Color.orange(),
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         embed = discord.Embed(
-            title="Member Warned",
-            description=f"{member.mention} has been warned and notified via DM.",
+            title="Member gewaarschuwd",
+            description=f"{member.mention} is gewaarschuwd en via DM geïnformeerd.",
             color=discord.Color.green(),
         )
         await interaction.response.send_message(embed=embed)
-        await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "warn", reason)
+        await self.log_infraction(
+            interaction.guild.id, member.id, interaction.user.id, "warn", reason
+        )
 
     @app_commands.command(
-        name="purge", description="Purge messages from the channel."
+        name="purge", description="Verwijdert messages uit het kanaal."
     )
     @is_moderator()
     async def purge(
@@ -334,8 +376,8 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             deleted = await interaction.channel.purge(limit=count, check=check)
             embed = discord.Embed(
-                title="Messages Purged",
-                description=f"Purged {len(deleted)} messages in this channel.",
+                title="Messages verwijderd",
+                description=f"{len(deleted)} messages verwijderd in dit kanaal.",
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -343,39 +385,39 @@ class ModCommands(commands.Cog, name="ModCommands"):
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to purge messages in this channel.",
+                description="Ik heb geen permissie om messages in dit kanaal te verwijderen.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.errors.HTTPException as e:
             embed = discord.Embed(
                 title="Error",
-                description=f"Purge failed: {e}",
+                description=f"Verwijderen mislukt: {e}",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name="timeout", description="Timeout a member in the server"
+        name="timeout", description="Timeout een member in de server"
     )
     @is_moderator()
     @app_commands.describe(
-        member="The member to timeout",
-        duration="The duration of the timeout (e.g., 1m, 5h, 1d). Max 28 days.",
-        reason="The reason for the timeout",
+        member="De member om te timeouten",
+        duration="De duration van de timeout (bijv. 1m, 5h, 1d). Max 28 dagen.",
+        reason="De reden voor de timeout",
     )
     async def timeout(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
         duration: str,
-        reason: str = "No reason provided",
+        reason: str = "Geen reden opgegeven",
     ):
         duration_timedelta = self.parse_duration(duration)
         if not duration_timedelta:
             embed = discord.Embed(
                 title="Error",
-                description="Invalid duration format. Use examples like 1m, 5h, 1d.",
+                description="Invalid duration format. Gebruik voorbeelden zoals 1m, 5h, 1d.",
                 color=discord.Color.red(),
             )
             return await interaction.response.send_message(
@@ -387,7 +429,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         if duration_timedelta > datetime.timedelta(days=28):
             embed = discord.Embed(
                 title="Error",
-                description="Maximum timeout duration is 28 days.",
+                description="Maximale timeout duration is 28 dagen.",
                 color=discord.Color.red(),
             )
             return await interaction.response.send_message(
@@ -397,11 +439,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"You have been timed out in {interaction.guild.name}",
-            description=f"Reason: {reason}\nDuration: {duration}",
+            title=f"⚠️ | Je bent getimed out.",
+            description=f"Reden: {reason}\nDuration: {duration}",
             color=discord.Color.dark_orange(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
         dm_sent = await self.send_dm_embed(member, dm_embed)
@@ -409,15 +452,17 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await member.timeout(timeout_until, reason=reason)
             embed = discord.Embed(
                 title="Member Timeout",
-                description=f"{member.mention} has been timed out for {duration}. Reason: {reason}",
+                description=f"{member.mention} is getimed out voor {duration}. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "timeout", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "timeout", reason
+            )
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to timeout this member.",
+                description="Ik heb geen permissie om deze member te timeouten.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -434,27 +479,28 @@ class ModCommands(commands.Cog, name="ModCommands"):
         return datetime.timedelta(**{unit: amount})
 
     @app_commands.command(
-        name="untimeout", description="Remove timeout from a member"
+        name="untimeout", description="Verwijdert timeout van een member"
     )
     @is_moderator()
     @app_commands.describe(
-        member="The member to remove timeout from",
-        reason="The reason for removing timeout",
+        member="De member om de timeout van te verwijderen",
+        reason="De reden voor het verwijderen van de timeout",
     )
     async def untimeout(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         dm_embed = discord.Embed(
-            title=f"Your timeout has been removed in {interaction.guild.name}",
-            description=f"Reason: {reason}",
+            title=f"Je timeout is verwijderd in {interaction.guild.name}",
+            description=f"Reden: {reason}",
             color=discord.Color.green(),
         )
-        dm_embed.set_footer(text=f"Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Gebruik de timezone bij het formatteren van de tijd
+        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -462,122 +508,132 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             await member.timeout(None, reason=reason)
             embed = discord.Embed(
-                title="Member Untimeout",
-                description=f"{member.mention} has been untimedout. Reason: {reason}",
+                title="Member untimeout",
+                description=f"{member.mention} is geuntimeout. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(interaction.guild.id, member.id, interaction.user.id, "untimeout", reason)
+            await self.log_infraction(
+                interaction.guild.id, member.id, interaction.user.id, "untimeout", reason
+            )
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to untimeout this member.",
+                description="Ik heb geen permissie om deze member te untimeouten.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name="history", description="Display a member's recent history."
+        name="history", description="Laat de recente straffen van een member zien."
     )
     @is_moderator()
-    @app_commands.describe(member="The member to view history for")
+    @app_commands.describe(member="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, member: discord.Member):
-        infractions = await self.bot.db.infractions.find({"guild_id": interaction.guild.id, "user_id": member.id}).sort("timestamp", pymongo.DESCENDING).limit(10).to_list(length=None)
+        infractions = await self.bot.db.infractions.find(
+            {"guild_id": interaction.guild.id, "user_id": member.id}
+        ).sort("timestamp", pymongo.DESCENDING).limit(
+            10
+        ).to_list(
+            length=None
+        )
         infraction_list = ""
         for infraction in infractions:
-            infraction_list += f"`{infraction['timestamp'].strftime('%Y-%m-%d %H:%M:%S UTC')}` - **{infraction['type'].capitalize()}**: {infraction['reason']}\n"
+            localized_timestamp = infraction['timestamp'].astimezone(TIMEZONE)
+            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction['type'].capitalize()}**: {infraction['reason']}\n"
 
         if not infraction_list:
-            infraction_list = "No history found for this user."
+            infraction_list = "Geen voorgaande straffen gevonden voor deze gebruiker."
 
         embed = discord.Embed(
-            title=f"History for {member.name}", color=discord.Color.blue(),
-            description=infraction_list
+            title=f"History voor {member.name}",
+            color=discord.Color.blue(),
+            description=infraction_list,
         )
         embed.add_field(
             name="Join Date",
-            value=member.joined_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            value=f"<t:{int(time.mktime(member.joined_at.astimezone(TIMEZONE).timetuple()))}:D>",
             inline=False,
         )
         embed.add_field(
             name="Account Creation Date",
-            value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            value=f"<t:{int(time.mktime(member.created_at.astimezone(TIMEZONE).timetuple()))}:D>",
             inline=False,
         )
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
     @app_commands.command(
         name="lockdown",
-        description="Prevent sending messages in a channel.",
+        description="Voorkom het versturen van berichten in een channel.",
     )
     @is_moderator()
     @app_commands.describe(
-        channel="The channel to lockdown", reason="The reason for the lockdown"
+        channel="De channel om te lockdownen", reason="De reden voor de lockdown"
     )
     async def lockdown(
         self,
         interaction: discord.Interaction,
         channel: discord.TextChannel,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
         try:
             await channel.set_permissions(
                 interaction.guild.default_role, send_messages=False
             )
             embed = discord.Embed(
-                title="Channel Locked Down",
-                description=f"{channel.mention} has been locked down. Reason: {reason}",
+                title="Channel Gelockdown",
+                description=f"{channel.mention} is gelockdown. Reden: {reason}",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to lockdown this channel.",
+                description="Ik heb geen permissie om dit channel te lockdownen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="unlockdown",
-        description="Unlock a locked channel.",
+        description="Unlock een gelockdown channel.",
     )
     @is_moderator()
     @app_commands.describe(
-        channel="The channel to unlock", reason="The reason for the unlockdown"
+        channel="De channel om te unlocken", reason="De reden voor het unlocken"
     )
     async def unlockdown(
         self,
         interaction: discord.Interaction,
         channel: discord.TextChannel,
-        reason: str = "No reason provided.",
+        reason: str = "Geen reden opgegeven.",
     ):
         try:
             await channel.set_permissions(
                 interaction.guild.default_role, send_messages=True
             )
             embed = discord.Embed(
-                title="Channel Unlocked",
-                description=f"{channel.mention} has been unlocked. Reason: {reason}",
+                title="Channel Geunlockt",
+                description=f"{channel.mention} is geunlockt. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to unlock this channel.",
+                description="Ik heb geen permissie om dit channel te unlocken.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name="slowmode", description="Set slowmode in a channel."
+        name="slowmode", description="Stel slowmode in een channel in."
     )
     @is_moderator()
     @app_commands.describe(
-        channel="The channel to set slowmode in",
-        seconds="The slowmode delay in seconds",
+        channel="De channel om slowmode in te stellen",
+        seconds="De slowmode delay in seconden",
     )
     async def slowmode(
         self,
@@ -588,56 +644,99 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             await channel.edit(slowmode_delay=seconds)
             embed = discord.Embed(
-                title="Slowmode Set",
-                description=f"Slowmode set to {seconds} seconds in {channel.mention}.",
+                title="Slowmode Ingesteld",
+                description=f"Slowmode ingesteld op {seconds} seconden in {channel.mention}.",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
-                description="I do not have permission to set slowmode in this channel.",
+                description="Ik heb geen permissie om slowmode in dit channel in te stellen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Error",
-                description="Failed to set slowmode.",
+                description="Kon slowmode niet instellen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    async def log_infraction(self, guild_id, user_id, moderator_id, infraction_type, reason):
+    async def log_infraction(
+        self, guild_id, user_id, moderator_id, infraction_type, reason
+    ):
         infraction = {
             "guild_id": guild_id,
             "user_id": user_id,
             "moderator_id": moderator_id,
             "type": infraction_type,
             "reason": reason,
-            "timestamp": datetime.datetime.utcnow()
+            "timestamp": datetime.datetime.utcnow(),
         }
-        await self.bot.db.infractions.insert_one(infraction)
+        await self.infractions_collection.insert_one(infraction)
 
-@app_commands.context_menu(name="Purge Below")
+    @app_commands.command(name="set_mod_setting", description="Stel een moderator setting in.")
+    @is_moderator()
+    @app_commands.describe(
+        setting_name="De setting om aan te passen",
+        setting_value="De waarde voor de setting."
+    )
+    @app_commands.choices(setting_name=[
+        app_commands.Choice(name="moderator_id", value="moderator_id"),
+        app_commands.Choice(name="unban_request_url", value="unban_request_url"),
+    ])
+    async def set_mod_setting(self, interaction: discord.Interaction,
+                                setting_name: str,
+                                setting_value: str):
+        """Stelt een moderator setting in."""
+        valid_settings = {
+            "moderator_id": "moderator_id",
+            "unban_request_url": "unban_request_url"
+        }
+
+        if setting_name not in valid_settings:
+            return await interaction.response.send_message(
+                f"Ongeldige setting naam. Geldige settings zijn: {', '.join(valid_settings.keys())}",
+                ephemeral=True)
+
+        try:
+            if setting_name == "moderator_id":
+                setting_value = int(setting_value)
+        except ValueError:
+            return await interaction.response.send_message("De 'moderator_id' moet een getal zijn.", ephemeral=True)
+
+        await self.settings_collection.update_one(
+            {"_id": "mod_settings"},
+            {"$set": {setting_name: setting_value}},
+            upsert=True,
+        )
+
+        await interaction.response.send_message(
+            f"Setting '{setting_name}' is ingesteld op '{setting_value}'.",
+            ephemeral=True)
+
+
+@app_commands.context_menu(name="Verwijder Hieronder")
 @is_moderator()
 async def purge_below(interaction: discord.Interaction, message: discord.Message):
     try:
         await interaction.response.defer(ephemeral=True)
         messages_to_delete = []
-        async for msg in interaction.channel.history(limit=None, oldest_first=False):
+        async for msg in interaction.channel.history(
+            limit=None, oldest_first=False
+        ):
             if msg.id == message.id:
                 break
             messages_to_delete.append(msg)
 
         if messages_to_delete:
-            await interaction.channel.delete_messages(
-                messages_to_delete
-            )
+            await interaction.channel.delete_messages(messages_to_delete)
 
         embed = discord.Embed(
-            title="Messages Purged Below",
-            description=f"Purged {len(messages_to_delete)} messages below the selected message.",
+            title="Messages verwijderd Hieronder",
+            description=f"{len(messages_to_delete)} messages verwijderd onder de geselecteerde message.",
             color=discord.Color.green(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -645,17 +744,17 @@ async def purge_below(interaction: discord.Interaction, message: discord.Message
     except discord.errors.Forbidden:
         embed = discord.Embed(
             title="Permission Error",
-            description="I do not have permission to purge messages in this channel.",
+            description="Ik heb geen permissie om messages in dit channel te verwijderen.",
             color=discord.Color.red(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
     except discord.errors.HTTPException as e:
-        embed = discord.Embed(
-            title="Error",
-            description=f"Purge failed: {e}",
-            color=discord.Color.red(),
-        )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+            embed = discord.Embed(
+                title="Error",
+                description=f"Verwijderen mislukt: {e}",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot):
