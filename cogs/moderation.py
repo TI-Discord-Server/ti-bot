@@ -676,7 +676,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
             "timestamp": datetime.datetime.utcnow(),
         }
         await self.infractions_collection.insert_one(infraction)
-
     @app_commands.command(name="set_mod_setting", description="Stel een moderator setting in.")
     @is_moderator()
     @app_commands.describe(
@@ -686,6 +685,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.choices(setting_name=[
         app_commands.Choice(name="moderator_id", value="moderator_id"),
         app_commands.Choice(name="unban_request_url", value="unban_request_url"),
+        app_commands.Choice(name="unban_request_kanaal_id", value="unban_request_kanaal_id"),
+        app_commands.Choice(name="aanvragen_log_kanaal_id_1", value="aanvragen_log_kanaal_id_1"),
+        app_commands.Choice(name="aanvragen_log_kanaal_id_2", value="aanvragen_log_kanaal_id_2"),
     ])
     async def set_mod_setting(self, interaction: discord.Interaction,
                                 setting_name: str,
@@ -693,7 +695,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
         """Stelt een moderator setting in."""
         valid_settings = {
             "moderator_id": "moderator_id",
-            "unban_request_url": "unban_request_url"
+            "unban_request_url": "unban_request_url",
+            "unban_request_kanaal_id": "unban_request_kanaal_id",
+            "aanvragen_log_kanaal_id_1": "aanvragen_log_kanaal_id_1",
+            "aanvragen_log_kanaal_id_2": "aanvragen_log_kanaal_id_2",
         }
 
         if setting_name not in valid_settings:
@@ -702,10 +707,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 ephemeral=True)
 
         try:
-            if setting_name == "moderator_id":
+            if setting_name in ("moderator_id", "unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"):
                 setting_value = int(setting_value)
         except ValueError:
-            return await interaction.response.send_message("De 'moderator_id' moet een getal zijn.", ephemeral=True)
+            return await interaction.response.send_message(f"De '{setting_name}' moet een getal zijn.", ephemeral=True)
 
         await self.settings_collection.update_one(
             {"_id": "mod_settings"},
@@ -716,7 +721,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await interaction.response.send_message(
             f"Setting '{setting_name}' is ingesteld op '{setting_value}'.",
             ephemeral=True)
-
 
 @app_commands.context_menu(name="Verwijder Hieronder")
 @is_moderator()
