@@ -123,13 +123,15 @@ class DiscordWebhookHandler(logging.Handler):
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-        mongo_uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/dev?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true"
-        motor = AsyncIOMotorClient(mongo_uri, connect=True)
+        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
+        motor = AsyncIOMotorClient(
+            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true",
+            connect=True,
+        )
         motor.get_io_loop = asyncio.get_running_loop
-        self.db = motor.get_database("dev")
+        self.db = motor.bot
         self.color = discord.Color.blurple()
         self.token = BOT_TOKEN
-
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         # Select whatever we need here and make sure we have the correct things enabled on the Discord Developer Portal.
