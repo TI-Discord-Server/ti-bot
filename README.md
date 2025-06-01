@@ -23,6 +23,16 @@ This bot can be started using python3 or via a container.
 
 2. Open the file **`docker-compose.yml`**.
 3. Ensure your **`.env`** file is in the repository's root folder with the exact name `.env`.
+
+   - ```shell
+      BOT_TOKEN='XXX'
+      MONGODB_IP_ADDRESS='mongo' # don't toucht this if you run it with docker compose config!
+      MONGODB_PASSWORD='yourpassword123!' # check with the docker-compose.yaml to be the same!
+      WEBHOOK_URL='<https://discord.com/api/webhooks/1343185088115904662/YXcrhENRo6d1eQQFL5mCjOpF5Y8A0JS1udqraJB70v33vHAFrJ2Nqade7hagB0Zid6ta>'
+      MONGODB_PORT=27017 # check with the docker-compose.yaml to be the same!
+      MONGODB_USERNAME=bot # create first the mongodb user with the mongo shell. see readme below.
+
+```
 4. Start the services using Docker Compose:
 
    ```bash
@@ -89,7 +99,7 @@ use bot
 ```mongo
 db.createUser({
   user: "bot",
-  pwd: "Password123",
+  pwd: "yourpassword123!",
   roles: [
     { role: "readWrite", db: "bot" }
   ]
