@@ -14,15 +14,26 @@ This bot can be started using python3 or via a container.
 ## 🚀 Deploying Tibot-v3 with Docker
 
 1. Run the following command in your CLI from the root folder to build the Docker image:
-
    ```bash
    docker build -t tibot-v3 .
    ```
 
 ### running with docker compose
 
-2. Open the file **`docker-compose.yml`**.
-3. Ensure your **`.env`** file is in the repository's root folder with the exact name `.env`.
+2. Check the file **`docker-compose.yml`**.
+
+3.1 First make a file with the name **.env** copy paste the **examples.env** to the **.env** file
+
+   - Environment Variables (.env)
+      - De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` voor een voorbeeld. De volgende variabelen zijn nodig. Let op IP en poort moeten exact kloppen voor te kunnen werken in het docker netwerk. Zie **examples.env** als correcte tamplate met onze docker-compose.yaml
+         - `BOT_TOKEN`: Je Discord bot token
+         - `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB server
+         - `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB authenticatie
+         - `MONGODB_PORT`: De poort van je MongoDB server (standaard waarde = 27017)
+         - `MONGODB_USERNAME`: De naam van de MongoDB tabel en gebruiker (standaard waarde = bot)
+         - `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
+
+3.2 Inhoud van examples.env
 
    - ```shell
       BOT_TOKEN='XXX'
@@ -32,26 +43,33 @@ This bot can be started using python3 or via a container.
       MONGODB_PORT=27017 # check with the docker-compose.yaml to be the same!
       MONGODB_USERNAME=bot # create first the mongodb user with the mongo shell. see readme below.
 
-```
+
 4. Start the services using Docker Compose:
+``` 
+   docker compose up mongo -d
+```
+5. MongoDB Gebruiker Toevoegen:
+Als je nog geen bot-gebruiker hebt voor MongoDB, run de volgende twee commandos apart.
 
-   ```bash
-   docker compose up -d
-   ```
+```mongo
+use bot
+```
+run beide afzonderlijk van elkaar.
+```mongo
+db.createUser({
+  user: "bot",
+  pwd: "yourpassword123!",
+  roles: [
+    { role: "readWrite", db: "bot" }
+  ]
+})
+```
+Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
 
----
-
-### 🚀 Running Without Docker Compose
-
-If you prefer not to use `docker compose`, follow these steps:
-
-1. Open your terminal or CLI.
-2. Run the following command, adjusting the values where necessary:
-
-   ```bash
-   docker run      -e BOT_TOKEN="tokenxxx"      -e MONGODB_IP_ADDRESS="127.0.0.1"      -e MONGODB_PASSWORD="xxxxx"      -e WEBHOOK_URL="https://discord.com/api/webhooks/1343185088115904662/YXcrhENRo6d1eQQFL5mCjOpF5Y8A0JS1udqraJB70v33vHAFrJ2Nqade7hagB0Zid6ta"      --link mongo:mongo      tibot-v3
-   ```
-
+4. Start the webapp using Docker Compose:
+``` 
+   docker compose up webapp -d
+```
 ---
 
 ### 🛠️ Notes
@@ -76,37 +94,6 @@ If you prefer not to use `docker compose`, follow these steps:
 
 - Upload emojis [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
 - Maak er zo gebruik van: <:emoji_name:emoji_id>
-
-## Environment Variables (.env)
-
-De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` voor een voorbeeld. De volgende variabelen zijn nodig:
-
-- `BOT_TOKEN`: Je Discord bot token
-- `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB server
-- `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB authenticatie
-- `MONGODB_PORT`: De poort van je MongoDB server (standaard waarde = 27017)
-- `MONGODB_USERNAME`: De naam van de MongoDB tabel en gebruiker (standaard waarde = bot)
-- `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
-
-## MongoDB Gebruiker Toevoegen
-
-Als je nog geen bot-gebruiker hebt voor MongoDB, run de volgende twee commandos apart.
-
-```mongo
-use bot
-```
-
-```mongo
-db.createUser({
-  user: "bot",
-  pwd: "yourpassword123!",
-  roles: [
-    { role: "readWrite", db: "bot" }
-  ]
-})
-```
-
-Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
 
 ## TODOS
 
