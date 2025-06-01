@@ -80,10 +80,13 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` v
 
 ## MongoDB Gebruiker Toevoegen
 
-Als je nog geen bot-gebruiker hebt voor MongoDB:
+Als je nog geen bot-gebruiker hebt voor MongoDB, run de volgende twee commandos apart.
 
 ```mongo
 use bot
+```
+
+```mongo
 db.createUser({
   user: "bot",
   pwd: "Password123",
