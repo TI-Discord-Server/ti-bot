@@ -1,60 +1,78 @@
 # TI Discord Bot
 
-## run tibot-v3 developers
+## 🔧 Voor Ontwikkelaars: Tibot-v3 Uitvoeren
 
-This bot can be started using python3 or via a container.
+Deze bot kan worden gestart met Python of via een container (Docker).
 
-1. Create a .env file and fill it in as usual (see the README for details).
-2. Start the bot in your preferred way.
+### Zonder Docker
 
-### without docker
-
-1. Run using `python3 main.py`.
-
-## 🚀 Deploying Tibot-v3 with Docker
-
-1. Run the following command in your CLI from the root folder to build the Docker image:
+1. Maak een `.env` bestand aan en vul dit in zoals gebruikelijk (zie `.env.example` voor een voorbeeld).
+2. Start de bot met het volgende commando:
    ```bash
-   docker build -t tibot-v3 .
+   python3 main.py
    ```
 
-### running with docker compose
+---
 
-2. Check the file **`docker-compose.yml`**.
+## 🚀 Tibot-v3 Deployen met Docker
 
-3.1 First make a file with the name **.env** copy paste the **examples.env** to the **.env** file
+### 1. Docker image bouwen
 
-   - Environment Variables (.env)
-      - De bot gebruikt een `.env` bestand voor gevoelige gegevens, zie `.env.example` voor een voorbeeld. De volgende variabelen zijn nodig. Let op IP en poort moeten exact kloppen voor te kunnen werken in het docker netwerk. Zie **examples.env** als correcte tamplate met onze docker-compose.yaml
-         - `BOT_TOKEN`: Je Discord bot token
-         - `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB server
-         - `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB authenticatie
-         - `MONGODB_PORT`: De poort van je MongoDB server (standaard waarde = 27017)
-         - `MONGODB_USERNAME`: De naam van de MongoDB tabel en gebruiker (standaard waarde = bot)
-         - `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
-
-3.2 Inhoud van examples.env
-
-   - ```shell
-      BOT_TOKEN='XXX'
-      MONGODB_IP_ADDRESS='mongo' # don't toucht this if you run it with docker compose config!
-      MONGODB_PASSWORD='yourpassword123!' # check with the docker-compose.yaml to be the same!
-      WEBHOOK_URL='<https://discord.com/api/webhooks/1343185088115904662/YXcrhENRo6d1eQQFL5mCjOpF5Y8A0JS1udqraJB70v33vHAFrJ2Nqade7hagB0Zid6ta>'
-      MONGODB_PORT=27017 # check with the docker-compose.yaml to be the same!
-      MONGODB_USERNAME=bot # create first the mongodb user with the mongo shell. see readme below.
-
-
-4. Start the services using Docker Compose:
-``` 
-   docker compose up mongo -d
+Voer het volgende commando uit in je CLI, vanuit de rootmap:
+```bash
+docker build -t tibot-v3 .
 ```
-5. MongoDB Gebruiker Toevoegen:
-Als je nog geen bot-gebruiker hebt voor MongoDB, run de volgende twee commandos apart.
+
+### 2. Docker Compose gebruiken
+
+1. Controleer het bestand `docker-compose.yml`.
+2.1 Maak een bestand genaamd `.env` aan door de inhoud van `examples.env` te kopiëren.
+
+#### Vereiste omgevingsvariabelen (.env)
+
+De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` als correcte template met onze `docker-compose.yml` configuratie. De volgende variabelen zijn vereist:
+
+- `BOT_TOKEN`: Je Discord bot-token
+- `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB-server
+- `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB-authenticatie
+- `MONGODB_PORT`: De poort van je MongoDB-server (standaardwaarde = 27017)
+- `MONGODB_USERNAME`: De naam van de MongoDB-gebruiker en database (standaard = bot)
+- `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
+
+**Voorbeeld (.env):**
+```env
+BOT_TOKEN='XXX'
+MONGODB_IP_ADDRESS='mongo' # Laat dit ongewijzigd bij gebruik van docker-compose
+MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
+WEBHOOK_URL='<https://discord.com/api/webhooks/123456789/abcdef...>'
+MONGODB_PORT=27017
+MONGODB_USERNAME=bot
+```
+2.2 Pas in main.py de connection string aan. Verwijder de TLs optie
+specifiek verwijder je dit **&tls=true&tlsInsecure=true**
+Resultaat:
+```py
+        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
+        motor = AsyncIOMotorClient(
+            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256",
+            connect=True,
+        )
+```
+### 3. Services starten met Docker Compose
+
+Start MongoDB:
+```bash
+docker compose up mongo -d
+```
+
+### 4. MongoDB-gebruiker toevoegen
+
+Als je nog geen gebruiker hebt voor de bot, voer dan deze commando’s afzonderlijk uit:
 
 ```mongo
 use bot
 ```
-run beide afzonderlijk van elkaar.
+
 ```mongo
 db.createUser({
   user: "bot",
@@ -64,60 +82,65 @@ db.createUser({
   ]
 })
 ```
+
 Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
 
-4. Start the webapp using Docker Compose:
-``` 
-   docker compose up webapp -d
+Start daarna de webapp:
+```bash
+docker compose up webapp -d
 ```
+
 ---
 
-### 🛠️ Notes
+## 🛠️ Notities
 
-- Ensure MongoDB is running before starting the bot.
-- The `.env` file should contain all necessary environment variables.
-- If you face any networking issues, consider adjusting the `MONGODB_IP_ADDRESS` to match your setup.
+- Zorg ervoor dat MongoDB actief is vóór het starten van de bot.
+- Het `.env` bestand moet alle vereiste variabelen bevatten.
+- Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` juist is ingesteld.
 
-## Repo Regels
+---
 
-- Gebruik [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), een PEP8 compliant linter zodat al je code de style guide volgt en beetje leesbaar is.
-- Maak een Discord bot via de [Discord developer portal](https://discord.com/developers/applications) om je code te testen voordat je iets in production gebruikt.
-- Gelieve de ./cogs en ./utils folders correct te gebruiken. ./utils is voor code die herbruikt kan/moet worden en back-end logic. ./cogs is voor alle tasks, commands, etc. waar users interactie mee hebben. Kijk gerust naar de voorbeelden in ./cogs/help.py en ./cogs/faq.py.
-- Upload emojis die gebruikt worden door de bot naar de Discord developer portal in plaats van server emojis te gebruiken. Zo ontstaan er geen permission issues of missing emojis.
+## 📚 Repository Regels
 
-## Slash commands
+- Gebruik [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), een PEP8-conforme linter, om je code leesbaar en gestandaardiseerd te houden.
+- Maak een Discord bot aan via de [Discord Developer Portal](https://discord.com/developers/applications) om te testen.
+- Gebruik `./cogs` voor interactiecommando’s en `./utils` voor herbruikbare backend-logica.
+- Upload emoji’s naar de Discord Developer Portal om permissieproblemen te vermijden.
 
-- Wanneer je de commands niet kan zien, reload Discord applicatie.
-- Het duurt soms even voor de (nieuwe) slash commands zichtbaar zijn
+---
 
-## Emojis
+## ⚡ Slash Commands
 
-- Upload emojis [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
-- Maak er zo gebruik van: <:emoji_name:emoji_id>
+- Zie je slash-commands niet? Herstart de Discord-applicatie.
+- Soms duurt het even voordat nieuwe slash-commands zichtbaar zijn.
 
-## TODOS
+---
 
-Nyo:
+## 😊 Emoji’s
 
-- mod functies (ban, mute, kick, etc...)
-- unban verzoek
+- Upload emoji’s [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
+- Gebruik ze als volgt: `<:emoji_naam:emoji_id>`
+
+---
+
+## ✅ TODO's
+
+**Nyo:**
+- Mod functies (ban, mute, kick, etc…)
+- Unban-verzoek
 - Prune (optioneel)
 
-Quinten:
-
+**Quinten:**
 - Confessions
-- Voorbeeld variabelen gebruiken adhv collection
+- Voorbeeldvariabelen gebruiken adhv collection
 
-Jaak:
+**Jaak:**
+- Verify functie (Office365-authenticatie?)
 
-- Verify functie (Office365 auth?)
+**Kobe:**
+- ~~Modmail~~ (stickers kunnen niet verstuurd worden)
+- Loggen naar bestand + bestand opslaan op server. Bestand moet opvraagbaar zijn via commando: `/transcript [user_id]`
 
-Kobe:
-
-- ~~Modmail~~ (stickers kunnen niet verstuurd worden.)
-- Loggen naar bestand + bestand opslaan in server, bestand moet kunnen opgevraagd worden via commando (/transcript [user_id])
-
-Warre:
-
-- Bekendmaking punten commando (variabel maken)
+**Warre:**
+- Punten bekendmaken (variabel maken)
 - Report functie
