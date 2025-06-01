@@ -67,8 +67,8 @@ docker compose up mongo -d
 
 ### 4. MongoDB-gebruiker toevoegen
 
-Als je nog geen gebruiker hebt voor de bot, voer dan deze commando’s afzonderlijk uit:
-
+- Als je nog geen gebruiker hebt voor de bot.
+Conencteer met een mongo CLI of mongo GUI app met deze connection string `mongodb://root:yourpassword123!@localhost:27017/` Vervolgens voer je deze commando's afzonderlijk uit:
 ```mongo
 use bot
 ```
