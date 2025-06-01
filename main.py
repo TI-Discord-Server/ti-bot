@@ -121,7 +121,7 @@ class Bot(commands.Bot):
     def __init__(self, **kwargs):
         # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
         motor = AsyncIOMotorClient(
-            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256",
+            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true",
             connect=True,
         )
         motor.get_io_loop = asyncio.get_running_loop
