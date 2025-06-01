@@ -9,7 +9,7 @@ BOT_TOKEN: Final[str] = cast(str, getenv("BOT_TOKEN"))
 MONGODB_PASSWORD: Final[str] = cast(str, getenv("MONGODB_PASSWORD"))
 MONGODB_IP_ADDRESS: Final[str] = cast(str, getenv("MONGODB_IP_ADDRESS"))
 MONGODB_PORT: Final[str] = cast(str, getenv("MONGODB_PORT", "27017"))
-MONGODB_USERNAME: Final[str] = cast(str, getenv("MONGODB_USERNAME", "bot"))
+MONGODB_USERNAME: Final[str] = cast(str, getenv("MONGODB_USERNAME", "dev"))
 WEBHOOK_URL: Final[str] = cast(str, getenv("WEBHOOK_URL"))
 
 __all__: Final[Tuple[str, ...]] = (

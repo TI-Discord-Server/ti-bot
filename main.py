@@ -8,6 +8,7 @@ import traceback
 import typing
 from logging.handlers import RotatingFileHandler
 from typing import Awaitable, Final, Protocol
+import urllib.parse
 
 import aiohttp
 from aiohttp import web
@@ -38,6 +39,8 @@ from utils.errors import (
     UnknownUser,
 )
 
+MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD)
+MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME)
 load_dotenv()
 
 DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset(
@@ -47,6 +50,7 @@ DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset
         329293977494880257,  # Arthur - @arthurvg
         925002667502239784,  # Jaak - @princessakina
         337521371414396928,  # Warre - @warru
+        294146279456636929,  # Nyo - @itsnyoty
     ]
 )
 
@@ -119,13 +123,10 @@ class DiscordWebhookHandler(logging.Handler):
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
-        motor = AsyncIOMotorClient(
-            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true",
-            connect=True,
-        )
+        mongo_uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/dev?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true"
+        motor = AsyncIOMotorClient(mongo_uri, connect=True)
         motor.get_io_loop = asyncio.get_running_loop
-        self.db = motor.bot
+        self.db = motor.get_database("dev")
         self.color = discord.Color.blurple()
         self.token = BOT_TOKEN
 
