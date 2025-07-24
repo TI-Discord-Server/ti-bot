@@ -77,7 +77,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             return
 
         await interaction.response.send_message(
-            "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'I have a code' om je code in te voeren.",
+            "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
             ephemeral=True
         )
 
