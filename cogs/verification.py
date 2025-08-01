@@ -147,7 +147,10 @@ class Verification(commands.Cog):
             ),
             color=discord.Color.blue()
         )
-        await interaction.response.send_message(embed=embed, view=VerificationView(self.bot))
+
+        await interaction.channel.send(embed=embed, view=VerificationView(self.bot))
+
+        await interaction.response.send_message("✅ Bericht is verzonden", ephemeral=True)
 
     @app_commands.command(name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)")
     @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
@@ -179,6 +182,11 @@ class Verification(commands.Cog):
         guild = interaction.guild
         member = guild.get_member(record["user_id"])
         await self.bot.db.verifications.delete_one({"email": email})
+
+        if member and any(role.name == "Moderator" for role in member.roles):
+            await interaction.response.send_message("❌ Je kunt geen moderator kicken.", ephemeral=True)
+            return
+
         if member:
             try:
                 await member.kick(reason="Verificatie ingetrokken door moderator.")
