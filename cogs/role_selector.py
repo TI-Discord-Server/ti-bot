@@ -136,8 +136,8 @@ class RoleSelect(discord.ui.Select):
         if not message:
             message = "Geen wijzigingen aangebracht."
         
-        # Update the view with the new role selections
-        await self.role_selector.show_role_select(interaction, self.category_name, message)
+        # Update the view with the new role selections (edit the existing message)
+        await self.role_selector.update_role_select_message(interaction, self.category_name, message)
 
 class RoleSelectorView(discord.ui.View):
     def __init__(self, role_selector):
@@ -356,6 +356,76 @@ class RoleSelector(commands.Cog):
             await interaction.edit_original_response(embed=embed, view=view)
         else:
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    async def update_role_select_message(self, interaction: discord.Interaction, category_name: str, message: str = None):
+        """Update the existing role select message instead of creating a new one."""
+        # Get the categories
+        categories = await self.get_categories()
+        
+        # Find the selected category
+        category = next((c for c in categories if c.name == category_name), None)
+        if not category:
+            await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
+            return
+        
+        # Create a new view
+        view = discord.ui.View(timeout=180)
+        
+        # Add a back button to return to category selection
+        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+        
+        async def back_button_callback(back_interaction: discord.Interaction):
+            # Create a new view with the category select
+            category_view = discord.ui.View(timeout=180)
+            category_view.add_item(CategorySelect(self, categories))
+            
+            # Create embed for category selection
+            embed = discord.Embed(
+                title="🎭 Rolselectie",
+                description="Kies een categorie om rollen te beheren.",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
+            
+            await back_interaction.response.edit_message(
+                embed=embed,
+                view=category_view
+            )
+        
+        back_button.callback = back_button_callback
+        view.add_item(back_button)
+        
+        # Add the role select menu
+        view.add_item(RoleSelect(self, category_name, category.roles, interaction.user.roles))
+        
+        # Create embed for role selection
+        embed = discord.Embed(
+            title=f"🎭 Rolselectie - {category_name}",
+            description="Selecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen.",
+            color=discord.Color.green()
+        )
+        
+        if message:
+            embed.add_field(name="Status", value=message, inline=False)
+        
+        # Add available roles to the embed
+        role_list = []
+        for role in category.roles:
+            user_has_role = any(user_role.name == role["role_name"] for user_role in interaction.user.roles)
+            status = "✅" if user_has_role else "❌"
+            role_list.append(f"{status} {role['emoji']} {role['name']}")
+        
+        if role_list:
+            embed.add_field(
+                name="Beschikbare Rollen",
+                value="\n".join(role_list),
+                inline=False
+            )
+        
+        embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
+        
+        # Always edit the message since this is called after a role selection
+        await interaction.response.edit_message(embed=embed, view=view)
     
     @app_commands.command(name="setup_role_menu", description="Maak het rolselectie menu")
     async def setup_role_menu(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
