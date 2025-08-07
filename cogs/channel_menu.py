@@ -137,31 +137,61 @@ class CourseSelect(discord.ui.Select):
             removed_roles = []
             
             for channel in year_channels:
-                # Format the role name with spaces and proper capitalization
-                # Convert "programmeren-1" to "Programmeren 1"
-                formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
-                role_name = formatted_name
+                # First, try to find an existing role that has access to this channel
+                existing_role = None
                 
-                # Find or create a role for this channel
-                role = discord.utils.get(interaction.guild.roles, name=role_name)
+                # Get all roles that have explicit permissions for this channel
+                overwrites = channel.overwrites
                 
-                # If role doesn't exist, create it
-                if not role:
-                    # Create a role with the same color as the category
-                    role_color = discord.Color.green() if self.year == "1" else discord.Color.gold() if self.year == "2" else discord.Color.red()
-                    role = await interaction.guild.create_role(
-                        name=role_name,
-                        color=role_color,
-                        mentionable=False,
-                        reason=f"Created for channel access to {channel.name}"
-                    )
+                # Look for roles that have read_messages=True and don't have other permissions
+                for role, permissions in overwrites.items():
+                    # Skip @everyone role
+                    if role == interaction.guild.default_role:
+                        continue
+                        
+                    # Check if this is a role (not a member) and has read_messages permission
+                    if isinstance(role, discord.Role) and permissions.read_messages:
+                        # Check if this role only has permissions for this specific channel
+                        # Count how many channels this role has permissions in
+                        channel_count = 0
+                        for ch in interaction.guild.channels:
+                            if isinstance(ch, discord.TextChannel) and role in ch.overwrites:
+                                channel_count += 1
+                                
+                        # If this role only has permissions in this one channel, use it
+                        if channel_count == 1:
+                            existing_role = role
+                            break
+                
+                # If we found an existing role with the right permissions, use it
+                if existing_role:
+                    role = existing_role
+                else:
+                    # Format the role name with spaces and proper capitalization
+                    # Convert "programmeren-1" to "Programmeren 1"
+                    formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
+                    role_name = formatted_name
                     
-                    # Set permissions for this role on the channel
-                    await channel.set_permissions(role, read_messages=True)
+                    # Find or create a role for this channel
+                    role = discord.utils.get(interaction.guild.roles, name=role_name)
                     
-                    # Hide the channel from @everyone
-                    everyone_role = interaction.guild.default_role
-                    await channel.set_permissions(everyone_role, read_messages=False)
+                    # If role doesn't exist, create it
+                    if not role:
+                        # Create a role with the same color as the category
+                        role_color = discord.Color.green() if self.year == "1" else discord.Color.gold() if self.year == "2" else discord.Color.red()
+                        role = await interaction.guild.create_role(
+                            name=role_name,
+                            color=role_color,
+                            mentionable=False,
+                            reason=f"Created for channel access to {channel.name}"
+                        )
+                        
+                        # Set permissions for this role on the channel
+                        await channel.set_permissions(role, read_messages=True)
+                        
+                        # Hide the channel from @everyone
+                        everyone_role = interaction.guild.default_role
+                        await channel.set_permissions(everyone_role, read_messages=False)
                 
                 # Add or remove the role from the user
                 if channel in selected_channels:
