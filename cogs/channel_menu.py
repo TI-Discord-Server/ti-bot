@@ -151,21 +151,59 @@ class CourseSelect(discord.ui.Select):
                 # Get all roles that have explicit permissions for this channel
                 overwrites = channel.overwrites
                 
-                # Look for roles that have read_messages=True
-                for role_or_member, permissions in overwrites.items():
-                    # Skip @everyone role and members
-                    if role_or_member == interaction.guild.default_role or not isinstance(role_or_member, discord.Role):
+                # First, check if there's a role named after the channel (with proper capitalization)
+                formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
+                channel_specific_role = discord.utils.get(interaction.guild.roles, name=formatted_name)
+                
+                # Also check for common naming patterns for channel access roles
+                access_role_name = f"access-{channel.name}"
+                access_role = discord.utils.get(interaction.guild.roles, name=access_role_name)
+                
+                # Check for other common naming patterns
+                channel_role_name = channel.name  # Exact match with channel name
+                channel_role = discord.utils.get(interaction.guild.roles, name=channel_role_name)
+                
+                # Check for any role that contains the channel name (for custom roles)
+                custom_role = None
+                for role in interaction.guild.roles:
+                    # Skip default roles and roles with common names
+                    if role == interaction.guild.default_role or role.name in ["Admin", "Moderator", "Bot", "everyone"]:
                         continue
                     
-                    # Check if this role has read_messages permission
-                    if permissions.read_messages:
-                        # Log for debugging
-                        self.bot.log.info(f"Found role {role_or_member.name} with read access to {channel.name}")
-                        
-                        # Use the first role we find with read access
-                        existing_role = role_or_member
-                        self.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
+                    # Check if the role name contains the channel name (case insensitive)
+                    if channel.name.lower() in role.name.lower():
+                        custom_role = role
                         break
+                
+                # If we found a role with the channel's name or a related naming pattern, use it
+                if channel_specific_role:
+                    self.bot.log.info(f"Found role {channel_specific_role.name} matching channel name {channel.name}")
+                    existing_role = channel_specific_role
+                elif access_role:
+                    self.bot.log.info(f"Found access role {access_role.name} for channel {channel.name}")
+                    existing_role = access_role
+                elif channel_role:
+                    self.bot.log.info(f"Found exact match role {channel_role.name} for channel {channel.name}")
+                    existing_role = channel_role
+                elif custom_role:
+                    self.bot.log.info(f"Found custom role {custom_role.name} containing channel name {channel.name}")
+                    existing_role = custom_role
+                else:
+                    # Look for roles that have explicit read_messages=True for this channel
+                    for role_or_member, permissions in overwrites.items():
+                        # Skip @everyone role and members
+                        if role_or_member == interaction.guild.default_role or not isinstance(role_or_member, discord.Role):
+                            continue
+                        
+                        # Check if this role has read_messages permission
+                        if permissions.read_messages:
+                            # Log for debugging
+                            self.bot.log.info(f"Found role {role_or_member.name} with explicit read access to {channel.name}")
+                            
+                            # Use this role
+                            existing_role = role_or_member
+                            self.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
+                            break
                 
                 # If we found an existing role with the right permissions, use it
                 if existing_role:
