@@ -105,7 +105,7 @@ class CourseSelect(discord.ui.Select):
         selected_channel_ids = self.values
         
         # Log for debugging
-        print(f"User {interaction.user.name} selected channel IDs: {selected_channel_ids}")
+        self.view.bot.log.info(f"User {interaction.user.name} selected channel IDs: {selected_channel_ids}")
         
         # Get all channels in the guild
         all_channels = interaction.guild.channels
@@ -117,7 +117,7 @@ class CourseSelect(discord.ui.Select):
         ]
         
         # Log for debugging
-        print(f"Selected channels: {[channel.name for channel in selected_channels]}")
+        self.view.bot.log.info(f"Selected channels: {[channel.name for channel in selected_channels]}")
         
         try:
             # Get all channels in the year category
@@ -158,7 +158,7 @@ class CourseSelect(discord.ui.Select):
                     # Check if this role has read_messages permission
                     if permissions.read_messages:
                         # Log for debugging
-                        print(f"Found role {role_or_member.name} with read access to {channel.name}")
+                        self.view.bot.log.info(f"Found role {role_or_member.name} with read access to {channel.name}")
                         
                         # Check if this role has permissions in other channels
                         exclusive_to_this_channel = True
@@ -169,7 +169,7 @@ class CourseSelect(discord.ui.Select):
                         
                         if exclusive_to_this_channel:
                             existing_role = role_or_member
-                            print(f"Using existing role {existing_role.name} for {channel.name}")
+                            self.view.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
                             break
                 
                 # If we found an existing role with the right permissions, use it
@@ -208,13 +208,13 @@ class CourseSelect(discord.ui.Select):
                 if channel in selected_channels:
                     if role not in interaction.user.roles:
                         # Log for debugging
-                        print(f"Adding role {role.name} to user {interaction.user.name} for channel {channel.name}")
+                        self.view.bot.log.info(f"Adding role {role.name} to user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.add_roles(role, reason=f"User selected {channel.name} in channel menu")
                         added_roles.append(role)
                 else:
                     if role in interaction.user.roles:
                         # Log for debugging
-                        print(f"Removing role {role.name} from user {interaction.user.name} for channel {channel.name}")
+                        self.view.bot.log.info(f"Removing role {role.name} from user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.remove_roles(role, reason=f"User deselected {channel.name} in channel menu")
                         removed_roles.append(role)
             
@@ -260,6 +260,7 @@ class CourseSelect(discord.ui.Select):
 class YearSelectView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=None)
+        self.bot = bot
         self.add_item(YearSelect(bot))
 
 
