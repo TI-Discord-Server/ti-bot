@@ -499,4 +499,11 @@ class RoleSelector(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
 
 async def setup(bot):
-    await bot.add_cog(RoleSelector(bot))
+    bot.log.info("Setting up RoleSelector cog")
+    cog = RoleSelector(bot)
+    await bot.add_cog(cog)
+    bot.log.info("RoleSelector cog added successfully")
+    
+    # Log the commands that are registered
+    commands = [cmd.name for cmd in cog.__cog_app_commands__]
+    bot.log.info(f"Registered commands in RoleSelector: {commands}")
