@@ -94,14 +94,33 @@ class YearSelect(discord.ui.Select):
         view.bot = self.bot  # Pass the bot reference to the view
         view.add_item(CourseSelect(channels, year, self.bot))
         
-        # Create the message with current selections
-        message = f"Je hebt jaar {year} geselecteerd. Selecteer nu je vakken:"
+        # Create embed for course selection
+        year_colors = {"1": discord.Color.green(), "2": discord.Color.gold(), "3": discord.Color.red()}
+        year_emojis = {"1": "🟩", "2": "🟨", "3": "🟥"}
+        
+        embed = discord.Embed(
+            title=f"{year_emojis[year]} Jaar {year} - Vakselectie",
+            description="Selecteer de vakken die je wilt volgen uit het dropdown menu hieronder.",
+            color=year_colors[year]
+        )
         
         if user_channel_roles:
-            message += f"\n\n**Je huidige selecties:** {', '.join(user_channel_roles)}"
+            embed.add_field(
+                name="✅ Je huidige selecties",
+                value=", ".join(user_channel_roles),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="ℹ️ Info",
+                value="Je hebt nog geen vakken geselecteerd.",
+                inline=False
+            )
+        
+        embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
         await interaction.response.send_message(
-            message,
+            embed=embed,
             view=view,
             ephemeral=True
         )
@@ -338,14 +357,25 @@ class ChannelMenu(commands.Cog):
         # First respond to the interaction to prevent timeout
         await interaction.response.defer(ephemeral=True)
         
+        # Create embed for channel menu
+        embed = discord.Embed(
+            title="📚 Kanaal Selectie",
+            description="Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
+                       "Je krijgt alleen toegang tot de kanalen die je selecteert.",
+            color=discord.Color.purple()
+        )
+        embed.add_field(
+            name="📋 Instructies",
+            value="1️⃣ Kies je studiejaar uit het dropdown menu\n"
+                  "2️⃣ Selecteer de vakken die je wilt volgen\n"
+                  "3️⃣ Je krijgt automatisch toegang tot de geselecteerde kanalen",
+            inline=False
+        )
+        embed.set_footer(text="Gebruik het dropdown menu om je jaar te selecteren")
+        
         # Send the menu immediately
         view = YearSelectView(self.bot)
-        menu_message = await interaction.channel.send(
-            "# Kanaal Selectie\n"
-            "Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
-            "Je krijgt alleen toegang tot de kanalen die je selecteert.",
-            view=view
-        )
+        menu_message = await interaction.channel.send(embed=embed, view=view)
         
         # Now check and create categories in the background
         await interaction.followup.send("Menu is aangemaakt! Nu worden de categorieën gecontroleerd...", ephemeral=True)

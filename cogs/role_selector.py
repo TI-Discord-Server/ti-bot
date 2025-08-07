@@ -236,16 +236,26 @@ class RoleSelector(commands.Cog):
         if not channel:
             return None
         
-        # Generate the message content
-        content = "# 🎭 Kies je rollen!\nSelecteer een categorie in het dropdown menu hieronder om rollen te kiezen.\n\n"
-        content += "## Beschikbare Rollen\n"
+        # Create the embed
+        embed = discord.Embed(
+            title="🎭 Kies je rollen!",
+            description="Selecteer een categorie in het dropdown menu hieronder om rollen te kiezen.",
+            color=discord.Color.blue()
+        )
         
         categories = await self.get_categories()
         for category in categories:
-            content += f"**{category.name}**\n"
+            role_list = []
             for role in category.roles:
-                content += f"{role['emoji']} → @{role['role_name']}\n"
-            content += "\n"
+                role_list.append(f"{role['emoji']} → @{role['role_name']}")
+            
+            embed.add_field(
+                name=f"**{category.name}**",
+                value="\n".join(role_list) if role_list else "Geen rollen beschikbaar",
+                inline=False
+            )
+        
+        embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
         
         # Create the view
         view = await RoleSelectorView(self).refresh(categories)
@@ -254,13 +264,13 @@ class RoleSelector(commands.Cog):
         if message_id:
             try:
                 message = await channel.fetch_message(message_id)
-                await message.edit(content=content, view=view)
+                await message.edit(embed=embed, view=view)
                 return message
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
         
         # Create a new message if we couldn't edit the existing one
-        message = await channel.send(content=content, view=view)
+        message = await channel.send(embed=embed, view=view)
         
         # Save the message ID and channel ID
         await self.bot.db.role_selector.update_one(
@@ -297,8 +307,16 @@ class RoleSelector(commands.Cog):
             category_view = discord.ui.View(timeout=180)
             category_view.add_item(CategorySelect(self, categories))
             
+            # Create embed for category selection
+            embed = discord.Embed(
+                title="🎭 Rolselectie",
+                description="Kies een categorie om rollen te beheren.",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
+            
             await back_interaction.response.edit_message(
-                content=f"# Rolselectie\nKies een categorie om rollen te beheren.",
+                embed=embed,
                 view=category_view
             )
         
@@ -308,16 +326,36 @@ class RoleSelector(commands.Cog):
         # Add the role select menu
         view.add_item(RoleSelect(self, category_name, category.roles, interaction.user.roles))
         
-        # Respond to the interaction
-        content = f"# Rolselectie - {category_name}\nSelecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen."
+        # Create embed for role selection
+        embed = discord.Embed(
+            title=f"🎭 Rolselectie - {category_name}",
+            description="Selecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen.",
+            color=discord.Color.green()
+        )
         
         if message:
-            content += f"\n\n{message}"
+            embed.add_field(name="Status", value=message, inline=False)
+        
+        # Add available roles to the embed
+        role_list = []
+        for role in category.roles:
+            user_has_role = any(user_role.name == role["role_name"] for user_role in interaction.user.roles)
+            status = "✅" if user_has_role else "❌"
+            role_list.append(f"{status} {role['emoji']} {role['name']}")
+        
+        if role_list:
+            embed.add_field(
+                name="Beschikbare Rollen",
+                value="\n".join(role_list),
+                inline=False
+            )
+        
+        embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
         
         if interaction.response.is_done():
-            await interaction.edit_original_response(content=content, view=view)
+            await interaction.edit_original_response(embed=embed, view=view)
         else:
-            await interaction.response.send_message(content=content, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
     @app_commands.command(name="setup_role_menu", description="Maak het rolselectie menu")
     async def setup_role_menu(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
