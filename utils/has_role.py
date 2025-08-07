@@ -1,19 +1,21 @@
 import functools
 import discord
 
-# Hardcoded Moderator role ID - this is the official Moderator role ID
-# If you don't have this specific ID, you can set it to None and the function will use position-based checks
+# Hardcoded role IDs - these are the official role IDs
+# If you don't have these specific IDs, you can set them to None and the function will use position-based checks
 MODERATOR_ROLE_ID = None  # Replace with actual ID if known, e.g., 123456789012345678
+ADMIN_ROLE_ID = None      # Replace with actual ID if known, e.g., 123456789012345678
 
-# Minimum position in the role hierarchy that a "Moderator" role should have
+# Minimum position in the role hierarchy that roles should have
 # Higher number means higher in the hierarchy
 MIN_MODERATOR_POSITION = 15  # Adjust based on your server's role hierarchy
+MIN_ADMIN_POSITION = 20      # Adjust based on your server's role hierarchy - should be higher than moderator
 
 
 def has_role(role, error_message=None):
     """
     A custom decorator that checks if a user has a specific role by ID or name.
-    For roles named "Moderator", performs additional security checks to prevent spoofing.
+    For roles named "Moderator" or "Admin", performs additional security checks to prevent spoofing.
     Automatically responds with an error message if the check fails.
 
     Parameters:
@@ -31,12 +33,10 @@ def has_role(role, error_message=None):
                 return None
 
             has_required_role = False
+            user_roles = interaction.user.roles
             
-            # Special handling for "Moderator" role to prevent spoofing
+            # Special handling for security-sensitive roles to prevent spoofing
             if role == "Moderator":
-                # Get all roles the user has
-                user_roles = interaction.user.roles
-                
                 for r in user_roles:
                     # If we know the exact role ID, use that as the primary check
                     if MODERATOR_ROLE_ID and r.id == MODERATOR_ROLE_ID:
@@ -52,6 +52,24 @@ def has_role(role, error_message=None):
                     if r.permissions.administrator:
                         has_required_role = True
                         break
+            
+            elif role == "Admin":
+                for r in user_roles:
+                    # If we know the exact role ID, use that as the primary check
+                    if ADMIN_ROLE_ID and r.id == ADMIN_ROLE_ID:
+                        has_required_role = True
+                        break
+                    
+                    # Otherwise, check both name AND position in hierarchy
+                    if r.name == "Admin" and r.position >= MIN_ADMIN_POSITION:
+                        has_required_role = True
+                        break
+                    
+                    # Also allow server administrators to pass this check
+                    if r.permissions.administrator:
+                        has_required_role = True
+                        break
+            
             else:
                 # For other roles, use the original logic
                 if isinstance(role, int):
