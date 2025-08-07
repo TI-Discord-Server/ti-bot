@@ -159,19 +159,34 @@ class ChannelMenu(commands.Cog):
         # Create and send the year selection view
         view = YearSelectView(self.bot)
         
-        await interaction.response.send_message(
+        # Send as a standalone message, not as a reply
+        await interaction.response.defer(ephemeral=True)
+        await interaction.channel.send(
             "# Kanaal Selectie\n"
             "Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
             "Je krijgt alleen toegang tot de kanalen die je selecteert.",
             view=view
         )
+        await interaction.followup.send("Menu is aangemaakt!", ephemeral=True)
     
     async def ensure_categories_exist(self, guild):
-        # Define the categories we need
+        # Define the categories we need with test subjects
         required_categories = [
-            {"name": "━━━ 🟩 1E JAAR ━━━", "position": 0},
-            {"name": "━━━ 🟨 2E JAAR ━━━", "position": 10},
-            {"name": "━━━ 🟥 3E JAAR ━━━", "position": 20}
+            {
+                "name": "━━━ 🟩 1E JAAR ━━━", 
+                "position": 0,
+                "subjects": ["programmeren-1", "wiskunde-basis", "computernetwerken", "webdevelopment", "databases-intro"]
+            },
+            {
+                "name": "━━━ 🟨 2E JAAR ━━━", 
+                "position": 10,
+                "subjects": ["programmeren-2", "algoritmen", "software-engineering", "databases-advanced", "operating-systems"]
+            },
+            {
+                "name": "━━━ 🟥 3E JAAR ━━━", 
+                "position": 20,
+                "subjects": ["machine-learning", "security", "stage", "afstudeerproject", "web-frameworks"]
+            }
         ]
         
         # Check if each category exists, create if not
@@ -179,17 +194,19 @@ class ChannelMenu(commands.Cog):
             category = discord.utils.get(guild.categories, name=cat_info["name"])
             if not category:
                 # Create the category
-                await guild.create_category(
+                category = await guild.create_category(
                     name=cat_info["name"],
                     position=cat_info["position"]
                 )
-                
-                # Create a general channel in this category
-                year = "1" if "1E" in cat_info["name"] else "2" if "2E" in cat_info["name"] else "3"
-                await guild.create_text_channel(
-                    name=f"algemeen-jaar-{year}",
-                    category=discord.utils.get(guild.categories, name=cat_info["name"])
-                )
+            
+            # Check if the test subjects exist, create if not
+            existing_channels = [c.name for c in category.channels if isinstance(c, discord.TextChannel)]
+            for subject in cat_info["subjects"]:
+                if subject not in existing_channels:
+                    await guild.create_text_channel(
+                        name=subject,
+                        category=category
+                    )
 
 
 async def setup(bot):
