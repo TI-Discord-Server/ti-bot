@@ -4,6 +4,8 @@ from discord.ext import commands
 from typing import List, Dict, Optional, Union, Any
 import asyncio
 
+from utils.has_role import has_role
+
 class RoleCategory:
     def __init__(self, name: str, roles: List[Dict[str, Union[str, int]]] = None):
         self.name = name
@@ -210,18 +212,7 @@ class RoleSelector(commands.Cog):
         # Setup persistent view
         self.bot.add_view(RoleSelectorView(self))
     
-    async def has_council_role(self, interaction: discord.Interaction) -> bool:
-        """Check if the user has 'The Council' role."""
-        council_role = discord.utils.get(interaction.guild.roles, name="The Council")
-        if not council_role:
-            await interaction.response.send_message("De 'The Council' rol bestaat niet.", ephemeral=True)
-            return False
-        
-        if council_role not in interaction.user.roles:
-            await interaction.response.send_message("Je hebt de 'The Council' rol nodig om dit commando te gebruiken.", ephemeral=True)
-            return False
-        
-        return True
+    # Using the has_role decorator instead of a separate method
     
     async def get_categories(self) -> List[RoleCategory]:
         """Get all role categories from the database."""
@@ -329,11 +320,9 @@ class RoleSelector(commands.Cog):
             await interaction.response.send_message(content=content, view=view, ephemeral=True)
     
     @app_commands.command(name="setup_role_menu", description="Maak het rolselectie menu")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def setup_role_menu(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         """Setup the role selection menu in the specified channel."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Use the current channel if none is specified
         if not channel:
@@ -350,11 +339,9 @@ class RoleSelector(commands.Cog):
             await interaction.followup.send("Kon het rolselectie menu niet aanmaken.", ephemeral=True)
     
     @app_commands.command(name="add_role_category", description="Voeg een nieuwe rolcategorie toe")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def add_role_category(self, interaction: discord.Interaction, name: str):
         """Add a new role category."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Get existing categories
         categories = await self.get_categories()
@@ -375,11 +362,9 @@ class RoleSelector(commands.Cog):
         await interaction.response.send_message(f"Categorie '{name}' is toegevoegd.", ephemeral=True)
     
     @app_commands.command(name="remove_role_category", description="Verwijder een rolcategorie")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def remove_role_category(self, interaction: discord.Interaction, name: str):
         """Remove a role category."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Get existing categories
         categories = await self.get_categories()
@@ -406,11 +391,9 @@ class RoleSelector(commands.Cog):
         await interaction.response.send_message(f"Categorie '{name}' is verwijderd.", ephemeral=True)
     
     @app_commands.command(name="add_role", description="Voeg een rol toe aan een categorie")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def add_role(self, interaction: discord.Interaction, category_name: str, role: discord.Role, emoji: str, display_name: str = None):
         """Add a role to a category."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Get existing categories
         categories = await self.get_categories()
@@ -447,11 +430,9 @@ class RoleSelector(commands.Cog):
         await interaction.response.send_message(f"Rol '{role.name}' is toegevoegd aan categorie '{category_name}'.", ephemeral=True)
     
     @app_commands.command(name="remove_role", description="Verwijder een rol uit een categorie")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def remove_role(self, interaction: discord.Interaction, category_name: str, role_name: str):
         """Remove a role from a category."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Get existing categories
         categories = await self.get_categories()
@@ -489,11 +470,9 @@ class RoleSelector(commands.Cog):
         await interaction.response.send_message(f"Rol '{role_name}' is verwijderd uit categorie '{category_name}'.", ephemeral=True)
     
     @app_commands.command(name="list_role_categories", description="Toon alle rolcategorieën")
+    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def list_role_categories(self, interaction: discord.Interaction):
         """List all role categories."""
-        # Check if the user has the required role
-        if not await self.has_council_role(interaction):
-            return
         
         # Get existing categories
         categories = await self.get_categories()
