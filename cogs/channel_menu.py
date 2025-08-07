@@ -145,9 +145,6 @@ class CourseSelect(discord.ui.Select):
         # Get the selected channel IDs
         selected_channel_ids = self.values
         
-        # Log for debugging
-        self.bot.log.info(f"User {interaction.user.name} selected channel IDs: {selected_channel_ids}")
-        
         # Get all channels in the guild
         all_channels = interaction.guild.channels
         
@@ -156,9 +153,6 @@ class CourseSelect(discord.ui.Select):
             channel for channel in all_channels 
             if str(channel.id) in selected_channel_ids
         ]
-        
-        # Log for debugging
-        self.bot.log.info(f"Selected channels: {[channel.name for channel in selected_channels]}")
         
         try:
             # Get all channels in the year category
@@ -216,16 +210,12 @@ class CourseSelect(discord.ui.Select):
                 
                 # If we found a role with the channel's name or a related naming pattern, use it
                 if channel_specific_role:
-                    self.bot.log.info(f"Found role {channel_specific_role.name} matching channel name {channel.name}")
                     existing_role = channel_specific_role
                 elif access_role:
-                    self.bot.log.info(f"Found access role {access_role.name} for channel {channel.name}")
                     existing_role = access_role
                 elif channel_role:
-                    self.bot.log.info(f"Found exact match role {channel_role.name} for channel {channel.name}")
                     existing_role = channel_role
                 elif custom_role:
-                    self.bot.log.info(f"Found custom role {custom_role.name} containing channel name {channel.name}")
                     existing_role = custom_role
                 else:
                     # Look for roles that have explicit read_messages=True for this channel
@@ -236,12 +226,8 @@ class CourseSelect(discord.ui.Select):
                         
                         # Check if this role has read_messages permission
                         if permissions.read_messages:
-                            # Log for debugging
-                            self.bot.log.info(f"Found role {role_or_member.name} with explicit read access to {channel.name}")
-                            
                             # Use this role
                             existing_role = role_or_member
-                            self.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
                             break
                 
                 # If we found an existing role with the right permissions, use it
@@ -279,14 +265,10 @@ class CourseSelect(discord.ui.Select):
                 # Add or remove the role from the user
                 if channel in selected_channels:
                     if role not in interaction.user.roles:
-                        # Log for debugging
-                        self.bot.log.info(f"Adding role {role.name} to user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.add_roles(role, reason=f"User selected {channel.name} in channel menu")
                         added_roles.append(role)
                 else:
                     if role in interaction.user.roles:
-                        # Log for debugging
-                        self.bot.log.info(f"Removing role {role.name} from user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.remove_roles(role, reason=f"User deselected {channel.name} in channel menu")
                         removed_roles.append(role)
             
