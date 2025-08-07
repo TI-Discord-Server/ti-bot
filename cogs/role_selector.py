@@ -137,7 +137,9 @@ class RoleSelect(discord.ui.Select):
             message = "Geen wijzigingen aangebracht."
         
         # Update the view with the new role selections (edit the existing message)
-        await self.role_selector.update_role_select_message(interaction, self.category_name, message)
+        # Refresh the member object to get updated roles
+        updated_member = await interaction.guild.fetch_member(interaction.user.id)
+        await self.role_selector.update_role_select_message(interaction, self.category_name, message, updated_member.roles)
 
 class RoleSelectorView(discord.ui.View):
     def __init__(self, role_selector):
@@ -357,8 +359,11 @@ class RoleSelector(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    async def update_role_select_message(self, interaction: discord.Interaction, category_name: str, message: str = None):
+    async def update_role_select_message(self, interaction: discord.Interaction, category_name: str, message: str = None, user_roles = None):
         """Update the existing role select message instead of creating a new one."""
+        # Use provided user_roles or fall back to interaction.user.roles
+        if user_roles is None:
+            user_roles = interaction.user.roles
         # Get the categories
         categories = await self.get_categories()
         
@@ -396,7 +401,7 @@ class RoleSelector(commands.Cog):
         view.add_item(back_button)
         
         # Add the role select menu
-        view.add_item(RoleSelect(self, category_name, category.roles, interaction.user.roles))
+        view.add_item(RoleSelect(self, category_name, category.roles, user_roles))
         
         # Create embed for role selection
         embed = discord.Embed(
@@ -411,7 +416,7 @@ class RoleSelector(commands.Cog):
         # Add available roles to the embed
         role_list = []
         for role in category.roles:
-            user_has_role = any(user_role.name == role["role_name"] for user_role in interaction.user.roles)
+            user_has_role = any(user_role.name == role["role_name"] for user_role in user_roles)
             status = "✅" if user_has_role else "❌"
             role_list.append(f"{status} {role['emoji']} {role['name']}")
         
