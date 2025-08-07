@@ -99,6 +99,8 @@ class CourseSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
         # Get the selected channel IDs
         selected_channel_ids = self.values
         
@@ -112,40 +114,95 @@ class CourseSelect(discord.ui.Select):
         ]
         
         try:
-            # Update user's permissions for these channels
-            # Note: Discord has a limit of 250 permission overwrites per channel
-            # If you have more than 250 users with individual permissions, you should use roles instead
-            for channel in all_channels:
-                if isinstance(channel, discord.TextChannel):
-                    # If channel is in the selected list, ensure user can see it
-                    if channel in selected_channels:
-                        await channel.set_permissions(interaction.user, read_messages=True)
-                    # If channel is in the same year category but not selected, hide it
-                    elif (channel.category and 
-                          f"{self.year}E JAAR" in channel.category.name and
-                          not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])):
-                        await channel.set_permissions(interaction.user, read_messages=False)
+            # Get all channels in the year category
+            year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
+            category_name = f"━━━ {year_emoji_map[self.year]} {self.year}E JAAR ━━━"
+            category = discord.utils.get(interaction.guild.categories, name=category_name)
+            
+            if not category:
+                await interaction.followup.send(
+                    f"Category {category_name} not found. Please contact an administrator.",
+                    ephemeral=True
+                )
+                return
+            
+            year_channels = [
+                channel for channel in category.channels 
+                if isinstance(channel, discord.TextChannel) and
+                not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])
+            ]
+            
+            # Process each channel in the year category
+            added_roles = []
+            removed_roles = []
+            
+            for channel in year_channels:
+                # Find or create a role for this channel
+                role_name = f"access-{channel.name}"
+                role = discord.utils.get(interaction.guild.roles, name=role_name)
+                
+                # If role doesn't exist, create it
+                if not role:
+                    # Create a role with the same color as the category
+                    role_color = discord.Color.green() if self.year == "1" else discord.Color.gold() if self.year == "2" else discord.Color.red()
+                    role = await interaction.guild.create_role(
+                        name=role_name,
+                        color=role_color,
+                        mentionable=False,
+                        reason=f"Created for channel access to {channel.name}"
+                    )
+                    
+                    # Set permissions for this role on the channel
+                    await channel.set_permissions(role, read_messages=True)
+                    
+                    # Hide the channel from @everyone
+                    everyone_role = interaction.guild.default_role
+                    await channel.set_permissions(everyone_role, read_messages=False)
+                
+                # Add or remove the role from the user
+                if channel in selected_channels:
+                    if role not in interaction.user.roles:
+                        await interaction.user.add_roles(role, reason=f"User selected {channel.name} in channel menu")
+                        added_roles.append(role)
+                else:
+                    if role in interaction.user.roles:
+                        await interaction.user.remove_roles(role, reason=f"User deselected {channel.name} in channel menu")
+                        removed_roles.append(role)
             
             # Send confirmation message
-            if selected_channels:
-                channel_names = ", ".join([channel.name for channel in selected_channels])
-                await interaction.response.send_message(
-                    f"Je hebt toegang gekregen tot de volgende vakken: {channel_names}",
+            if added_roles:
+                added_channels = ", ".join([role.name.replace("access-", "") for role in added_roles])
+                if removed_roles:
+                    removed_channels = ", ".join([role.name.replace("access-", "") for role in removed_roles])
+                    await interaction.followup.send(
+                        f"Je hebt toegang gekregen tot: {added_channels}\n"
+                        f"Je hebt geen toegang meer tot: {removed_channels}",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        f"Je hebt toegang gekregen tot: {added_channels}",
+                        ephemeral=True
+                    )
+            elif removed_roles:
+                removed_channels = ", ".join([role.name.replace("access-", "") for role in removed_roles])
+                await interaction.followup.send(
+                    f"Je hebt geen toegang meer tot: {removed_channels}",
                     ephemeral=True
                 )
             else:
-                await interaction.response.send_message(
-                    "Je hebt geen vakken geselecteerd. Je ziet nu alleen de algemene kanalen voor dit jaar.",
+                await interaction.followup.send(
+                    "Er zijn geen wijzigingen aangebracht in je toegang tot vakken.",
                     ephemeral=True
                 )
                 
         except discord.Forbidden:
-            await interaction.response.send_message(
-                "Er is een fout opgetreden bij het instellen van de kanaalrechten. Neem contact op met een beheerder.",
+            await interaction.followup.send(
+                "Er is een fout opgetreden bij het instellen van de rollen. Neem contact op met een beheerder.",
                 ephemeral=True
             )
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
                 ephemeral=True
             )
