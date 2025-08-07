@@ -162,17 +162,10 @@ class CourseSelect(discord.ui.Select):
                         # Log for debugging
                         self.bot.log.info(f"Found role {role_or_member.name} with read access to {channel.name}")
                         
-                        # Check if this role has permissions in other channels
-                        exclusive_to_this_channel = True
-                        for ch in interaction.guild.channels:
-                            if isinstance(ch, discord.TextChannel) and ch != channel and role_or_member in ch.overwrites:
-                                exclusive_to_this_channel = False
-                                break
-                        
-                        if exclusive_to_this_channel:
-                            existing_role = role_or_member
-                            self.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
-                            break
+                        # Use the first role we find with read access
+                        existing_role = role_or_member
+                        self.bot.log.info(f"Using existing role {existing_role.name} for {channel.name}")
+                        break
                 
                 # If we found an existing role with the right permissions, use it
                 if existing_role:
