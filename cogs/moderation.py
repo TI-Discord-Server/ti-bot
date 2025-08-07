@@ -834,8 +834,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 view = ConfessionView(self.bot)
                 
                 if target_channel == interaction.channel:
-                    await interaction.response.send_message(
+                    await target_channel.send(
                         "Click the button below to submit a confession:", view=view)
+                    await interaction.response.send_message("✅ Confession button is aangemaakt!", ephemeral=True)
                 else:
                     await target_channel.send(
                         "Click the button below to submit a confession:", view=view)
