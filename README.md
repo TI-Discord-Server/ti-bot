@@ -67,7 +67,7 @@ ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.sh script
 
 ### Fernet Encryptiesleutel Genereren
 
-Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde script om een veilige sleutel te genereren:
+Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde script om een veilige sleutel te genereren met OpenSSL:
 
 ```bash
 # Maak het script uitvoerbaar (indien nodig)

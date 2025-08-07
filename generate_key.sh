@@ -1,19 +1,14 @@
 #!/bin/bash
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
-    echo "Python 3 is not installed. Please install Python 3 to generate a Fernet key."
+# Check if OpenSSL is installed
+if ! command -v openssl &> /dev/null; then
+    echo "OpenSSL is not installed. Please install OpenSSL to generate a secure key."
     exit 1
 fi
 
-# Check if cryptography package is installed
-if ! python3 -c "import cryptography.fernet" &> /dev/null; then
-    echo "Installing cryptography package..."
-    python3 -m pip install cryptography
-fi
-
-# Generate a Fernet key
-KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+# Generate a 32-byte random key and encode it in base64
+# This creates a key compatible with Fernet encryption
+KEY=$(openssl rand -base64 32 | tr -d '\n' | cut -c1-44)
 
 echo "Generated Fernet key:"
 echo $KEY
