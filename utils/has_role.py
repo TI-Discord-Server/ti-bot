@@ -1,21 +1,11 @@
 import functools
 import discord
 
-# Hardcoded role IDs - these are the official role IDs
-# If you don't have these specific IDs, you can set them to None and the function will use position-based checks
-MODERATOR_ROLE_ID = None  # Replace with actual ID if known, e.g., 123456789012345678
-ADMIN_ROLE_ID = None      # Replace with actual ID if known, e.g., 123456789012345678
-
-# Minimum position in the role hierarchy that roles should have
-# Higher number means higher in the hierarchy
-MIN_MODERATOR_POSITION = 15  # Adjust based on your server's role hierarchy
-MIN_ADMIN_POSITION = 20      # Adjust based on your server's role hierarchy - should be higher than moderator
-
 
 def has_role(role, error_message=None):
     """
     A custom decorator that checks if a user has a specific role by ID or name.
-    For roles named "Moderator" or "Admin", performs additional security checks to prevent spoofing.
+    For role name checks, ensures the user has the highest role with that name in the server.
     Automatically responds with an error message if the check fails.
 
     Parameters:
@@ -33,51 +23,31 @@ def has_role(role, error_message=None):
                 return None
 
             has_required_role = False
-            user_roles = interaction.user.roles
             
-            # Special handling for security-sensitive roles to prevent spoofing
-            if role == "Moderator":
-                for r in user_roles:
-                    # If we know the exact role ID, use that as the primary check
-                    if MODERATOR_ROLE_ID and r.id == MODERATOR_ROLE_ID:
-                        has_required_role = True
-                        break
-                    
-                    # Otherwise, check both name AND position in hierarchy
-                    if r.name == "Moderator" and r.position >= MIN_MODERATOR_POSITION:
-                        has_required_role = True
-                        break
-                    
-                    # Also allow server administrators to pass this check
-                    if r.permissions.administrator:
-                        has_required_role = True
-                        break
-            
-            elif role == "Admin":
-                for r in user_roles:
-                    # If we know the exact role ID, use that as the primary check
-                    if ADMIN_ROLE_ID and r.id == ADMIN_ROLE_ID:
-                        has_required_role = True
-                        break
-                    
-                    # Otherwise, check both name AND position in hierarchy
-                    if r.name == "Admin" and r.position >= MIN_ADMIN_POSITION:
-                        has_required_role = True
-                        break
-                    
-                    # Also allow server administrators to pass this check
-                    if r.permissions.administrator:
-                        has_required_role = True
-                        break
-            
+            # Always allow users with administrator permissions
+            if any(r.permissions.administrator for r in interaction.user.roles):
+                has_required_role = True
             else:
-                # For other roles, use the original logic
+                # Check by role ID or name
                 if isinstance(role, int):
                     # Check by role ID (preferred method)
                     has_required_role = any(r.id == role for r in interaction.user.roles)
                 else:
-                    # Check by role name (fallback)
-                    has_required_role = any(r.name == role for r in interaction.user.roles)
+                    # For role name checks, we need to find the highest role with that name in the server
+                    # and check if the user has it
+                    
+                    # First, find all roles in the server with the given name
+                    server_roles_with_name = [r for r in interaction.guild.roles if r.name == role]
+                    
+                    if server_roles_with_name:
+                        # Sort roles by position (higher position = higher in hierarchy)
+                        server_roles_with_name.sort(key=lambda r: r.position, reverse=True)
+                        
+                        # Get the highest role with the given name
+                        highest_role = server_roles_with_name[0]
+                        
+                        # Check if the user has this specific role
+                        has_required_role = any(r.id == highest_role.id for r in interaction.user.roles)
 
             if not has_required_role:
                 # Use custom error message or default
