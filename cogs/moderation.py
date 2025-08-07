@@ -811,6 +811,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.choices(component=[
         app_commands.Choice(name="Confessions - Confession button", value="confessions"),
         app_commands.Choice(name="Role Menu - Role selection menu", value="role_menu"),
+        app_commands.Choice(name="Channel Menu - Year/course selection", value="channel_menu"),
         app_commands.Choice(name="Verification - Verification message", value="verification"),
     ])
     async def setup_command(self, interaction: discord.Interaction,
@@ -849,7 +850,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 return
         
         elif component == "role_menu":
-            # Setup role menu
+            # Setup role menu overview
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if not role_selector_cog:
                 await interaction.response.send_message(
@@ -864,17 +865,28 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     ephemeral=True)
                 return
             
-            # Create the role menu
+            # Create the overview embed (like update_role_menu_message does)
+            embed = discord.Embed(
+                title="🎭 Kies je rollen!",
+                description="Selecteer een categorie in het dropdown menu hieronder om rollen te kiezen.",
+                color=discord.Color.blue()
+            )
+            
+            for category in categories:
+                role_list = []
+                for role in category.roles:
+                    role_list.append(f"{role['emoji']} → @{role['role_name']}")
+                
+                embed.add_field(
+                    name=f"**{category.name}**",
+                    value="\n".join(role_list) if role_list else "Geen rollen",
+                    inline=True
+                )
+            
+            # Create the view with category select
             from cogs.role_selector import CategorySelect, RoleSelectorView
             view = RoleSelectorView(role_selector_cog)
             view.add_item(CategorySelect(role_selector_cog, categories))
-            
-            embed = discord.Embed(
-                title="🎭 Rolselectie",
-                description="Kies een categorie om rollen te beheren.",
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
             
             if target_channel == interaction.channel:
                 await interaction.response.send_message(embed=embed, view=view)
@@ -882,6 +894,53 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 await target_channel.send(embed=embed, view=view)
                 await interaction.response.send_message(
                     f"✅ Role menu ingesteld in {target_channel.mention}", ephemeral=True)
+        
+        elif component == "channel_menu":
+            # Setup channel menu
+            channel_menu_cog = self.bot.get_cog("ChannelMenu")
+            if not channel_menu_cog:
+                await interaction.response.send_message(
+                    "❌ Channel menu systeem is niet geladen.", ephemeral=True)
+                return
+            
+            # Create embed for channel menu (same as in setup_channel_menu)
+            embed = discord.Embed(
+                title="📚 Kanaal Selectie",
+                description="Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
+                           "Je krijgt alleen toegang tot de kanalen die je selecteert.",
+                color=discord.Color.purple()
+            )
+            embed.add_field(
+                name="📋 Instructies",
+                value="1️⃣ Kies je studiejaar uit het dropdown menu\n"
+                      "2️⃣ Selecteer de vakken die je wilt volgen\n"
+                      "3️⃣ Je krijgt automatisch toegang tot de geselecteerde kanalen",
+                inline=False
+            )
+            embed.set_footer(text="Gebruik het dropdown menu om je jaar te selecteren")
+            
+            # Import and create the view
+            try:
+                from cogs.channel_menu import YearSelectView
+                view = YearSelectView(self.bot)
+                
+                if target_channel == interaction.channel:
+                    await interaction.response.defer(ephemeral=True)
+                    await target_channel.send(embed=embed, view=view)
+                    await interaction.followup.send("✅ Channel menu is aangemaakt!", ephemeral=True)
+                else:
+                    await interaction.response.defer(ephemeral=True)
+                    await target_channel.send(embed=embed, view=view)
+                    await interaction.followup.send(
+                        f"✅ Channel menu ingesteld in {target_channel.mention}", ephemeral=True)
+                
+                # Ensure categories exist in the background
+                await channel_menu_cog.ensure_categories_exist(interaction.guild)
+                
+            except ImportError:
+                await interaction.response.send_message(
+                    "❌ Kon channel menu view niet laden.", ephemeral=True)
+                return
         
         elif component == "verification":
             # Setup verification message

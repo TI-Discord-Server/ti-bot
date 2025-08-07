@@ -374,44 +374,6 @@ class ChannelMenu(commands.Cog):
         
         return user_channel_roles
     
-    @app_commands.command(
-        name="setup_channel_menu",
-        description="Setup the year and course selection menu"
-    )
-    @has_admin()
-    async def setup_channel_menu(self, interaction: discord.Interaction):
-        # First respond to the interaction to prevent timeout
-        await interaction.response.defer(ephemeral=True)
-        
-        # Create embed for channel menu
-        embed = discord.Embed(
-            title="📚 Kanaal Selectie",
-            description="Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
-                       "Je krijgt alleen toegang tot de kanalen die je selecteert.",
-            color=discord.Color.purple()
-        )
-        embed.add_field(
-            name="📋 Instructies",
-            value="1️⃣ Kies je studiejaar uit het dropdown menu\n"
-                  "2️⃣ Selecteer de vakken die je wilt volgen\n"
-                  "3️⃣ Je krijgt automatisch toegang tot de geselecteerde kanalen",
-            inline=False
-        )
-        embed.set_footer(text="Gebruik het dropdown menu om je jaar te selecteren")
-        
-        # Send the menu immediately
-        view = YearSelectView(self.bot)
-        menu_message = await interaction.channel.send(embed=embed, view=view)
-        
-        # Now check and create categories in the background
-        await interaction.followup.send("Menu is aangemaakt! Nu worden de categorieën gecontroleerd...", ephemeral=True)
-        
-        # Check if the required categories exist, create if not
-        await self.ensure_categories_exist(interaction.guild)
-        
-        # Send a final confirmation
-        await interaction.followup.send("Categorieën en kanalen zijn gecontroleerd en aangemaakt indien nodig.", ephemeral=True)
-    
     async def ensure_categories_exist(self, guild):
         # Define the categories we need with test subjects
         required_categories = [
