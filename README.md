@@ -46,6 +46,10 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` a
 - `MONGODB_PORT`: De poort van je MongoDB-server (standaardwaarde = 27017)
 - `MONGODB_USERNAME`: De naam van de MongoDB-gebruiker en database (standaard = bot)
 - `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
+- `SMTP_PASSWORD`: Het wachtwoord voor SMTP-authenticatie (voor e-mailverificatie)
+- `SMTP_EMAIL`: Het e-mailadres dat gebruikt wordt voor het versturen van verificatie-e-mails
+- `SMTP_SERVER`: De SMTP-server voor het versturen van e-mails (bijv. smtp.gmail.com)
+- `ENCRYPTION_KEY`: Een Fernet-encryptiesleutel voor het beveiligen van gevoelige gegevens
 
 **Voorbeeld (.env):**
 ```env
@@ -55,7 +59,25 @@ MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
 WEBHOOK_URL='https://discord.com/api/webhooks/123456789/abcdef...'
 MONGODB_PORT=27017
 MONGODB_USERNAME=bot
+SMTP_PASSWORD='app_password_for_email' # App-specifiek wachtwoord voor e-mail
+SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
+SMTP_SERVER='smtp.gmail.com'
+ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.sh script
 ```
+
+### Fernet Encryptiesleutel Genereren
+
+Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde script om een veilige sleutel te genereren:
+
+```bash
+# Maak het script uitvoerbaar (indien nodig)
+chmod +x generate_key.sh
+
+# Voer het script uit om een sleutel te genereren
+./generate_key.sh
+```
+
+Kopieer de gegenereerde sleutel naar je `.env` bestand als `ENCRYPTION_KEY`.
 
 ### TLS Configuratie
 
