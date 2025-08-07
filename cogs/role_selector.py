@@ -320,9 +320,13 @@ class RoleSelector(commands.Cog):
             await interaction.response.send_message(content=content, view=view, ephemeral=True)
     
     @app_commands.command(name="setup_role_menu", description="Maak het rolselectie menu")
-    @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def setup_role_menu(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         """Setup the role selection menu in the specified channel."""
+        # Check if the user has the required role
+        council_role = discord.utils.get(interaction.guild.roles, name="The Council")
+        if council_role not in interaction.user.roles:
+            await interaction.response.send_message("Je hebt de 'The Council' rol nodig om dit commando te gebruiken.", ephemeral=True)
+            return
         
         # Use the current channel if none is specified
         if not channel:
