@@ -62,22 +62,19 @@ MONGODB_USERNAME=bot
 SMTP_PASSWORD='app_password_for_email' # App-specifiek wachtwoord voor e-mail
 SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
 SMTP_SERVER='smtp.gmail.com'
-ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.sh script
+ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.py script
 ```
 
 ### Fernet Encryptiesleutel Genereren
 
-Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde script om een veilige sleutel te genereren met OpenSSL:
+Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde Python script om een veilige sleutel te genereren:
 
 ```bash
-# Maak het script uitvoerbaar (indien nodig)
-chmod +x generate_key.sh
-
 # Voer het script uit om een sleutel te genereren
-./generate_key.sh
+python3 generate_key.py
 ```
 
-Kopieer de gegenereerde sleutel naar je `.env` bestand als `ENCRYPTION_KEY`.
+Kopieer de gegenereerde sleutel naar je `.env` bestand als `ENCRYPTION_KEY='gegenereerde_sleutel'`.
 
 ### TLS Configuratie
 
