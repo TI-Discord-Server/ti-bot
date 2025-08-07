@@ -111,28 +111,42 @@ class CourseSelect(discord.ui.Select):
             if str(channel.id) in selected_channel_ids
         ]
         
-        # Update user's permissions for these channels
-        for channel in all_channels:
-            if isinstance(channel, discord.TextChannel):
-                # If channel is in the selected list, ensure user can see it
-                if channel in selected_channels:
-                    await channel.set_permissions(interaction.user, read_messages=True)
-                # If channel is in the same year category but not selected, hide it
-                elif (channel.category and 
-                      f"{self.year}E JAAR" in channel.category.name and
-                      not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])):
-                    await channel.set_permissions(interaction.user, read_messages=False)
-        
-        # Send confirmation message
-        if selected_channels:
-            channel_names = ", ".join([channel.name for channel in selected_channels])
+        try:
+            # Update user's permissions for these channels
+            # Note: Discord has a limit of 250 permission overwrites per channel
+            # If you have more than 250 users with individual permissions, you should use roles instead
+            for channel in all_channels:
+                if isinstance(channel, discord.TextChannel):
+                    # If channel is in the selected list, ensure user can see it
+                    if channel in selected_channels:
+                        await channel.set_permissions(interaction.user, read_messages=True)
+                    # If channel is in the same year category but not selected, hide it
+                    elif (channel.category and 
+                          f"{self.year}E JAAR" in channel.category.name and
+                          not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])):
+                        await channel.set_permissions(interaction.user, read_messages=False)
+            
+            # Send confirmation message
+            if selected_channels:
+                channel_names = ", ".join([channel.name for channel in selected_channels])
+                await interaction.response.send_message(
+                    f"Je hebt toegang gekregen tot de volgende vakken: {channel_names}",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    "Je hebt geen vakken geselecteerd. Je ziet nu alleen de algemene kanalen voor dit jaar.",
+                    ephemeral=True
+                )
+                
+        except discord.Forbidden:
             await interaction.response.send_message(
-                f"Je hebt toegang gekregen tot de volgende vakken: {channel_names}",
+                "Er is een fout opgetreden bij het instellen van de kanaalrechten. Neem contact op met een beheerder.",
                 ephemeral=True
             )
-        else:
+        except Exception as e:
             await interaction.response.send_message(
-                "Je hebt geen vakken geselecteerd. Je ziet nu alleen de algemene kanalen voor dit jaar.",
+                f"Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
                 ephemeral=True
             )
 
@@ -153,21 +167,26 @@ class ChannelMenu(commands.Cog):
     )
     @has_admin()
     async def setup_channel_menu(self, interaction: discord.Interaction):
-        # Check if the required categories exist, create them if not
-        await self.ensure_categories_exist(interaction.guild)
-        
-        # Create and send the year selection view
-        view = YearSelectView(self.bot)
-        
-        # Send as a standalone message, not as a reply
+        # First respond to the interaction to prevent timeout
         await interaction.response.defer(ephemeral=True)
-        await interaction.channel.send(
+        
+        # Send the menu immediately
+        view = YearSelectView(self.bot)
+        menu_message = await interaction.channel.send(
             "# Kanaal Selectie\n"
             "Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
             "Je krijgt alleen toegang tot de kanalen die je selecteert.",
             view=view
         )
-        await interaction.followup.send("Menu is aangemaakt!", ephemeral=True)
+        
+        # Now check and create categories in the background
+        await interaction.followup.send("Menu is aangemaakt! Nu worden de categorieën gecontroleerd...", ephemeral=True)
+        
+        # Check if the required categories exist, create if not
+        await self.ensure_categories_exist(interaction.guild)
+        
+        # Send a final confirmation
+        await interaction.followup.send("Categorieën en kanalen zijn gecontroleerd en aangemaakt indien nodig.", ephemeral=True)
     
     async def ensure_categories_exist(self, guild):
         # Define the categories we need with test subjects
@@ -198,11 +217,9 @@ class ChannelMenu(commands.Cog):
                     name=cat_info["name"],
                     position=cat_info["position"]
                 )
-            
-            # Check if the test subjects exist, create if not
-            existing_channels = [c.name for c in category.channels if isinstance(c, discord.TextChannel)]
-            for subject in cat_info["subjects"]:
-                if subject not in existing_channels:
+                
+                # Only add test subjects to newly created categories
+                for subject in cat_info["subjects"]:
                     await guild.create_text_channel(
                         name=subject,
                         category=category
