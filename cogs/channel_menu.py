@@ -61,13 +61,47 @@ class YearSelect(discord.ui.Select):
             )
             return
         
+        # Get the user's current roles for this year's channels
+        user_roles = interaction.user.roles
+        user_channel_roles = []
+        
+        # Check which channels the user already has access to
+        for channel in channels:
+            # Format the channel name with spaces and proper capitalization
+            formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
+            
+            # Check if the user has a role with this name
+            if discord.utils.get(user_roles, name=formatted_name):
+                user_channel_roles.append(formatted_name)
+            
+            # Also check for other naming patterns
+            access_role_name = f"access-{channel.name}"
+            if discord.utils.get(user_roles, name=access_role_name):
+                user_channel_roles.append(formatted_name)
+                
+            # Check for exact match with channel name
+            if discord.utils.get(user_roles, name=channel.name):
+                user_channel_roles.append(formatted_name)
+                
+            # Check for custom roles containing the channel name
+            for role in user_roles:
+                if channel.name.lower() in role.name.lower() and role.name not in ["Admin", "Moderator", "Bot", "everyone"]:
+                    user_channel_roles.append(formatted_name)
+                    break
+        
         # Create a multi-select menu for the channels
         view = discord.ui.View(timeout=None)
         view.bot = self.bot  # Pass the bot reference to the view
         view.add_item(CourseSelect(channels, year, self.bot))
         
+        # Create the message with current selections
+        message = f"Je hebt jaar {year} geselecteerd. Selecteer nu je vakken:"
+        
+        if user_channel_roles:
+            message += f"\n\n**Je huidige selecties:** {', '.join(user_channel_roles)}"
+        
         await interaction.response.send_message(
-            f"Je hebt jaar {year} geselecteerd. Selecteer nu je vakken:",
+            message,
             view=view,
             ephemeral=True
         )
@@ -84,10 +118,15 @@ class CourseSelect(discord.ui.Select):
             # Skip channels that start with certain prefixes (like general channels)
             if any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"]):
                 continue
+            
+            # Format the channel name with spaces and proper capitalization
+            # Convert "programmeren-1" to "Programmeren 1"
+            formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
                 
             options.append(
                 discord.SelectOption(
-                    label=channel.name,
+                    label=formatted_name,
+                    description=channel.name,  # Show original name as description
                     value=str(channel.id)
                 )
             )
@@ -277,6 +316,13 @@ class CourseSelect(discord.ui.Select):
                     "Er zijn geen wijzigingen aangebracht in je toegang tot vakken.",
                     ephemeral=True
                 )
+                
+            # Add a message about how to manage roles
+            await interaction.followup.send(
+                "**Tip:** Om je toegang te beheren, gebruik dit menu opnieuw. "
+                "Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen.",
+                ephemeral=True
+            )
                 
         except discord.Forbidden:
             await interaction.followup.send(
