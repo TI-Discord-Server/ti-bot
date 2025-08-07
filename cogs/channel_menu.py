@@ -104,6 +104,9 @@ class CourseSelect(discord.ui.Select):
         # Get the selected channel IDs
         selected_channel_ids = self.values
         
+        # Log for debugging
+        print(f"User {interaction.user.name} selected channel IDs: {selected_channel_ids}")
+        
         # Get all channels in the guild
         all_channels = interaction.guild.channels
         
@@ -112,6 +115,9 @@ class CourseSelect(discord.ui.Select):
             channel for channel in all_channels 
             if str(channel.id) in selected_channel_ids
         ]
+        
+        # Log for debugging
+        print(f"Selected channels: {[channel.name for channel in selected_channels]}")
         
         try:
             # Get all channels in the year category
@@ -143,29 +149,34 @@ class CourseSelect(discord.ui.Select):
                 # Get all roles that have explicit permissions for this channel
                 overwrites = channel.overwrites
                 
-                # Look for roles that have read_messages=True and don't have other permissions
-                for role, permissions in overwrites.items():
-                    # Skip @everyone role
-                    if role == interaction.guild.default_role:
+                # Look for roles that have read_messages=True
+                for role_or_member, permissions in overwrites.items():
+                    # Skip @everyone role and members
+                    if role_or_member == interaction.guild.default_role or not isinstance(role_or_member, discord.Role):
                         continue
+                    
+                    # Check if this role has read_messages permission
+                    if permissions.read_messages:
+                        # Log for debugging
+                        print(f"Found role {role_or_member.name} with read access to {channel.name}")
                         
-                    # Check if this is a role (not a member) and has read_messages permission
-                    if isinstance(role, discord.Role) and permissions.read_messages:
-                        # Check if this role only has permissions for this specific channel
-                        # Count how many channels this role has permissions in
-                        channel_count = 0
+                        # Check if this role has permissions in other channels
+                        exclusive_to_this_channel = True
                         for ch in interaction.guild.channels:
-                            if isinstance(ch, discord.TextChannel) and role in ch.overwrites:
-                                channel_count += 1
-                                
-                        # If this role only has permissions in this one channel, use it
-                        if channel_count == 1:
-                            existing_role = role
+                            if isinstance(ch, discord.TextChannel) and ch != channel and role_or_member in ch.overwrites:
+                                exclusive_to_this_channel = False
+                                break
+                        
+                        if exclusive_to_this_channel:
+                            existing_role = role_or_member
+                            print(f"Using existing role {existing_role.name} for {channel.name}")
                             break
                 
                 # If we found an existing role with the right permissions, use it
                 if existing_role:
                     role = existing_role
+                    # Make sure the role has the correct permissions
+                    await channel.set_permissions(role, read_messages=True)
                 else:
                     # Format the role name with spaces and proper capitalization
                     # Convert "programmeren-1" to "Programmeren 1"
@@ -196,10 +207,14 @@ class CourseSelect(discord.ui.Select):
                 # Add or remove the role from the user
                 if channel in selected_channels:
                     if role not in interaction.user.roles:
+                        # Log for debugging
+                        print(f"Adding role {role.name} to user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.add_roles(role, reason=f"User selected {channel.name} in channel menu")
                         added_roles.append(role)
                 else:
                     if role in interaction.user.roles:
+                        # Log for debugging
+                        print(f"Removing role {role.name} from user {interaction.user.name} for channel {channel.name}")
                         await interaction.user.remove_roles(role, reason=f"User deselected {channel.name} in channel menu")
                         removed_roles.append(role)
             
