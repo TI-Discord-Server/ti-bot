@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.app_commands import command
 from discord.ext import commands
 import datetime
-from utils.has_role import has_role
+from utils.has_admin import has_admin
 
 
 class Reports(commands.Cog, name="reports"):
@@ -94,7 +94,7 @@ class Reports(commands.Cog, name="reports"):
         name="set_report_channel",
         description="Set the channel where reports should be sent (Moderators only).",
     )
-    @has_role("Moderator")
+    @has_admin()
     async def set_report_channel(
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):

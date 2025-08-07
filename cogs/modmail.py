@@ -9,7 +9,7 @@ from discord.app_commands import (
 
 from utils.thread import ThreadManager
 from utils.utils import *
-from utils.has_role import has_role
+from utils.has_admin import has_admin
 from utils import checks
 
 
@@ -37,7 +37,7 @@ class Modmail(commands.Cog, name="modmail"):
         name="set_modmail_settings",
         description="Set modmail category and / or logs channel",
     )
-    @has_role("Moderator")
+    @has_admin()
     async def set_modmail_settings(
             self, interaction: discord.Interaction, category: discord.CategoryChannel = None, channel: discord.TextChannel = None
     ):
@@ -75,7 +75,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.command(usage="[after] [close message]")
     @command(name="close", description="Close the thread")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def close(
             self,
@@ -94,7 +94,7 @@ class Modmail(commands.Cog, name="modmail"):
         await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
 
     @command(name="generate_transcript", description="Makes a transcript and sends it in log_channel")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def generate_transcript(
             self,
@@ -110,7 +110,7 @@ class Modmail(commands.Cog, name="modmail"):
         await confirmation.delete()
 
     @command(name="transcripts", description="Gives transcripts with certain person")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def transcripts(
             self,
@@ -171,7 +171,7 @@ class Modmail(commands.Cog, name="modmail"):
         return mention
 
     @command(name="nsfw", description="Changes Modmail-thread to NSFW status")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def nsfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as NSFW (not safe for work)."""
@@ -179,7 +179,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.response.send_message("🔞 Set Channel to NSFW")
 
     @command(name="sfw", description="Changes Modmail-thread to SFW status")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def sfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as SFW (safe for work)."""
@@ -187,7 +187,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.response.send_message("⚠️ Set Channel to SFW")
 
     @command(name="reply", description="Replies to a Modmail-message")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def reply(self, interaction: discord.Interaction, msg: str):
         """
@@ -209,7 +209,7 @@ class Modmail(commands.Cog, name="modmail"):
         await confirmation.delete()
 
     @command(name="areply", description="Replies anonymous to a Modmail-message")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def areply(self, interaction: discord.Interaction, msg: str):
         """
@@ -230,7 +230,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.group(invoke_without_command=True)
     @command(name="note", description="Clarification of modmail")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def note(self, interaction: discord.Interaction, msg: str):
         """
@@ -252,7 +252,7 @@ class Modmail(commands.Cog, name="modmail"):
         await confirmation.delete()
 
     @command(name="edit", description="Edits a Modmail-message")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def edit(self, interaction: discord.Interaction, message: str, message_id: Optional[str] = "" ):
         """
@@ -285,7 +285,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.command(usage="<user> [category] [options]")
     @command(name="contact", description="Opens a modmail ticket")
-    @has_role("Moderator")
+    @has_admin()
     async def contact(
             self,
             interaction: discord.Interaction,
@@ -368,7 +368,7 @@ class Modmail(commands.Cog, name="modmail"):
             await interaction.delete_original_response()
 
     @command(name="delete", description="Deletes a modmail message.")
-    @has_role("Moderator")
+    @has_admin()
     @checks.thread_only()
     async def delete(self, interaction: discord.Interaction, message_id: Optional[str] = ""):
         """
