@@ -11,20 +11,6 @@ class ConfessionCommands(commands.Cog):
         self.tasks = ConfessionTasks(bot)
 
     @app_commands.command(
-        name="setup_confessions",
-        description="Set up the confession button in the public channel.",
-    )
-    @app_commands.checks.has_role(1342591576764977223)
-    async def setup_confessions(self, interaction: discord.Interaction):
-        view = ConfessionView(self.bot)
-        await interaction.response.send_message(
-            "Click the button below to submit a confession:", view=view
-        )
-        self.bot.log.info(
-            f"{interaction.user} heeft de setup_confessions command uitgevoerd."
-        )
-
-    @app_commands.command(
         name="force_review", description="Force the review of confessions."
     )
     @app_commands.checks.has_role(1342591576764977223)

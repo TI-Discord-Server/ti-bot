@@ -432,29 +432,6 @@ class RoleSelector(commands.Cog):
         # Always edit the message since this is called after a role selection
         await interaction.response.edit_message(embed=embed, view=view)
     
-    @app_commands.command(name="setup_role_menu", description="Maak het rolselectie menu")
-    async def setup_role_menu(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
-        """Setup the role selection menu in the specified channel."""
-        # Check if the user has the required role
-        council_role = discord.utils.get(interaction.guild.roles, name="The Council")
-        if council_role not in interaction.user.roles:
-            await interaction.response.send_message("Je hebt de 'The Council' rol nodig om dit commando te gebruiken.", ephemeral=True)
-            return
-        
-        # Use the current channel if none is specified
-        if not channel:
-            channel = interaction.channel
-        
-        await interaction.response.defer(ephemeral=True)
-        
-        # Create or update the role menu message
-        message = await self.update_role_menu_message(channel.id, self.role_menu_message_id)
-        
-        if message:
-            await interaction.followup.send(f"Rolselectie menu is aangemaakt in {channel.mention}!", ephemeral=True)
-        else:
-            await interaction.followup.send("Kon het rolselectie menu niet aanmaken.", ephemeral=True)
-    
     @app_commands.command(name="add_role_category", description="Voeg een nieuwe rolcategorie toe")
     @has_role("The Council", "Je hebt de 'The Council' rol nodig om dit commando te gebruiken.")
     async def add_role_category(self, interaction: discord.Interaction, name: str):

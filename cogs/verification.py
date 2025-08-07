@@ -134,24 +134,6 @@ class Verification(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="verify_message", description="Stuur het verificatiebericht")
-    async def verify_message(self, interaction: Interaction):
-        embed = discord.Embed(
-            title="Verificatie vereist",
-            description=(
-                "Om toegang te krijgen tot deze server moet je een student zijn van HoGent.\n"
-                "Je moet verifiëren met een geldig studentenmailadres. Je ontvangt een code per mail, "
-                "die je hieronder moet invullen om toegang te krijgen.\n"
-                "Je e-mailadres wordt opgeslagen in onze database zolang je op de server blijft. "
-                "Wil je het laten verwijderen, verlaat dan de server of maak een ticket aan. Je toegang wordt dan ingetrokken."
-            ),
-            color=discord.Color.blue()
-        )
-
-        await interaction.channel.send(embed=embed, view=VerificationView(self.bot))
-
-        await interaction.response.send_message("✅ Bericht is verzonden", ephemeral=True)
-
     @app_commands.command(name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)")
     @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
     async def get_email(self, interaction: Interaction, user: discord.Member):
