@@ -137,8 +137,12 @@ class CourseSelect(discord.ui.Select):
             removed_roles = []
             
             for channel in year_channels:
+                # Format the role name with spaces and proper capitalization
+                # Convert "programmeren-1" to "Programmeren 1"
+                formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
+                role_name = formatted_name
+                
                 # Find or create a role for this channel
-                role_name = f"access-{channel.name}"
                 role = discord.utils.get(interaction.guild.roles, name=role_name)
                 
                 # If role doesn't exist, create it
@@ -171,9 +175,9 @@ class CourseSelect(discord.ui.Select):
             
             # Send confirmation message
             if added_roles:
-                added_channels = ", ".join([role.name.replace("access-", "") for role in added_roles])
+                added_channels = ", ".join([role.name for role in added_roles])
                 if removed_roles:
-                    removed_channels = ", ".join([role.name.replace("access-", "") for role in removed_roles])
+                    removed_channels = ", ".join([role.name for role in removed_roles])
                     await interaction.followup.send(
                         f"Je hebt toegang gekregen tot: {added_channels}\n"
                         f"Je hebt geen toegang meer tot: {removed_channels}",
@@ -185,7 +189,7 @@ class CourseSelect(discord.ui.Select):
                         ephemeral=True
                     )
             elif removed_roles:
-                removed_channels = ", ".join([role.name.replace("access-", "") for role in removed_roles])
+                removed_channels = ", ".join([role.name for role in removed_roles])
                 await interaction.followup.send(
                     f"Je hebt geen toegang meer tot: {removed_channels}",
                     ephemeral=True
