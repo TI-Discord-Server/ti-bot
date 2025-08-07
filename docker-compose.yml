@@ -20,7 +20,11 @@ services:
     restart: always
 
   webapp:
-    image: tibot-v3
+    build:
+      context: .
+      args:
+        # Set to "true" to enable TLS for MongoDB connection
+        ENABLE_TLS: "false"
     depends_on:
       - mongo
     networks:

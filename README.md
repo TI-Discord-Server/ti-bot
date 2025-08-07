@@ -9,7 +9,11 @@ Deze bot kan worden gestart met Python of via een container (Docker).
 1. Maak een `.env` bestand aan en vul dit in zoals gebruikelijk (zie `.env.example` voor een voorbeeld).
 2. Start de bot met het volgende commando:
    ```bash
+   # Zonder TLS (standaard)
    python3 main.py
+   
+   # Met TLS ingeschakeld
+   python3 main.py --tls
    ```
 
 ---
@@ -20,13 +24,17 @@ Deze bot kan worden gestart met Python of via een container (Docker).
 
 Voer het volgende commando uit in je CLI, vanuit de rootmap:
 ```bash
+# Standaard build (zonder TLS)
 docker build -t tibot-v3 .
+
+# Build met TLS ingeschakeld
+docker build -t tibot-v3 --build-arg ENABLE_TLS=true .
 ```
 
 ### 2. Docker Compose gebruiken
 
 1. Controleer het bestand `docker-compose.yml`.
-2.1 Maak een bestand genaamd `.env` aan door de inhoud van `examples.env` te kopiëren.
+2. Maak een bestand genaamd `.env` aan door de inhoud van `examples.env` te kopiëren.
 
 #### Vereiste omgevingsvariabelen (.env)
 
@@ -44,20 +52,35 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` a
 BOT_TOKEN='XXX'
 MONGODB_IP_ADDRESS='mongo' # Laat dit ongewijzigd bij gebruik van docker-compose
 MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
-WEBHOOK_URL='<https://discord.com/api/webhooks/123456789/abcdef...>'
+WEBHOOK_URL='https://discord.com/api/webhooks/123456789/abcdef...'
 MONGODB_PORT=27017
 MONGODB_USERNAME=bot
 ```
-2.2 Pas in main.py de connection string aan. Verwijder de TLs optie
-specifiek verwijder je dit **&tls=true&tlsInsecure=true**
-Resultaat:
-```py
-        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
-        motor = AsyncIOMotorClient(
-            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256",
-            connect=True,
-        )
+
+### TLS Configuratie
+
+De bot ondersteunt nu een optionele TLS-verbinding voor MongoDB. Standaard is TLS uitgeschakeld voor lokale ontwikkeling, maar het kan worden ingeschakeld met de `--tls` vlag:
+
+```bash
+# TLS inschakelen bij het starten van de bot
+python3 main.py --tls
 ```
+
+Bij gebruik van Docker kan TLS worden ingeschakeld op verschillende manieren:
+
+1. Tijdens het bouwen van de image:
+   ```bash
+   docker build -t tibot-v3 --build-arg ENABLE_TLS=true .
+   ```
+
+2. In docker-compose.yml (wijzig de ENABLE_TLS waarde):
+   ```yaml
+   webapp:
+     build:
+       context: .
+       args:
+         ENABLE_TLS: "true"  # Wijzig naar "true" om TLS in te schakelen
+   ```
 ### 3. Services starten met Docker Compose
 
 Start MongoDB:
@@ -67,25 +90,28 @@ docker compose up mongo -d
 
 ### 4. MongoDB-gebruiker toevoegen
 
-- Als je nog geen gebruiker hebt voor de bot.
-Conencteer met een mongo CLI of mongo GUI app met deze connection string `mongodb://root:yourpassword123!@localhost:27017/` Vervolgens voer je deze commando's afzonderlijk uit:
-```mongo
-use bot
-```
+Als je nog geen gebruiker hebt voor de bot:
+1. Connecteer met een MongoDB CLI of GUI app met deze connection string:
+   ```
+   mongodb://root:yourpassword123!@localhost:27017/
+   ```
+2. Voer deze commando's uit om een nieuwe gebruiker aan te maken:
+   ```javascript
+   use bot
+   
+   db.createUser({
+     user: "bot",
+     pwd: "yourpassword123!",
+     roles: [
+       { role: "readWrite", db: "bot" }
+     ]
+   })
+   ```
+3. Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
 
-```mongo
-db.createUser({
-  user: "bot",
-  pwd: "yourpassword123!",
-  roles: [
-    { role: "readWrite", db: "bot" }
-  ]
-})
-```
+### 5. Bot starten
 
-Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
-
-Start daarna de webapp:
+Start de bot container:
 ```bash
 docker compose up webapp -d
 ```
@@ -97,6 +123,7 @@ docker compose up webapp -d
 - Zorg ervoor dat MongoDB actief is vóór het starten van de bot.
 - Het `.env` bestand moet alle vereiste variabelen bevatten.
 - Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` juist is ingesteld.
+- TLS is standaard uitgeschakeld voor lokale ontwikkeling, maar kan worden ingeschakeld met de `--tls` vlag.
 
 ---
 
