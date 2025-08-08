@@ -210,6 +210,36 @@ class Verification(commands.Cog):
         kicked = False
         if member and not is_moderator:
             try:
+                # Create a permanent invite before kicking
+                invite = None
+                try:
+                    # Try to create invite from the first available text channel
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).create_instant_invite:
+                            invite = await channel.create_invite(
+                                max_age=0,  # Permanent invite
+                                max_uses=0,  # Unlimited uses
+                                reason="Invite voor gekickte gebruiker om terug te keren"
+                            )
+                            break
+                except Exception:
+                    # If invite creation fails, continue with kick anyway
+                    pass
+                
+                # Send DM with invite before kicking
+                try:
+                    dm_message = "Je verificatie is ingetrokken door een moderator en je bent gekickt van de server."
+                    if invite:
+                        dm_message += f"\n\nJe kunt terugkeren via deze uitnodiging: {invite.url}"
+                    else:
+                        dm_message += "\n\nNeem contact op met een moderator om terug te keren."
+                    
+                    await member.send(dm_message)
+                except Exception:
+                    # If DM fails, continue with kick anyway
+                    pass
+                
+                # Kick the user
                 await member.kick(reason="Verificatie ingetrokken door moderator.")
                 kicked = True
             except Exception:
