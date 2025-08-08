@@ -41,8 +41,20 @@ from utils.errors import (
 )
 
 # Parse command line arguments
+def str_to_bool(v):
+    """Convert string to boolean for argument parsing."""
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 parser = argparse.ArgumentParser(description='TI Discord Bot')
-parser.add_argument('--tls', action='store_true', help='Enable TLS for MongoDB connection')
+parser.add_argument('--tls', type=str_to_bool, nargs='?', const=True, default=False, 
+                   help='Enable TLS for MongoDB connection. Use --tls, --tls=true, or --tls=false')
 args = parser.parse_args()
 
 MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD)

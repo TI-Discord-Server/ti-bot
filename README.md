@@ -12,8 +12,14 @@ Deze bot kan worden gestart met Python of via een container (Docker).
    # Zonder TLS (standaard)
    python3 main.py
    
-   # Met TLS ingeschakeld
+   # Met TLS ingeschakeld (alle onderstaande opties werken)
    python3 main.py --tls
+   python3 main.py --tls=true
+   python3 main.py --tls=yes
+   
+   # TLS expliciet uitschakelen
+   python3 main.py --tls=false
+   python3 main.py --tls=no
    ```
 
 ---
@@ -94,11 +100,17 @@ De bot ondersteunt migratie van verificatiegegevens uit een oude database. Dit i
 
 ### TLS Configuratie
 
-De bot ondersteunt nu een optionele TLS-verbinding voor MongoDB. Standaard is TLS uitgeschakeld voor lokale ontwikkeling, maar het kan worden ingeschakeld met de `--tls` vlag:
+De bot ondersteunt nu een optionele TLS-verbinding voor MongoDB. Standaard is TLS uitgeschakeld voor lokale ontwikkeling, maar het kan worden ingeschakeld met verschillende opties:
 
 ```bash
-# TLS inschakelen bij het starten van de bot
+# TLS inschakelen bij het starten van de bot (alle opties werken)
 python3 main.py --tls
+python3 main.py --tls=true
+python3 main.py --tls=yes
+
+# TLS expliciet uitschakelen
+python3 main.py --tls=false
+python3 main.py --tls=no
 ```
 
 Bij gebruik van Docker kan TLS worden ingeschakeld op verschillende manieren:
@@ -158,7 +170,7 @@ docker compose up webapp -d
 - Zorg ervoor dat MongoDB actief is vóór het starten van de bot.
 - Het `.env` bestand moet alle vereiste variabelen bevatten.
 - Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` juist is ingesteld.
-- TLS is standaard uitgeschakeld voor lokale ontwikkeling, maar kan worden ingeschakeld met de `--tls` vlag.
+- TLS is standaard uitgeschakeld voor lokale ontwikkeling, maar kan worden ingeschakeld met verschillende opties: `--tls`, `--tls=true`, `--tls=false`, etc.
 
 ---
 
