@@ -236,6 +236,7 @@ class Bot(commands.Bot):
 
         self.__started = False
         self.owner_ids: frozenset[int] = frozenset()  # Will be loaded from database
+        self._guild_id: typing.Optional[int] = None  # Cached guild ID
 
         self.tree.error(self.on_application_command_error)
 
@@ -279,6 +280,10 @@ class Bot(commands.Bot):
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
             
+            # Load guild ID and developer IDs from database
+            await self.load_guild_id()
+            await self.load_developer_ids()
+            
             # Populate thread cache on startup
             try:
                 await self.threads.populate_cache()
@@ -301,6 +306,14 @@ class Bot(commands.Bot):
             return settings["guild_id"]
         return None
 
+    async def load_guild_id(self):
+        """Load guild ID from database and cache it."""
+        self._guild_id = await self.get_guild_id()
+        if self._guild_id:
+            self.log.info(f"Loaded guild ID {self._guild_id} from database")
+        else:
+            self.log.warning("No guild ID configured in database")
+
     async def load_developer_ids(self):
         """Load developer IDs from database configuration."""
         settings = await self.db.settings.find_one({"_id": "server_settings"})
@@ -312,9 +325,8 @@ class Bot(commands.Bot):
 
     @property
     def guild_id(self) -> typing.Optional[int]:
-        """Synchronous property for backward compatibility."""
-        # This is a fallback - ideally use get_guild_id() for new code
-        return None
+        """Synchronous property that returns cached guild ID."""
+        return self._guild_id
 
     def get_guild_icon(
             self, guild: typing.Optional[discord.Guild], *, size: typing.Optional[int] = None
