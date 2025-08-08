@@ -159,44 +159,71 @@ class Verification(commands.Cog):
             await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
 
     @app_commands.command(name="unverify", description="Verwijder een verificatie en kick de gebruiker")
-    @app_commands.describe(email="Het e-mailadres om te verwijderen")
-    async def unverify(self, interaction: Interaction, email: str):
+    @app_commands.describe(
+        email="Het e-mailadres om te verwijderen (optioneel)",
+        user="De gebruiker om te unverifiëren (optioneel)"
+    )
+    async def unverify(self, interaction: Interaction, email: str = None, user: discord.Member = None):
         # Only moderators
         if not any(role.name == "Moderator" for role in interaction.user.roles):
             await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
             return
 
-        # Find record by searching through all records and decrypting emails
+        # Must provide either email or user
+        if not email and not user:
+            await interaction.response.send_message("❌ Je moet een e-mailadres of gebruiker opgeven.", ephemeral=True)
+            return
+
+        # Find record
         record = None
-        all_records = self.bot.db.verifications.find({})
-        async for r in all_records:
-            try:
-                decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
-                if decrypted_email == email:
-                    record = r
-                    break
-            except Exception:
-                # Skip invalid encrypted emails or corrupted records
-                continue
+        if user:
+            # Search by user ID
+            record = await self.bot.db.verifications.find_one({"user_id": user.id})
+        else:
+            # Search by email (decrypt all records)
+            all_records = self.bot.db.verifications.find({})
+            async for r in all_records:
+                try:
+                    decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
+                    if decrypted_email == email:
+                        record = r
+                        break
+                except Exception:
+                    # Skip invalid encrypted emails or corrupted records
+                    continue
         
         if not record:
-            await interaction.response.send_message("❌ Geen gebruiker gevonden met dit e-mailadres.", ephemeral=True)
+            search_term = f"gebruiker {user.mention}" if user else f"e-mailadres {email}"
+            await interaction.response.send_message(f"❌ Geen verificatie gevonden voor {search_term}.", ephemeral=True)
             return
             
         guild = interaction.guild
         member = guild.get_member(record["user_id"])
+        
+        # Remove verification from database
         await self.bot.db.verifications.delete_one({"_id": record["_id"]})
 
-        if member and any(role.name == "Moderator" for role in member.roles):
-            await interaction.response.send_message("❌ Je kunt geen moderator kicken.", ephemeral=True)
-            return
-
-        if member:
+        # Check if target is a moderator
+        is_moderator = member and any(role.name == "Moderator" for role in member.roles)
+        
+        # Try to kick if not a moderator
+        kicked = False
+        if member and not is_moderator:
             try:
                 await member.kick(reason="Verificatie ingetrokken door moderator.")
+                kicked = True
             except Exception:
                 pass
-        await interaction.response.send_message("✅ Gebruiker verwijderd en verificatie ingetrokken.", ephemeral=True)
+
+        # Send appropriate response
+        if is_moderator:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
+        elif kicked:
+            await interaction.response.send_message("✅ Gebruiker gekickt en verificatie ingetrokken.", ephemeral=True)
+        elif member:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker kon niet gekickt worden.", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
