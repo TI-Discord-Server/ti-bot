@@ -1,5 +1,6 @@
 import re
 import typing
+from typing import Literal
 from urllib import parse
 
 import discord
@@ -27,7 +28,7 @@ def truncate(text: str, max: int = 50) -> str:  # pylint: disable=redefined-buil
     text = text.strip()
     return text[: max - 3].strip() + "..." if len(text) > max else text
 
-def is_image_url(url: str, **kwargs) -> str:
+def is_image_url(url: str, **kwargs) -> Literal[b""] | str:
     """
     Check if the URL is pointing to an image.
 
@@ -56,7 +57,7 @@ def is_image_url(url: str, **kwargs) -> str:
     return parse_image_url(url, **kwargs)
 
 
-def parse_image_url(url: str, *, convert_size=True) -> str:
+def parse_image_url(url: str, *, convert_size=True) -> Literal[b""] | str:
     """
     Convert the image URL into a sized Discord avatar.
 
@@ -185,6 +186,8 @@ def get_top_role(member: discord.Member, hoisted=True):
             return role
         if role.hoist:
             return role
+        return None
+    return None
 
 
 async def create_thread_channel(bot, recipient, category, overwrites, *, name=None, errors_raised=None):
