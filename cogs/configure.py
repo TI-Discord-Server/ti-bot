@@ -116,27 +116,34 @@ class BaseConfigView(discord.ui.View):
     
     async def create_main_embed(self):
         """Create the main configuration embed."""
-        embed = discord.Embed(
-            title="🔧 Bot Configuratie",
-            description="Selecteer een categorie om de instellingen te bekijken en aan te passen.",
-            color=discord.Color.blue(),
-            timestamp=datetime.datetime.now()
-        )
-        embed.add_field(
-            name="📋 Beschikbare Categorieën",
-            value=(
-                "🏠 **Server Instellingen** - Basis server configuratie\n"
-                "📧 **Modmail** - Modmail systeem instellingen\n"
-                "🤫 **Confessions** - Confession systeem instellingen\n"
-                "🚨 **Reports** - Report systeem instellingen\n"
-                "✅ **Verificatie** - Verificatie systeem instellingen\n"
-                "🛡️ **Moderatie** - Moderatie instellingen\n"
-                "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen"
-            ),
-            inline=False
-        )
-        embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
-        return embed
+        try:
+            self.bot.log.debug("Creating main configuration embed...")
+            embed = discord.Embed(
+                title="🔧 Bot Configuratie",
+                description="Selecteer een categorie om de instellingen te bekijken en aan te passen.",
+                color=discord.Color.blue(),
+                timestamp=datetime.datetime.now()
+            )
+            self.bot.log.debug("Embed created, adding fields...")
+            embed.add_field(
+                name="📋 Beschikbare Categorieën",
+                value=(
+                    "🏠 **Server Instellingen** - Basis server configuratie\n"
+                    "📧 **Modmail** - Modmail systeem instellingen\n"
+                    "🤫 **Confessions** - Confession systeem instellingen\n"
+                    "🚨 **Reports** - Report systeem instellingen\n"
+                    "✅ **Verificatie** - Verificatie systeem instellingen\n"
+                    "🛡️ **Moderatie** - Moderatie instellingen\n"
+                    "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen"
+                ),
+                inline=False
+            )
+            embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
+            self.bot.log.debug("Main embed created successfully")
+            return embed
+        except Exception as e:
+            self.bot.log.error(f"Error creating main embed: {e}", exc_info=True)
+            raise
 
 
 class ServerConfigView(BaseConfigView):
@@ -144,68 +151,83 @@ class ServerConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create server configuration embed."""
-        settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
-        
-        embed = discord.Embed(
-            title="🏠 Server Instellingen",
-            description="Basis server configuratie instellingen",
-            color=discord.Color.green(),
-            timestamp=datetime.datetime.now()
-        )
-        
-        # Show current guild (auto-detected or configured)
-        current_guild = self.bot.guild
-        configured_guild_id = settings.get("guild_id", None)
-        
-        if current_guild:
-            if configured_guild_id:
-                guild_status = f"**Geconfigureerd:** {current_guild.name} (`{current_guild.id}`)"
-            else:
-                guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
-        else:
-            # Fallback: show the guild_id even if guild object not found
-            guild_id = self.bot.guild_id or 1334456602324897792
-            guild_status = f"**Standaard:** Server ID `{guild_id}` (server niet gevonden)"
+        try:
+            self.bot.log.debug("Creating server configuration embed...")
+            settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
+            self.bot.log.debug(f"Retrieved server settings: {settings}")
             
-        embed.add_field(
-            name="🏠 Huidige Server",
-            value=guild_status,
-            inline=False
-        )
-        
-        # Show multi-guild info if applicable
-        if len(self.bot.guilds) > 1:
+            embed = discord.Embed(
+                title="🏠 Server Instellingen",
+                description="Basis server configuratie instellingen",
+                color=discord.Color.green(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            # Show current guild (auto-detected or configured)
+            self.bot.log.debug("Getting current guild info...")
+            current_guild = self.bot.guild
+            configured_guild_id = settings.get("guild_id", None)
+            self.bot.log.debug(f"Current guild: {current_guild}, Configured guild_id: {configured_guild_id}")
+            
+            if current_guild:
+                if configured_guild_id:
+                    guild_status = f"**Geconfigureerd:** {current_guild.name} (`{current_guild.id}`)"
+                else:
+                    guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
+            else:
+                # Fallback: show the guild_id even if guild object not found
+                guild_id = self.bot.guild_id or 1334456602324897792
+                guild_status = f"**Standaard:** Server ID `{guild_id}` (server niet gevonden)"
+                self.bot.log.warning(f"Guild object not found, using fallback guild_id: {guild_id}")
+                
             embed.add_field(
-                name="ℹ️ Multi-Server Info",
-                value=f"Bot is in {len(self.bot.guilds)} servers. Configureer een specifieke server ID als de auto-detectie niet correct is.",
+                name="🏠 Huidige Server",
+                value=guild_status,
                 inline=False
             )
-        
-        # Developer IDs
-        dev_ids = settings.get("developer_ids", [])
-        if dev_ids:
-            dev_mentions = []
-            for dev_id in dev_ids[:5]:  # Show max 5
-                user = self.bot.get_user(dev_id)
-                if user:
-                    dev_mentions.append(f"<@{dev_id}> (`{dev_id}`)")
-                else:
-                    dev_mentions.append(f"Onbekende gebruiker (`{dev_id}`)")
+            self.bot.log.debug("Added guild status field")
             
-            dev_text = "\n".join(dev_mentions)
-            if len(dev_ids) > 5:
-                dev_text += f"\n... en {len(dev_ids) - 5} meer"
-        else:
-            dev_text = "Geen ontwikkelaars ingesteld"
+            # Show multi-guild info if applicable
+            if len(self.bot.guilds) > 1:
+                embed.add_field(
+                    name="ℹ️ Multi-Server Info",
+                    value=f"Bot is in {len(self.bot.guilds)} servers. Configureer een specifieke server ID als de auto-detectie niet correct is.",
+                    inline=False
+                )
+                self.bot.log.debug("Added multi-guild info field")
             
-        embed.add_field(
-            name="👨‍💻 Ontwikkelaars",
-            value=dev_text,
-            inline=False
-        )
-        
-        embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
-        return embed
+            # Developer IDs
+            self.bot.log.debug("Processing developer IDs...")
+            dev_ids = settings.get("developer_ids", [])
+            if dev_ids:
+                dev_mentions = []
+                for dev_id in dev_ids[:5]:  # Show max 5
+                    user = self.bot.get_user(dev_id)
+                    if user:
+                        dev_mentions.append(f"<@{dev_id}> (`{dev_id}`)")
+                    else:
+                        dev_mentions.append(f"Onbekende gebruiker (`{dev_id}`)")
+                
+                dev_text = "\n".join(dev_mentions)
+                if len(dev_ids) > 5:
+                    dev_text += f"\n... en {len(dev_ids) - 5} meer"
+            else:
+                dev_text = "Geen ontwikkelaars ingesteld"
+                
+            embed.add_field(
+                name="👨‍💻 Ontwikkelaars",
+                value=dev_text,
+                inline=False
+            )
+            self.bot.log.debug("Added developer IDs field")
+            
+            embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
+            self.bot.log.debug("Server configuration embed created successfully")
+            return embed
+            
+        except Exception as e:
+            self.bot.log.error(f"Error creating server configuration embed: {e}", exc_info=True)
+            raise
     
     @discord.ui.button(label="Server ID overschrijven", style=discord.ButtonStyle.secondary, emoji="🏠")
     async def set_guild_id(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1079,10 +1101,36 @@ class Configure(commands.Cog):
     @has_admin_permissions()
     async def configure(self, interaction: discord.Interaction, visible: bool = True):
         """Open the configuration interface."""
-        view = ConfigurationView(self.bot, interaction.user.id, visible)
-        embed = await view.create_main_embed()
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=not visible)
+        try:
+            self.bot.log.info(f"Configure command called by {interaction.user} ({interaction.user.id}) in guild {interaction.guild_id}")
+            self.bot.log.debug(f"Bot guild_id: {getattr(self.bot, 'guild_id', 'NOT_SET')}")
+            self.bot.log.debug(f"Bot guild: {getattr(self.bot, 'guild', 'NOT_SET')}")
+            
+            self.bot.log.debug("Creating ConfigurationView...")
+            view = ConfigurationView(self.bot, interaction.user.id, visible)
+            
+            self.bot.log.debug("Creating main embed...")
+            embed = await view.create_main_embed()
+            
+            self.bot.log.debug("Sending response...")
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=not visible)
+            self.bot.log.info("Configure command completed successfully")
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in configure command: {e}", exc_info=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
+                        ephemeral=True
+                    )
+            except Exception as followup_error:
+                self.bot.log.error(f"Failed to send error message: {followup_error}")
 
 
 
