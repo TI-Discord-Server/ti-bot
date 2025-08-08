@@ -530,15 +530,24 @@ class Verification(commands.Cog):
         guild = interaction.guild
         member = guild.get_member(record["user_id"])
         
-        # Remove verification from database
-        await self.bot.db.verifications.delete_one({"_id": record["_id"]})
-
         # Check if target is a moderator
         is_moderator = member and any(role.name == "Moderator" for role in member.roles)
         
-        # Try to kick if not a moderator
-        kicked = False
+        # Send initial response immediately
+        if is_moderator:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
+        elif not member:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
+        else:
+            # User exists and is not a moderator - will attempt kick
+            await interaction.response.send_message("🔄 Verificatie wordt ingetrokken en gebruiker wordt gekickt...", ephemeral=True)
+        
+        # Remove verification from database
+        await self.bot.db.verifications.delete_one({"_id": record["_id"]})
+        
+        # Try to kick if not a moderator and member exists
         if member and not is_moderator:
+            kicked = False
             try:
                 # Create a permanent invite before kicking
                 invite = None
@@ -572,18 +581,13 @@ class Verification(commands.Cog):
                 # Kick the user
                 await member.kick(reason="Verificatie ingetrokken door moderator.")
                 kicked = True
-            except Exception:
-                pass
-
-        # Send appropriate response
-        if is_moderator:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
-        elif kicked:
-            await interaction.response.send_message("✅ Gebruiker gekickt en verificatie ingetrokken.", ephemeral=True)
-        elif member:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker kon niet gekickt worden.", ephemeral=True)
-        else:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
+                
+                # Send followup message about successful kick
+                await interaction.followup.send("✅ Gebruiker succesvol gekickt en verificatie ingetrokken.", ephemeral=True)
+                
+            except Exception as e:
+                # Send followup message about failed kick
+                await interaction.followup.send("✅ Verificatie ingetrokken, maar gebruiker kon niet gekickt worden.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
