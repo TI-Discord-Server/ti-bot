@@ -50,7 +50,7 @@ class VerificationView(ui.View):
             title="Migratie voor Afgestudeerden",
             description="Deze optie is **alleen** voor studenten die:\n"
                        "• Al geverifieerd waren in het oude systeem\n"
-                       "• Geen toegang meer hebben tot hun oude HoGent e-mail\n"
+                       "• Geen toegang meer hebben tot hun oude HOGENT e-mail\n"
                        "• Hun verificatie willen overzetten naar het nieuwe systeem\n\n"
                        "⚠️ **Let op:** We controleren of je e-mailadres nog actief is. "
                        "Deze migratie werkt alleen als je e-mail niet meer bestaat.\n\n"
