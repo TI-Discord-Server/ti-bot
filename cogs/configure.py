@@ -153,18 +153,31 @@ class ServerConfigView(BaseConfigView):
             timestamp=datetime.datetime.now()
         )
         
-        guild_id = settings.get("guild_id", "Niet ingesteld")
-        if guild_id != "Niet ingesteld":
-            guild = self.bot.get_guild(guild_id)
-            guild_name = guild.name if guild else f"Onbekende server ({guild_id})"
+        # Show current guild (auto-detected or configured)
+        current_guild = self.bot.guild
+        configured_guild_id = settings.get("guild_id", None)
+        
+        if current_guild:
+            if configured_guild_id:
+                guild_status = f"**Geconfigureerd:** {current_guild.name} (`{current_guild.id}`)"
+            else:
+                guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
         else:
-            guild_name = "Niet ingesteld"
+            guild_status = "Geen server gevonden"
             
         embed.add_field(
-            name="🏠 Server ID",
-            value=f"`{guild_id}`\n**Server:** {guild_name}",
+            name="🏠 Huidige Server",
+            value=guild_status,
             inline=False
         )
+        
+        # Show multi-guild info if applicable
+        if len(self.bot.guilds) > 1:
+            embed.add_field(
+                name="ℹ️ Multi-Server Info",
+                value=f"Bot is in {len(self.bot.guilds)} servers. Configureer een specifieke server ID als de auto-detectie niet correct is.",
+                inline=False
+            )
         
         # Developer IDs
         dev_ids = settings.get("developer_ids", [])
@@ -192,9 +205,9 @@ class ServerConfigView(BaseConfigView):
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
     
-    @discord.ui.button(label="Server ID instellen", style=discord.ButtonStyle.primary, emoji="🏠")
+    @discord.ui.button(label="Server ID overschrijven", style=discord.ButtonStyle.secondary, emoji="🏠")
     async def set_guild_id(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set guild ID."""
+        """Override auto-detected guild ID."""
         modal = GuildIdModal(self.bot, self.user_id, self.visible)
         await interaction.response.send_modal(modal)
     
@@ -760,14 +773,14 @@ class GuildIdModal(discord.ui.Modal):
     """Modal for setting guild ID."""
     
     def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(title="Server ID Instellen")
+        super().__init__(title="Server ID Overschrijven")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
         
         self.guild_id_input = discord.ui.TextInput(
             label="Server ID",
-            placeholder="Voer de server ID in...",
+            placeholder="Alleen nodig bij meerdere servers...",
             required=True,
             max_length=20
         )

@@ -307,12 +307,25 @@ class Bot(commands.Bot):
         return None
 
     async def load_guild_id(self):
-        """Load guild ID from database and cache it."""
-        self._guild_id = await self.get_guild_id()
-        if self._guild_id:
-            self.log.info(f"Loaded guild ID {self._guild_id} from database")
+        """Auto-detect guild ID from the guilds the bot is in."""
+        # First try to get from database (for backward compatibility)
+        db_guild_id = await self.get_guild_id()
+        
+        if db_guild_id:
+            self._guild_id = db_guild_id
+            self.log.info(f"Using configured guild ID {self._guild_id} from database")
+        elif len(self.guilds) == 1:
+            # Auto-detect: bot is in exactly one guild
+            self._guild_id = self.guilds[0].id
+            self.log.info(f"Auto-detected guild ID {self._guild_id} (bot is in 1 guild)")
+        elif len(self.guilds) > 1:
+            # Bot is in multiple guilds - need configuration
+            self.log.warning(f"Bot is in {len(self.guilds)} guilds but no guild_id configured. Please use /configure to set the main guild.")
+            self._guild_id = None
         else:
-            self.log.warning("No guild ID configured in database")
+            # Bot is in no guilds
+            self.log.warning("Bot is not in any guilds")
+            self._guild_id = None
 
     async def load_developer_ids(self):
         """Load developer IDs from database configuration."""
