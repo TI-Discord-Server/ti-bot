@@ -1,11 +1,15 @@
 from discord.app_commands import check
 from discord.interactions import Interaction
-from main import DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS as developer_ids
 from discord.ext import commands
 
 
 def developer():
     async def predicate(ctx: Interaction):
+        # Get developer IDs from database
+        settings = await ctx.client.db.settings.find_one({"_id": "server_settings"})
+        if not settings or "developer_ids" not in settings:
+            return False
+        developer_ids = settings["developer_ids"]
         return ctx.user.id in developer_ids
     return check(predicate)
 
