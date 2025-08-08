@@ -757,6 +757,10 @@ class Bot(commands.Bot):
             # Set shutdown event to signal other tasks
             self._shutdown_event.set()
             
+            # Close Discord connection FIRST to stop accepting new requests
+            await asyncio.wait_for(self.close(), timeout=10.0)
+            self.log.info("Discord connection closed - no new requests will be processed")
+            
             # Close health check server
             if hasattr(self, 'site') and self.site:
                 await asyncio.wait_for(self.site.stop(), timeout=5.0)
@@ -771,10 +775,6 @@ class Bot(commands.Bot):
             if hasattr(self, 'db') and self.db:
                 self.db.client.close()
                 self.log.info("Database connection closed")
-            
-            # Close Discord connection
-            await asyncio.wait_for(self.close(), timeout=10.0)
-            self.log.info("Discord connection closed")
             
         except asyncio.TimeoutError:
             self.log.warning("Graceful shutdown timed out, forcing exit")
