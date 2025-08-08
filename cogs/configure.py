@@ -221,6 +221,19 @@ class ServerConfigView(BaseConfigView):
             )
             self.bot.log.debug("Added developer IDs field")
             
+            # Webhook logging format
+            self.bot.log.debug("Processing webhook logging format...")
+            webhook_format = settings.get("webhook_log_format", "embed")
+            format_emoji = "📋" if webhook_format == "embed" else "📝"
+            format_description = "Rich embeds met kleuren en velden" if webhook_format == "embed" else "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format"
+            
+            embed.add_field(
+                name=f"{format_emoji} Webhook Logging Format",
+                value=f"**Huidige modus:** {webhook_format.title()}\n{format_description}",
+                inline=False
+            )
+            self.bot.log.debug("Added webhook logging format field")
+            
             embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
             self.bot.log.debug("Server configuration embed created successfully")
             return embed
@@ -251,6 +264,113 @@ class ServerConfigView(BaseConfigView):
         )
         embed.set_footer(text="Alleen administrators kunnen ontwikkelaars beheren")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Webhook Logging", style=discord.ButtonStyle.secondary, emoji="📝", row=1)
+    async def toggle_webhook_format(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle webhook logging format between embed and plaintext."""
+        try:
+            # Get current settings
+            settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
+            current_format = settings.get("webhook_log_format", "embed")
+            
+            # Toggle format
+            new_format = "plaintext" if current_format == "embed" else "embed"
+            
+            # Update database
+            await self.bot.db.settings.update_one(
+                {"_id": "server_settings"},
+                {"$set": {"webhook_log_format": new_format}},
+                upsert=True
+            )
+            
+            # Create confirmation embed
+            format_emoji = "📝" if new_format == "plaintext" else "📋"
+            format_description = "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format" if new_format == "plaintext" else "Rich embeds met kleuren en velden"
+            
+            embed = discord.Embed(
+                title=f"{format_emoji} Webhook Logging Format Gewijzigd",
+                description=f"**Nieuwe modus:** {new_format.title()}\n{format_description}",
+                color=discord.Color.green(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            if new_format == "plaintext":
+                embed.add_field(
+                    name="📝 Plaintext Voorbeeld",
+                    value="```\n[INFO] [14:30:25] Bot successfully started\n[WARNING] [14:30:26] Rate limit approaching\n[ERROR] [14:30:27] Database connection failed\n```",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="📋 Embed Voorbeeld",
+                    value="Rich embeds met kleuren, timestamps en gestructureerde velden zoals je nu ziet!",
+                    inline=False
+                )
+            
+            embed.set_footer(text="De wijziging is direct actief voor nieuwe log berichten")
+            
+            # Send confirmation and refresh the main view
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+            # Refresh the main configuration view
+            main_embed = await self.create_embed()
+            await interaction.edit_original_response(embed=main_embed, view=self)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error toggling webhook format: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het wijzigen van de webhook logging format:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=error_embed, ephemeral=True)
+    
+    @discord.ui.button(label="Test Webhook", style=discord.ButtonStyle.success, emoji="🧪", row=1)
+    async def test_webhook_logging(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send test messages to demonstrate current webhook logging format."""
+        try:
+            # Get current format
+            settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
+            current_format = settings.get("webhook_log_format", "embed")
+            
+            # Send test log messages
+            self.bot.log.info("🧪 Test INFO message - Webhook logging format test")
+            self.bot.log.warning("🧪 Test WARNING message - Rate limit approaching")
+            self.bot.log.error("🧪 Test ERROR message - Connection timeout")
+            
+            # Create confirmation embed
+            format_emoji = "📝" if current_format == "plaintext" else "📋"
+            embed = discord.Embed(
+                title=f"{format_emoji} Webhook Test Berichten Verzonden",
+                description=f"**Huidige format:** {current_format.title()}\n\nEr zijn 3 test berichten verzonden naar de webhook:\n• INFO bericht\n• WARNING bericht\n• ERROR bericht",
+                color=discord.Color.blue(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            if current_format == "plaintext":
+                embed.add_field(
+                    name="📝 Plaintext Format",
+                    value="Berichten worden getoond als:\n```\n[INFO] [HH:MM:SS] 🧪 Test INFO message - Webhook logging format test\n```",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="📋 Embed Format", 
+                    value="Berichten worden getoond als rich embeds met kleuren en velden (zoals deze!)",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Controleer je webhook kanaal om de test berichten te zien")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error testing webhook logging: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het testen van webhook logging:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=error_embed, ephemeral=True)
 
 
 class ModmailConfigView(BaseConfigView):

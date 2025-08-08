@@ -70,9 +70,10 @@ class Responder(Protocol):
 
 
 class DiscordWebhookHandler(logging.Handler):
-    def __init__(self, webhook_url):
+    def __init__(self, webhook_url, bot=None):
         super().__init__()
         self.webhook_url = webhook_url
+        self.bot = bot
         # Do not create a ClientSession here—set it to None; it will be lazily created.
         self.session = None
 
@@ -88,21 +89,41 @@ class DiscordWebhookHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
+    async def _get_webhook_format(self):
+        """Get the webhook logging format from database settings."""
+        if self.bot:
+            try:
+                settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
+                return settings.get("webhook_log_format", "embed")  # Default to embed
+            except Exception:
+                return "embed"  # Fallback to embed on error
+        return "embed"
+
     async def _async_emit(self, record):
         await self._ensure_session()
         try:
-            # Create a Discord webhook using the asynchronously created session.
             webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
             msg = self.format(record)
-            embed = discord.Embed(
-                title="Log Entry",
-                description=f"```{msg}```",
-                color=self._get_color(record.levelname),
-                timestamp=datetime.datetime.now(datetime.UTC),
-            )
-            embed.add_field(name="Level", value=record.levelname, inline=True)
-            embed.add_field(name="Logger", value=record.name, inline=True)
-            await webhook.send(embed=embed)
+            
+            # Get the current webhook format setting
+            format_type = await self._get_webhook_format()
+            
+            if format_type == "plaintext":
+                # Plaintext format with square brackets
+                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                plaintext_msg = f"[{record.levelname}] [{timestamp}] {msg}"
+                await webhook.send(content=f"```\n{plaintext_msg}\n```")
+            else:
+                # Default embed format
+                embed = discord.Embed(
+                    title="Log Entry",
+                    description=f"```{msg}```",
+                    color=self._get_color(record.levelname),
+                    timestamp=datetime.datetime.now(datetime.UTC),
+                )
+                embed.add_field(name="Level", value=record.levelname, inline=True)
+                embed.add_field(name="Logger", value=record.name, inline=True)
+                await webhook.send(embed=embed)
         except Exception:
             self.handleError(record)
 
@@ -226,7 +247,7 @@ class Bot(commands.Bot):
 
         # Add a webhook handler to log to a Discord webhook.
         if WEBHOOK_URL:
-            discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL)
+            discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL, self)
             discord_webhook_handler.setLevel(logging.INFO)
             bot_log.addHandler(discord_webhook_handler)
             discord_log.addHandler(discord_webhook_handler)
