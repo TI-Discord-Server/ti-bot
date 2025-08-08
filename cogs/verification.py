@@ -230,9 +230,9 @@ class Verification(commands.Cog):
                 try:
                     dm_message = "Je verificatie is ingetrokken door een moderator en je bent gekickt van de server."
                     if invite:
-                        dm_message += f"\n\nJe kunt terugkeren via deze uitnodiging: {invite.url}"
+                        dm_message += f"\n\nJe kunt terugkeren via deze uitnodiging: {invite.url}\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
                     else:
-                        dm_message += "\n\nNeem contact op met een moderator om terug te keren."
+                        dm_message += "\n\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
                     
                     await member.send(dm_message)
                 except Exception:
