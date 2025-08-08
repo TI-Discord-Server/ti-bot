@@ -54,7 +54,7 @@ class ShortTime:
         re.VERBOSE,
     )
 
-    discord_fmt = re.compile(r"<t:(?P<ts>[0-9]+)(?:\:?[RFfDdTt])?>")
+    discord_fmt = re.compile(r"<t:(?P<ts>[0-9]+)(?::?[RFfDdTt])?>")
 
     dt: datetime.datetime
 
