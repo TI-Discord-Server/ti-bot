@@ -474,7 +474,13 @@ class Thread:
             embed.description = message
             embed.set_footer(text="Replying will create a new modmail chat", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
 
-            await self.recipient.dm_channel.send(embed=embed)
+            try:
+                # Create DM channel if it doesn't exist, then send
+                if self.recipient.dm_channel is None:
+                    await self.recipient.create_dm()
+                await self.recipient.dm_channel.send(embed=embed)
+            except Exception as e:
+                self.bot.log.warning(f"Could not send close notification to user {self.recipient.id}: {e}")
 
         await self.channel.delete()
         self.bot.dispatch("thread_close", self, closer, silent, message)
