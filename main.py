@@ -319,13 +319,13 @@ class Bot(commands.Bot):
             self._guild_id = self.guilds[0].id
             self.log.info(f"Auto-detected guild ID {self._guild_id} (bot is in 1 guild)")
         elif len(self.guilds) > 1:
-            # Bot is in multiple guilds - need configuration
-            self.log.warning(f"Bot is in {len(self.guilds)} guilds but no guild_id configured. Please use /configure to set the main guild.")
-            self._guild_id = None
+            # Bot is in multiple guilds - use default as fallback
+            self._guild_id = 1334456602324897792  # Default guild ID
+            self.log.warning(f"Bot is in {len(self.guilds)} guilds, using default guild ID {self._guild_id}. Use /configure to change if needed.")
         else:
-            # Bot is in no guilds
-            self.log.warning("Bot is not in any guilds")
-            self._guild_id = None
+            # Bot is in no guilds - use default as fallback
+            self._guild_id = 1334456602324897792  # Default guild ID
+            self.log.warning(f"Bot is not in any guilds, using default guild ID {self._guild_id}")
 
     async def load_developer_ids(self):
         """Load developer IDs from database configuration."""

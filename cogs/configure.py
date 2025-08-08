@@ -163,7 +163,9 @@ class ServerConfigView(BaseConfigView):
             else:
                 guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
         else:
-            guild_status = "Geen server gevonden"
+            # Fallback: show the guild_id even if guild object not found
+            guild_id = self.bot.guild_id or 1334456602324897792
+            guild_status = f"**Standaard:** Server ID `{guild_id}` (server niet gevonden)"
             
         embed.add_field(
             name="🏠 Huidige Server",
