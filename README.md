@@ -34,7 +34,7 @@ Voer het volgende commando uit in je CLI, vanuit de rootmap:
 docker build -t tibot-v3 .
 
 # Build met TLS ingeschakeld
-docker build -t tibot-v3 --build-arg ENABLE_TLS=true .
+docker build -t tibot-v3 --build-arg TLSENABLED=true .
 ```
 
 ### 2. Docker Compose gebruiken
@@ -117,16 +117,16 @@ Bij gebruik van Docker kan TLS worden ingeschakeld op verschillende manieren:
 
 1. Tijdens het bouwen van de image:
    ```bash
-   docker build -t tibot-v3 --build-arg ENABLE_TLS=true .
+   docker build -t tibot-v3 --build-arg TLSENABLED=true .
    ```
 
-2. In docker-compose.yml (wijzig de ENABLE_TLS waarde):
+2. In docker-compose.yml (wijzig de TLSENABLED waarde):
    ```yaml
    webapp:
      build:
        context: .
        args:
-         ENABLE_TLS: "true"  # Wijzig naar "true" om TLS in te schakelen
+         TLSENABLED: "true"  # Wijzig naar "true" om TLS in te schakelen
    ```
 ### 3. Services starten met Docker Compose
 
