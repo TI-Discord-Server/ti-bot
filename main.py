@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import contextlib
 import datetime
 import logging
@@ -38,6 +39,11 @@ from utils.errors import (
     UnknownRole,
     UnknownUser,
 )
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='TI Discord Bot')
+parser.add_argument('--tls', action='store_true', help='Enable TLS for MongoDB connection')
+args = parser.parse_args()
 
 MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD)
 MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME)
@@ -123,9 +129,15 @@ class DiscordWebhookHandler(logging.Handler):
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-        # Connect to te MongoDB database with the async version of pymongo. Change IP address if needed.
+        # Connect to the MongoDB database with the async version of pymongo
+        connection_string = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256"
+        
+        # Add TLS parameters if TLS is enabled
+        if args.tls:
+            connection_string += "&tls=true&tlsInsecure=true"
+            
         motor = AsyncIOMotorClient(
-            f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256&tls=true&tlsInsecure=true",
+            connection_string,
             connect=True,
         )
         motor.get_io_loop = asyncio.get_running_loop
@@ -264,6 +276,13 @@ class Bot(commands.Bot):
         if not self.__started:
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
+            
+            # Populate thread cache on startup
+            try:
+                await self.threads.populate_cache()
+                self.log.info("Thread cache populated successfully")
+            except Exception as e:
+                self.log.error(f"Failed to populate thread cache: {e}")
 
     @property
     def guild(self) -> typing.Optional[discord.Guild]:

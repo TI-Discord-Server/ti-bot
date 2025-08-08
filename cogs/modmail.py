@@ -9,7 +9,7 @@ from discord.app_commands import (
 
 from utils.thread import ThreadManager
 from utils.utils import *
-from utils.has_role import has_role
+from utils.has_admin import has_admin
 from utils import checks
 
 
@@ -37,7 +37,7 @@ class Modmail(commands.Cog, name="modmail"):
         name="set_modmail_settings",
         description="Set modmail category and / or logs channel",
     )
-    @has_role("Moderator")
+    @has_admin()
     async def set_modmail_settings(
             self, interaction: discord.Interaction, category: discord.CategoryChannel = None, channel: discord.TextChannel = None
     ):
@@ -48,7 +48,7 @@ class Modmail(commands.Cog, name="modmail"):
                 upsert=True,
             )
             await interaction.response.send_message(
-                f"Modmail category has been set to {category.mention}."
+                f"Modmail categorie is ingesteld op {category.mention}."
             )
         if channel is not None:
             await self.db.settings.update_one(
@@ -57,7 +57,7 @@ class Modmail(commands.Cog, name="modmail"):
                 upsert=True,
             )
             await interaction.response.send_message(
-                f"Modmail-logs channel has been set to {channel.mention}."
+                f"Modmail-logs kanaal is ingesteld op {channel.mention}."
             )
 
     @set_modmail_settings.error
@@ -66,16 +66,16 @@ class Modmail(commands.Cog, name="modmail"):
     ):
         if isinstance(error, commands.CheckFailure):
             await interaction.response.send_message(
-                "You do not have permission to use this command.", ephemeral=True
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"An error occurred: {str(error)}", ephemeral=True
+                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
             )
 
     # @commands.command(usage="[after] [close message]")
-    @command(name="close", description="Close the thread")
-    @has_role("Moderator")
+    @command(name="close", description="Sluit het ticket")
+    @has_admin()
     @checks.thread_only()
     async def close(
             self,
@@ -86,15 +86,29 @@ class Modmail(commands.Cog, name="modmail"):
         """
         Close the current thread.
         """
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
-        modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
-
+        # Check if this is actually a ticket channel by looking for thread
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        
+        if thread is None:
+            await interaction.response.send_message("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
+            
+        # Respond immediately before closing (since channel will be deleted)
         silent = any(x == option for x in {"silent"})
-
+        close_msg = "🔒 Ticket wordt gesloten..."
+        if silent:
+            close_msg += " (stil)"
+        if reason:
+            close_msg += f"\nReden: {reason}"
+            
+        await interaction.response.send_message(close_msg, ephemeral=True)
+        
+        # Close the thread
+        modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
         await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
 
-    @command(name="generate_transcript", description="Makes a transcript and sends it in log_channel")
-    @has_role("Moderator")
+    @command(name="generate_transcript", description="Maakt een transcript en stuurt het naar het log kanaal")
+    @has_admin()
     @checks.thread_only()
     async def generate_transcript(
             self,
@@ -102,15 +116,21 @@ class Modmail(commands.Cog, name="modmail"):
     ):
         await interaction.response.defer(thinking=False)
 
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
-        await thread.store_and_send_log(closer=interaction.user, log_channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.followup.send("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
+            
+        try:
+            await thread.store_and_send_log(closer=interaction.user, log_channel=interaction.channel)
+            confirmation = await interaction.followup.send("📝 Transcript gegenereerd", ephemeral=True)
+            await asyncio.sleep(2)
+            await confirmation.delete()
+        except Exception as e:
+            await interaction.followup.send(f"❌ Fout bij genereren transcript: {str(e)}", ephemeral=True)
 
-        confirmation = await interaction.followup.send("📝 Transcript generated", ephemeral=True)
-        await asyncio.sleep(2)
-        await confirmation.delete()
-
-    @command(name="transcripts", description="Gives transcripts with certain person")
-    @has_role("Moderator")
+    @command(name="transcripts", description="Geeft transcripts van een bepaalde persoon")
+    @has_admin()
     @checks.thread_only()
     async def transcripts(
             self,
@@ -125,7 +145,7 @@ class Modmail(commands.Cog, name="modmail"):
         files_list = await cursor.to_list(length=None)  # Convert cursor to a list
 
         if not files_list:
-            await interaction.followup.send(f"No transcripts found for recipient {recipient_id}.")
+            await interaction.followup.send(f"Geen transcripts gevonden voor ontvanger {recipient_id}.")
             return
 
         amount = len(files_list)
@@ -157,7 +177,7 @@ class Modmail(commands.Cog, name="modmail"):
 
         # Send each batch separately
         for batch in file_batches:
-            await interaction.followup.send(f"{amount} transcripts found for recipient {recipient_id}:", files=batch)
+            await interaction.followup.send(f"{amount} transcripts gevonden voor ontvanger {recipient_id}:", files=batch)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
@@ -170,24 +190,24 @@ class Modmail(commands.Cog, name="modmail"):
             mention = "@" + user_or_role.lstrip("@")
         return mention
 
-    @command(name="nsfw", description="Changes Modmail-thread to NSFW status")
-    @has_role("Moderator")
+    @command(name="nsfw", description="Verandert Modmail-ticket naar NSFW status")
+    @has_admin()
     @checks.thread_only()
     async def nsfw(self, interaction: discord.Interaction):
-        """Flags a Modmail thread as NSFW (not safe for work)."""
+        """Markeert een Modmail ticket als NSFW (niet veilig voor werk)."""
         await interaction.channel.edit(nsfw=True)
-        await interaction.response.send_message("🔞 Set Channel to NSFW")
+        await interaction.response.send_message("🔞 Kanaal ingesteld op NSFW")
 
-    @command(name="sfw", description="Changes Modmail-thread to SFW status")
-    @has_role("Moderator")
+    @command(name="sfw", description="Verandert Modmail-ticket naar SFW status")
+    @has_admin()
     @checks.thread_only()
     async def sfw(self, interaction: discord.Interaction):
-        """Flags a Modmail thread as SFW (safe for work)."""
+        """Markeert een Modmail ticket als SFW (veilig voor werk)."""
         await interaction.channel.edit(nsfw=False)
-        await interaction.response.send_message("⚠️ Set Channel to SFW")
+        await interaction.response.send_message("⚠️ Kanaal ingesteld op SFW")
 
-    @command(name="reply", description="Replies to a Modmail-message")
-    @has_role("Moderator")
+    @command(name="reply", description="Antwoordt op een Modmail-bericht")
+    @has_admin()
     @checks.thread_only()
     async def reply(self, interaction: discord.Interaction, msg: str):
         """
@@ -197,19 +217,26 @@ class Modmail(commands.Cog, name="modmail"):
         """
         await interaction.response.defer(thinking=False)
 
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.followup.send("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
+            
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
 
-        async with interaction.channel.typing():
-            await thread.reply(sent_message)
-
-        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        try:
+            async with interaction.channel.typing():
+                await thread.reply(sent_message)
+            confirmation = await interaction.followup.send("📤 Bericht verzonden!", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Fout bij verzenden bericht: {str(e)}", ephemeral=True)
+            return
         await asyncio.sleep(3)
         await confirmation.delete()
 
-    @command(name="areply", description="Replies anonymous to a Modmail-message")
-    @has_role("Moderator")
+    @command(name="areply", description="Antwoordt anoniem op een Modmail-bericht")
+    @has_admin()
     @checks.thread_only()
     async def areply(self, interaction: discord.Interaction, msg: str):
         """
@@ -217,20 +244,27 @@ class Modmail(commands.Cog, name="modmail"):
         """
         await interaction.response.defer(thinking=False)
 
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.followup.send("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
+            
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
 
-        async with interaction.channel.typing():
-            await thread.reply(sent_message, anonymous=True)
-
-        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        try:
+            async with interaction.channel.typing():
+                await thread.reply(sent_message, anonymous=True)
+            confirmation = await interaction.followup.send("📤 Bericht verzonden!", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Fout bij verzenden bericht: {str(e)}", ephemeral=True)
+            return
         await asyncio.sleep(3)
         await confirmation.delete()
 
     # @commands.group(invoke_without_command=True)
-    @command(name="note", description="Clarification of modmail")
-    @has_role("Moderator")
+    @command(name="note", description="Verduidelijking van modmail")
+    @has_admin()
     @checks.thread_only()
     async def note(self, interaction: discord.Interaction, msg: str):
         """
@@ -239,20 +273,28 @@ class Modmail(commands.Cog, name="modmail"):
         """
         await interaction.response.defer(thinking=False)
 
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.followup.send("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
+            
         sent_message = await interaction.channel.send(msg)
         sent_message.author = interaction.user
 
-        async with interaction.channel.typing():
-            msg = await thread.note(sent_message)
-            await msg.pin()
+        try:
+            async with interaction.channel.typing():
+                msg = await thread.note(sent_message)
+                await msg.pin()
+        except Exception as e:
+            await interaction.followup.send(f"❌ Fout bij maken notitie: {str(e)}", ephemeral=True)
+            return
 
-        confirmation = await interaction.followup.send("📝 Noted", ephemeral=True)
+        confirmation = await interaction.followup.send("📝 Genoteerd", ephemeral=True)
         await asyncio.sleep(3)
         await confirmation.delete()
 
-    @command(name="edit", description="Edits a Modmail-message")
-    @has_role("Moderator")
+    @command(name="edit", description="Bewerkt een Modmail-bericht")
+    @has_admin()
     @checks.thread_only()
     async def edit(self, interaction: discord.Interaction, message: str, message_id: Optional[str] = "" ):
         """
@@ -263,7 +305,10 @@ class Modmail(commands.Cog, name="modmail"):
 
         Note: attachments **cannot** be edited.
         """
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.response.send_message("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
 
         message_id = int(message_id) if message_id.isdigit() and 17 <= len(message_id) <= 19 else None
 
@@ -273,19 +318,19 @@ class Modmail(commands.Cog, name="modmail"):
         except ValueError:
             return await interaction.response.send_message(
                 embed=discord.Embed(
-                    title="Failed",
-                    description="Cannot find a message to edit. Plain messages are not supported.",
+                    title="Mislukt",
+                    description="Kan het bericht niet vinden om te bewerken. Gewone berichten worden niet ondersteund.",
                     color=discord.Color.red(),
                 )
             )
 
-        await interaction.response.send_message("📝 Message edited successfully")
+        await interaction.response.send_message("📝 Bericht succesvol bewerkt")
         # await asyncio.sleep(5)
         # await interaction.delete_original_response()
 
     # @commands.command(usage="<user> [category] [options]")
-    @command(name="contact", description="Opens a modmail ticket")
-    @has_role("Moderator")
+    @command(name="contact", description="Opent een modmail ticket")
+    @has_admin()
     async def contact(
             self,
             interaction: discord.Interaction,
@@ -301,18 +346,18 @@ class Modmail(commands.Cog, name="modmail"):
 
         exists = await self.bot.threads.find(recipient=user)
         if exists:
-            errors.append(f"A thread for {user} already exists.")
+            errors.append(f"Een ticket voor {user} bestaat al.")
             if exists.channel:
                 errors[-1] += f" in {exists.channel.mention}"
             errors[-1] += "."
         elif user.bot:
-            errors.append(f"{user} is a bot, cannot add to thread.")
+            errors.append(f"{user} is een bot, kan niet aan ticket toevoegen.")
 
 
         if errors or not user:
             if not user:
                 # no users left
-                title = "Thread not created"
+                title = "Ticket niet aangemaakt"
             else:
                 title = None
 
@@ -338,12 +383,12 @@ class Modmail(commands.Cog, name="modmail"):
             return
 
         if creator.id == user.id:
-            description = "You have opened a Modmail chat."
+            description = "Je hebt een Modmail gesprek geopend."
         else:
-            description = "Staff have opened a Modmail thread."
+            description = "Staff heeft een Modmail ticket geopend."
 
         em = discord.Embed(
-            title="New Modmail",
+            title="Nieuwe Modmail",
             description=description,
             color=discord.Color.blurple(),
         )
@@ -354,8 +399,8 @@ class Modmail(commands.Cog, name="modmail"):
         await user.send(embed=em)
 
         embed = discord.Embed(
-            title="Created Modmail",
-            description=f"Modmail started by {creator.mention} for {user.mention}.",
+            title="Modmail Aangemaakt",
+            description=f"Modmail gestart door {creator.mention} voor {user.mention}.",
             color=discord.Color.blurple(),
         )
         await thread.wait_until_ready()
@@ -363,19 +408,22 @@ class Modmail(commands.Cog, name="modmail"):
         await thread.channel.send(embed=embed)
 
         if manual_trigger:
-            await interaction.response.send_message("✅ Modmail channel made!")
+            await interaction.response.send_message("✅ Modmail kanaal aangemaakt!")
             await asyncio.sleep(5)
             await interaction.delete_original_response()
 
-    @command(name="delete", description="Deletes a modmail message.")
-    @has_role("Moderator")
+    @command(name="delete", description="Verwijdert een modmail bericht.")
+    @has_admin()
     @checks.thread_only()
     async def delete(self, interaction: discord.Interaction, message_id: Optional[str] = ""):
         """
         Delete a message that was sent using the reply command
         Deletes the previous message
         """
-        thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
+        thread = await self.bot.threads.find(channel=interaction.channel)
+        if thread is None:
+            await interaction.response.send_message("❌ Dit is geen actief ticket kanaal.", ephemeral=True)
+            return
 
         message_id = int(message_id) if message_id.isdigit() and 17 <= len(message_id) <= 19 else None
 
@@ -385,13 +433,13 @@ class Modmail(commands.Cog, name="modmail"):
             self.bot.log.warning("Failed to delete message: %s.", e)
             return await interaction.response.send_message(
                 embed=discord.Embed(
-                    title="Failed",
-                    description="Cannot find a message to delete. Plain messages are not supported.",
+                    title="Mislukt",
+                    description="Kan het bericht niet vinden om te verwijderen. Gewone berichten worden niet ondersteund.",
                     color=discord.Color.red(),
                 )
             )
 
-        await interaction.response.send_message("🗑️ Message deleted.!")
+        await interaction.response.send_message("🗑️ Bericht verwijderd!")
 
 async def setup(bot):
     await bot.add_cog(Modmail(bot))

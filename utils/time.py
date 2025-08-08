@@ -66,7 +66,7 @@ class ShortTime:
                 self.dt = datetime.datetime.utcfromtimestamp(int(match.group("ts")), tz=datetime.timezone.utc)
                 return
             else:
-                raise commands.BadArgument("invalid time provided")
+                raise commands.BadArgument("ongeldige tijd opgegeven")
 
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
         now = now or datetime.datetime.now(datetime.timezone.utc)
@@ -84,7 +84,7 @@ class HumanTime:
         now = now or datetime.datetime.utcnow()
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
-            raise commands.BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"')
+            raise commands.BadArgument('ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days"')
 
         if not status.hasTime:
             # replace it with the current time
@@ -115,7 +115,7 @@ class FutureTime(Time):
         super().__init__(argument, now=now)
 
         if self._past:
-            raise commands.BadArgument("this time is in the past")
+            raise commands.BadArgument("deze tijd ligt in het verleden")
 
 
 class BadTimeTransform(app_commands.AppCommandError):
@@ -161,7 +161,7 @@ class FriendlyTimeResult:
         self, ctx: Context, uft: UserFriendlyTime, now: datetime.datetime, remaining: str
     ) -> None:
         if self.dt < now:
-            raise commands.BadArgument("This time is in the past.")
+            raise commands.BadArgument("Deze tijd ligt in het verleden.")
 
         # CHANGE
         # if not remaining:
@@ -243,13 +243,13 @@ class UserFriendlyTime(commands.Converter):
         dt, status, begin, end, dt_string = elements[0]
 
         if not status.hasDateOrTime:
-            raise commands.BadArgument('Invalid time provided, try e.g. "tomorrow" or "3 days".')
+            raise commands.BadArgument('Ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days".')
 
         if begin not in (0, 1) and end != len(argument):
             raise commands.BadArgument(
-                "Time is either in an inappropriate location, which "
-                "must be either at the end or beginning of your input, "
-                "or I just flat out did not understand what you meant. Sorry."
+                "Tijd staat op een ongepaste locatie, wat "
+                "aan het einde of begin van je invoer moet zijn, "
+                "of ik heb gewoon niet begrepen wat je bedoelde. Sorry."
             )
 
         if not status.hasTime:
@@ -267,10 +267,10 @@ class UserFriendlyTime(commands.Converter):
             if begin == 1:
                 # check if it's quoted:
                 if argument[0] != '"':
-                    raise commands.BadArgument("Expected quote before time input...")
+                    raise commands.BadArgument("Verwachtte aanhalingsteken voor tijd invoer...")
 
                 if not (end < len(argument) and argument[end] == '"'):
-                    raise commands.BadArgument("If the time is quoted, you must unquote it.")
+                    raise commands.BadArgument("Als de tijd tussen aanhalingstekens staat, moet je deze verwijderen.")
 
                 remaining = argument[end + 1 :].lstrip(" ,.!")
             else:

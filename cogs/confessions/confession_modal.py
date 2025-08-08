@@ -25,5 +25,5 @@ class ConfessionModal(Modal, title="Submit Confession"):
         }
         await self.bot.db.confessions.insert_one(confession)
         await interaction.response.send_message(
-            "Your confession has been submitted anonymously!", ephemeral=True
+            "Je bekentenis is anoniem ingediend!", ephemeral=True
         )

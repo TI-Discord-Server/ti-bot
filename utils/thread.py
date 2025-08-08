@@ -2,6 +2,10 @@
 thread by modmail-dev
 Source:
 https://github.com/modmail-dev/Modmail/blob/master/core/thread.py
+
+Note: "Thread" in this context refers to a modmail conversation thread,
+which is implemented using Discord channels (not Discord's thread feature).
+Each modmail conversation creates a dedicated Discord channel.
 """
 import asyncio
 import base64
@@ -158,7 +162,7 @@ class Thread:
             self.manager.cache.pop(self.id)
 
             embed = discord.Embed(color=self.bot.error_color)
-            embed.title = "Error while trying to create a thread."
+            embed.title = "Fout bij het aanmaken van een ticket."
             embed.description = str(e)
             embed.add_field(name="Recipient", value=recipient.mention)
 
@@ -186,7 +190,7 @@ class Thread:
 
         async def send_recipient_genesis_message():
             # Once thread is ready, tell the recipient (don't send if using contact on others)
-            thread_creation_response = "The staff team will get back to you as soon as possible."
+            thread_creation_response = "Het staff team zal zo snel mogelijk reageren."
 
             embed = discord.Embed(
                 color=discord.Color.blurple(),
@@ -195,9 +199,9 @@ class Thread:
             )
 
             embed.set_footer(
-                text="Your message has been sent", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
+                text="Je bericht is verzonden", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
             )
-            embed.title = "Modmail Created"
+            embed.title = "Modmail Aangemaakt"
 
             if creator is None or creator == recipient:
                 msg = await recipient.send(embed=embed)
@@ -256,26 +260,26 @@ class Thread:
             user_info.append(f"joined {joined}")
 
             if member.nick:
-                embed.add_field(name="Nickname", value=member.nick, inline=True)
+                embed.add_field(name="Bijnaam", value=member.nick, inline=True)
             if role_names:
-                embed.add_field(name="Roles", value=role_names, inline=True)
+                embed.add_field(name="Rollen", value=role_names, inline=True)
             embed.set_footer(text=footer)
         else:
             embed.set_author(name=str(user), icon_url=user.display_avatar.url, url=log_url)
-            embed.set_footer(text=f"{footer} • (not in main server)")
+            embed.set_footer(text=f"{footer} • (niet in hoofdserver)")
 
         embed.description += ", ".join(user_info)
 
         if log_count is not None:
-            connector = "with" if user_info else "has"
-            thread = "thread" if log_count == 1 else "threads"
-            embed.description += f" {connector} **{log_count or 'no'}** past {thread}."
+            connector = "met" if user_info else "heeft"
+            thread = "ticket" if log_count == 1 else "tickets"
+            embed.description += f" {connector} **{log_count or 'geen'}** eerdere {thread}."
         else:
             embed.description += "."
 
         mutual_guilds = [g for g in self.bot.guilds if user in g.members]
         if member is None or len(mutual_guilds) > 1:
-            embed.add_field(name="Mutual Server(s)", value=", ".join(g.name for g in mutual_guilds))
+            embed.add_field(name="Gedeelde Server(s)", value=", ".join(g.name for g in mutual_guilds))
 
         return embed
 
@@ -465,16 +469,22 @@ class Thread:
         #No notification to user
         if not silent:
             embed = discord.Embed(
-                title="Modmail Closed",
+                title="Modmail Gesloten",
                 color=discord.Color.red(),
             )
             embed.timestamp = discord.utils.utcnow()
             if not message:
-                message = "Staff has closed this Modmail chat"
+                message = "Staff heeft deze Modmail chat gesloten"
             embed.description = message
-            embed.set_footer(text="Replying will create a new modmail chat", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
+            embed.set_footer(text="Reageren zal een nieuwe modmail chat aanmaken", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
 
-            await self.recipient.dm_channel.send(embed=embed)
+            try:
+                # Create DM channel if it doesn't exist, then send
+                if self.recipient.dm_channel is None:
+                    await self.recipient.create_dm()
+                await self.recipient.dm_channel.send(embed=embed)
+            except Exception as e:
+                self.bot.log.warning(f"Could not send close notification to user {self.recipient.id}: {e}")
 
         await self.channel.delete()
         self.bot.dispatch("thread_close", self, closer, silent, message)
@@ -665,7 +675,7 @@ class Thread:
             embed = msg.embeds[0]
             if isinstance(msg.channel, discord.TextChannel):
                 # just for thread channel, we put the old message in embed field
-                embed.add_field(name="**Edited, former message:**", value=embed.description)
+                embed.add_field(name="**Bewerkt, vorig bericht:**", value=embed.description)
             embed.description = content
             await asyncio.gather(msg.edit(embed=embed))
 
@@ -696,8 +706,8 @@ class Thread:
             return await message.channel.send(
                 embed=discord.Embed(
                     color=discord.Color.red(),
-                    description="Your message could not be delivered since "
-                    "the recipient shares no servers with the bot.",
+                    description="Je bericht kon niet worden bezorgd omdat "
+                    "de ontvanger geen servers deelt met de bot.",
                 )
             )
 
@@ -720,15 +730,15 @@ class Thread:
             user_msg = None
             if isinstance(e, discord.Forbidden):
                 description = (
-                    "Your message could not be delivered as "
-                    "the recipient is only accepting direct "
-                    "messages from friends, or the bot was "
-                    "blocked by the recipient."
+                    "Je bericht kon niet worden bezorgd omdat "
+                    "de ontvanger alleen directe berichten "
+                    "van vrienden accepteert, of de bot werd "
+                    "geblokkeerd door de ontvanger."
                 )
             else:
                 description = (
-                    "Your message could not be delivered due "
-                    "to an unknown error."
+                    "Je bericht kon niet worden bezorgd door "
+                    "een onbekende fout."
                 )
             msg = await message.channel.send(
                 embed=discord.Embed(
@@ -789,7 +799,7 @@ class Thread:
         else:
             #Notes
             embed.set_author(
-                name=f"{'Persistent' if persistent_note else ''} Note by {author.name}",
+                name=f"{'Permanente' if persistent_note else ''} Notitie door {author.name}",
                 icon_url=self.bot.user.avatar.url
             )
 
@@ -887,7 +897,7 @@ class Thread:
                             description = f"[{filename}]({url})"
                         embed.add_field(name="Sticker", value=description)
                     else:
-                        embed.add_field(name="Image", value=f"[{filename}]({url})")
+                        embed.add_field(name="Afbeelding", value=f"[{filename}]({url})")
                 embedded_image = True
             else:
                 if note:
@@ -904,7 +914,7 @@ class Thread:
                     img_embed.url = url
                 if filename is not None:
                     img_embed.title = filename
-                img_embed.set_footer(text=f"Additional Image Upload ({additional_count})")
+                img_embed.set_footer(text=f"Extra Afbeelding Upload ({additional_count})")
                 img_embed.timestamp = message.created_at
                 additional_images.append(destination.send(embed=img_embed))
                 additional_count += 1
@@ -912,16 +922,16 @@ class Thread:
         file_upload_count = 1
 
         for url, filename, _ in attachments:
-            embed.add_field(name=f"File upload ({file_upload_count})", value=f"[{filename}]({url})")
+            embed.add_field(name=f"Bestand upload ({file_upload_count})", value=f"[{filename}]({url})")
             file_upload_count += 1
 
         if from_mod:
             embed.colour = discord.Color.yellow()
             if anonymous and isinstance(destination, discord.TextChannel):
-                footer = f"Anonymous Reply: {message.author}"
+                footer = f"Anonieme Reactie: {message.author}"
                 embed.set_footer(text=footer)
             else:
-                embed.set_footer(text="Response")
+                embed.set_footer(text="Reactie")
             embed.colour = discord.Color.blurple()
         else:
             embed.colour = discord.Colour.green()
@@ -987,15 +997,15 @@ class Thread:
         value = " ".join(x.mention for x in self._other_recipients)
         index = None
         for n, field in enumerate(embed.fields):
-            if field.name == "Other Recipients":
+            if field.name == "Andere Ontvangers":
                 index = n
                 break
 
         if index is None and value:
-            embed.add_field(name="Other Recipients", value=value, inline=False)
+            embed.add_field(name="Andere Ontvangers", value=value, inline=False)
         else:
             if value:
-                embed.set_field_at(index, name="Other Recipients", value=value, inline=False)
+                embed.set_field_at(index, name="Andere Ontvangers", value=value, inline=False)
             else:
                 embed.remove_field(index)
 
@@ -1010,7 +1020,7 @@ class ThreadManager:
         self.cache = {}
 
     async def populate_cache(self) -> None:
-        for channel in self.bot.modmail_guild.text_channels:
+        for channel in self.bot.guild.text_channels:
             await self.find(channel=channel)
 
     def __len__(self):
@@ -1057,7 +1067,12 @@ class ThreadManager:
                     not thread.channel or not self.bot.get_channel(thread.channel.id)
                 ):
                     self.bot.log.warning("Found existing thread for %s but the channel is invalid.", recipient_id)
-                    await thread.close(closer=self.bot.user, silent=True, delete_channel=False)
+                    # Just remove from cache and set cancelled, don't try to close invalid channel
+                    thread.cancelled = True
+                    try:
+                        self.cache.pop(thread.id, None)
+                    except KeyError:
+                        pass
                     thread = None
         else:
 
@@ -1158,8 +1173,8 @@ class ThreadManager:
             view.add_item(DenyButton("\uD83D\uDEAB"))
             confirm = await destination.send(
                 embed=discord.Embed(
-                    title="Confirm modmail creation",
-                    description="Click the button to confirm modmail creation which will directly contact our Staff.",
+                    title="Bevestig modmail aanmaak",
+                    description="Klik op de knop om modmail aanmaak te bevestigen wat direct contact opneemt met onze Staff.",
                     color=discord.Color.blurple(),
                 ),
                 view=view,
@@ -1170,8 +1185,8 @@ class ThreadManager:
                 self.bot.loop.create_task(
                     destination.send(
                         embed=discord.Embed(
-                            title="Cancelled",
-                            description="Timed out",
+                            title="Geannuleerd",
+                            description="Time-out",
                             color=discord.Color.red(),
                         )
                     )
@@ -1182,7 +1197,7 @@ class ThreadManager:
                 self.bot.loop.create_task(
                     destination.send(
                         embed=discord.Embed(
-                            title="Cancelled", color=discord.Color.red()
+                            title="Geannuleerd", color=discord.Color.red()
                         )
                     )
                 )

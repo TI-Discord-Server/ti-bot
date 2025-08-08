@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.app_commands import command
 from discord.ext import commands
 import datetime
-from utils.has_role import has_role
+from utils.has_admin import has_admin
 
 
 class Reports(commands.Cog, name="reports"):
@@ -40,7 +40,7 @@ class Reports(commands.Cog, name="reports"):
 
         if not reports_channel:
             await interaction.response.send_message(
-                "Reports channel not found. Please contact an admin.", ephemeral=True
+                "Rapportage kanaal niet gevonden. Neem contact op met een beheerder.", ephemeral=True
             )
             return
 
@@ -87,14 +87,14 @@ class Reports(commands.Cog, name="reports"):
         await reports_channel.send(f"<@&{self.moderator_role_id}>")
 
         await interaction.response.send_message(
-            "Your report has been submitted. Thank you!", ephemeral=True
+            "Je rapport is ingediend. Bedankt!", ephemeral=True
         )
 
     @command(
         name="set_report_channel",
         description="Set the channel where reports should be sent (Moderators only).",
     )
-    @has_role("Moderator")
+    @has_admin()
     async def set_report_channel(
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
@@ -109,18 +109,18 @@ class Reports(commands.Cog, name="reports"):
         )
 
         await interaction.response.send_message(
-            f"Reports channel has been set to {channel.mention}."
+            f"Rapportage kanaal is ingesteld op {channel.mention}."
         )
 
     @set_report_channel.error
     async def set_report_channel_error(self, interaction: discord.Interaction, error):
         if isinstance(error, commands.CheckFailure):
             await interaction.response.send_message(
-                "You do not have permission to use this command.", ephemeral=True
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"An error occurred: {str(error)}", ephemeral=True
+                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
             )
 
 
