@@ -3,5 +3,5 @@ WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt
 
-# Set the entrypoint based on the TLS argument
-ENTRYPOINT [ "python", "/app/main.py --tls=$TLSENABLED" ]
+# Set the entrypoint based on the TLS argument  
+ENTRYPOINT ["/bin/sh", "-c", "python /app/main.py --tls=${TLSENABLED}"]

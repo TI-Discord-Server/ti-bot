@@ -15,6 +15,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: yourpassword123!
+      TLSENABLED: false
     volumes:
       - mongo-data:/data/db
     restart: always
@@ -27,6 +28,8 @@ services:
       - discord-network
     env_file:
       - .env
+    environment:
+      TLSENABLED: false      
     restart: always
 
 volumes:
