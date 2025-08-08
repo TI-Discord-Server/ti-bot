@@ -91,14 +91,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te kicken.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Kicken mislukt.",
                 color=discord.Color.red(),
             )
@@ -172,14 +172,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te bannen.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Bannen mislukt.",
                 color=discord.Color.red(),
             )
@@ -239,14 +239,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om rollen te beheren voor deze member.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Muten mislukt.",
                 color=discord.Color.red(),
             )
@@ -267,7 +267,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         if not muted_role:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Geen 'Muted' role gevonden. Kan niet unmuten.",
                 color=discord.Color.red(),
             )
@@ -300,14 +300,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om rollen te beheren voor deze member.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Unmuten mislukt.",
                 color=discord.Color.red(),
             )
@@ -384,14 +384,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om messages in dit kanaal te verwijderen.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.errors.HTTPException as e:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description=f"Verwijderen mislukt: {e}",
                 color=discord.Color.red(),
             )
@@ -416,7 +416,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         duration_timedelta = self.parse_duration(duration)
         if not duration_timedelta:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Invalid duration format. Gebruik voorbeelden zoals 1m, 5h, 1d.",
                 color=discord.Color.red(),
             )
@@ -428,7 +428,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         if duration_timedelta > datetime.timedelta(days=28):
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Maximale timeout duration is 28 dagen.",
                 color=discord.Color.red(),
             )
@@ -461,7 +461,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te timeouten.",
                 color=discord.Color.red(),
             )
@@ -518,7 +518,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te untimeouten.",
                 color=discord.Color.red(),
             )
@@ -589,7 +589,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om dit channel te lockdownen.",
                 color=discord.Color.red(),
             )
@@ -621,7 +621,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om dit channel te unlocken.",
                 color=discord.Color.red(),
             )
@@ -651,14 +651,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed)
         except discord.errors.Forbidden:
             embed = discord.Embed(
-                title="Permission Error",
+                title="Permissie Fout",
                 description="Ik heb geen permissie om slowmode in dit channel in te stellen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description="Kon slowmode niet instellen.",
                 color=discord.Color.red(),
             )
@@ -702,14 +702,14 @@ async def purge_below(interaction: discord.Interaction, message: discord.Message
 
     except discord.errors.Forbidden:
         embed = discord.Embed(
-            title="Permission Error",
+            title="Permissie Fout",
             description="Ik heb geen permissie om messages in dit channel te verwijderen.",
             color=discord.Color.red(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
     except discord.errors.HTTPException as e:
             embed = discord.Embed(
-                title="Error",
+                title="Fout",
                 description=f"Verwijderen mislukt: {e}",
                 color=discord.Color.red(),
             )

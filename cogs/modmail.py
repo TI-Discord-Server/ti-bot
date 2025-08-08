@@ -48,7 +48,7 @@ class Modmail(commands.Cog, name="modmail"):
                 upsert=True,
             )
             await interaction.response.send_message(
-                f"Modmail category has been set to {category.mention}."
+                f"Modmail categorie is ingesteld op {category.mention}."
             )
         if channel is not None:
             await self.db.settings.update_one(
@@ -57,7 +57,7 @@ class Modmail(commands.Cog, name="modmail"):
                 upsert=True,
             )
             await interaction.response.send_message(
-                f"Modmail-logs channel has been set to {channel.mention}."
+                f"Modmail-logs kanaal is ingesteld op {channel.mention}."
             )
 
     @set_modmail_settings.error
@@ -66,11 +66,11 @@ class Modmail(commands.Cog, name="modmail"):
     ):
         if isinstance(error, commands.CheckFailure):
             await interaction.response.send_message(
-                "You do not have permission to use this command.", ephemeral=True
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                f"An error occurred: {str(error)}", ephemeral=True
+                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
             )
 
     # @commands.command(usage="[after] [close message]")
@@ -105,7 +105,7 @@ class Modmail(commands.Cog, name="modmail"):
         thread = await ThreadManager.find(self.bot.threads, channel=interaction.channel)
         await thread.store_and_send_log(closer=interaction.user, log_channel=interaction.channel)
 
-        confirmation = await interaction.followup.send("📝 Transcript generated", ephemeral=True)
+        confirmation = await interaction.followup.send("📝 Transcript gegenereerd", ephemeral=True)
         await asyncio.sleep(2)
         await confirmation.delete()
 
@@ -125,7 +125,7 @@ class Modmail(commands.Cog, name="modmail"):
         files_list = await cursor.to_list(length=None)  # Convert cursor to a list
 
         if not files_list:
-            await interaction.followup.send(f"No transcripts found for recipient {recipient_id}.")
+            await interaction.followup.send(f"Geen transcripts gevonden voor ontvanger {recipient_id}.")
             return
 
         amount = len(files_list)
@@ -157,7 +157,7 @@ class Modmail(commands.Cog, name="modmail"):
 
         # Send each batch separately
         for batch in file_batches:
-            await interaction.followup.send(f"{amount} transcripts found for recipient {recipient_id}:", files=batch)
+            await interaction.followup.send(f"{amount} transcripts gevonden voor ontvanger {recipient_id}:", files=batch)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
@@ -176,7 +176,7 @@ class Modmail(commands.Cog, name="modmail"):
     async def nsfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as NSFW (not safe for work)."""
         await interaction.channel.edit(nsfw=True)
-        await interaction.response.send_message("🔞 Set Channel to NSFW")
+        await interaction.response.send_message("🔞 Kanaal ingesteld op NSFW")
 
     @command(name="sfw", description="Changes Modmail-thread to SFW status")
     @has_admin()
@@ -184,7 +184,7 @@ class Modmail(commands.Cog, name="modmail"):
     async def sfw(self, interaction: discord.Interaction):
         """Flags a Modmail thread as SFW (safe for work)."""
         await interaction.channel.edit(nsfw=False)
-        await interaction.response.send_message("⚠️ Set Channel to SFW")
+        await interaction.response.send_message("⚠️ Kanaal ingesteld op SFW")
 
     @command(name="reply", description="Replies to a Modmail-message")
     @has_admin()
@@ -204,7 +204,7 @@ class Modmail(commands.Cog, name="modmail"):
         async with interaction.channel.typing():
             await thread.reply(sent_message)
 
-        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        confirmation = await interaction.followup.send("📤 Bericht verzonden!", ephemeral=True)
         await asyncio.sleep(3)
         await confirmation.delete()
 
@@ -224,7 +224,7 @@ class Modmail(commands.Cog, name="modmail"):
         async with interaction.channel.typing():
             await thread.reply(sent_message, anonymous=True)
 
-        confirmation = await interaction.followup.send("📤 Message sent!", ephemeral=True)
+        confirmation = await interaction.followup.send("📤 Bericht verzonden!", ephemeral=True)
         await asyncio.sleep(3)
         await confirmation.delete()
 
@@ -247,7 +247,7 @@ class Modmail(commands.Cog, name="modmail"):
             msg = await thread.note(sent_message)
             await msg.pin()
 
-        confirmation = await interaction.followup.send("📝 Noted", ephemeral=True)
+        confirmation = await interaction.followup.send("📝 Genoteerd", ephemeral=True)
         await asyncio.sleep(3)
         await confirmation.delete()
 
@@ -279,7 +279,7 @@ class Modmail(commands.Cog, name="modmail"):
                 )
             )
 
-        await interaction.response.send_message("📝 Message edited successfully")
+        await interaction.response.send_message("📝 Bericht succesvol bewerkt")
         # await asyncio.sleep(5)
         # await interaction.delete_original_response()
 
@@ -363,7 +363,7 @@ class Modmail(commands.Cog, name="modmail"):
         await thread.channel.send(embed=embed)
 
         if manual_trigger:
-            await interaction.response.send_message("✅ Modmail channel made!")
+            await interaction.response.send_message("✅ Modmail kanaal aangemaakt!")
             await asyncio.sleep(5)
             await interaction.delete_original_response()
 
@@ -391,7 +391,7 @@ class Modmail(commands.Cog, name="modmail"):
                 )
             )
 
-        await interaction.response.send_message("🗑️ Message deleted.!")
+        await interaction.response.send_message("🗑️ Bericht verwijderd!")
 
 async def setup(bot):
     await bot.add_cog(Modmail(bot))

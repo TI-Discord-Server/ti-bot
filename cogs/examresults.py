@@ -25,11 +25,11 @@ class examresults(commands.Cog, name="when_exam_results"):
 
         if not exam_result_date:
             await interaction.response.send_message(
-                "The exam result date has not been set yet. Please ask a moderator."
+                "De datum voor examenresultaten is nog niet ingesteld. Vraag het aan een moderator."
             )
         else:
             await interaction.response.send_message(
-                f"The exam results will be published on: {exam_result_date}"
+                f"De examenresultaten worden gepubliceerd op: {exam_result_date}"
             )
 
     @command(
@@ -46,7 +46,7 @@ class examresults(commands.Cog, name="when_exam_results"):
         )
 
         await interaction.response.send_message(
-            f"Exam result date updated to: {new_date}"
+            f"Datum voor examenresultaten bijgewerkt naar: {new_date}"
         )
 
     @setExamResults.error
@@ -55,7 +55,7 @@ class examresults(commands.Cog, name="when_exam_results"):
     ):
         if isinstance(error, commands.CheckFailure):
             await interaction.response.send_message(
-                "You do not have permission to use this command.", ephemeral=True
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
 
 

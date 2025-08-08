@@ -48,7 +48,7 @@ class YearSelect(discord.ui.Select):
         category = discord.utils.get(interaction.guild.categories, name=category_name)
         if not category:
             await interaction.response.send_message(
-                f"Category {category_name} not found. Please contact an administrator.",
+                f"Categorie {category_name} niet gevonden. Neem contact op met een beheerder.",
                 ephemeral=True
             )
             return
@@ -58,7 +58,7 @@ class YearSelect(discord.ui.Select):
         
         if not channels:
             await interaction.response.send_message(
-                f"No channels found in {category_name}. Please contact an administrator.",
+                f"Geen kanalen gevonden in {category_name}. Neem contact op met een beheerder.",
                 ephemeral=True
             )
             return
@@ -152,7 +152,7 @@ class CourseSelect(discord.ui.Select):
             # Get the channel menu cog for cache access
             channel_menu_cog = self.bot.get_cog('ChannelMenu')
             if not channel_menu_cog:
-                await interaction.followup.send("Channel menu system not available.", ephemeral=True)
+                await interaction.followup.send("Kanaal menu systeem niet beschikbaar.", ephemeral=True)
                 return
             
             # Get the channel-role mapping from cache

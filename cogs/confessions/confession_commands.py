@@ -17,7 +17,7 @@ class ConfessionCommands(commands.Cog):
     async def force_review(self, interaction: discord.Interaction):
         await self.tasks.daily_review()
         await interaction.response.send_message(
-            "Confession review has been forced.", ephemeral=True
+            "Confession beoordeling is geforceerd.", ephemeral=True
         )
         self.bot.log.info(
             f"{interaction.user} heeft handmatig een confession review getriggerd."

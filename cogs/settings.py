@@ -201,11 +201,11 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 
                 if target_channel == interaction.channel:
                     await target_channel.send(
-                        "Click the button below to submit a confession:", view=view)
+                        "Klik op de knop hieronder om een bekentenis in te dienen:", view=view)
                     await interaction.response.send_message("✅ Confession button is aangemaakt!", ephemeral=True)
                 else:
                     await target_channel.send(
-                        "Click the button below to submit a confession:", view=view)
+                        "Klik op de knop hieronder om een bekentenis in te dienen:", view=view)
                     await interaction.response.send_message(
                         f"✅ Confession button ingesteld in {target_channel.mention}", ephemeral=True)
                 

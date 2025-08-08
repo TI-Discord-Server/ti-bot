@@ -26,7 +26,7 @@ class Help(commands.Cog, name="help"):
                 inline=False,
             )
 
-        embed.set_footer(text="Use a command by typing / followed by the command name.")
+        embed.set_footer(text="Gebruik een commando door / te typen gevolgd door de commandonaam.")
 
         await interaction.response.send_message(
             embed=embed, ephemeral=True
