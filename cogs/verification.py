@@ -44,6 +44,21 @@ class VerificationView(ui.View):
     async def have_code(self, interaction: Interaction, button: ui.Button):
         await interaction.response.send_modal(CodeModal(self.bot))
 
+    @ui.button(label="Ik ben afgestudeerd", style=discord.ButtonStyle.secondary, custom_id="graduated", row=1)
+    async def graduated(self, interaction: Interaction, button: ui.Button):
+        embed = discord.Embed(
+            title="Migratie voor Afgestudeerden",
+            description="Deze optie is **alleen** voor studenten die:\n"
+                       "• Al geverifieerd waren in het oude systeem\n"
+                       "• Geen toegang meer hebben tot hun oude HoGent e-mail\n"
+                       "• Hun verificatie willen overzetten naar het nieuwe systeem\n\n"
+                       "⚠️ **Let op:** We controleren of je e-mailadres nog actief is. "
+                       "Deze migratie werkt alleen als je e-mail niet meer bestaat.\n\n"
+                       "💬 **Problemen?** DM de bot voor ondersteuning!",
+            color=0x0076C5
+        )
+        await interaction.response.send_message(embed=embed, view=MigrationView(self.bot), ephemeral=True)
+
 class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
     email = ui.TextInput(label="Studentenmail", placeholder="voorbeeld@student.hogent.be", required=True)
 
@@ -143,131 +158,32 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
             ephemeral=True
         )
 
-class Verification(commands.Cog):
-    def __init__(self, bot):
+class MigrationView(ui.View):
+    def __init__(self, bot: commands.Bot):
+        super().__init__(timeout=300)  # 5 minute timeout
         self.bot = bot
 
-    @app_commands.command(name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)")
-    @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
-    async def get_email(self, interaction: Interaction, user: discord.Member):
-        # Check for Moderator role
-        if not any(role.name == "Moderator" for role in interaction.user.roles):
-            await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
-            return
+    @ui.button(label="Start Migratie", style=discord.ButtonStyle.primary, custom_id="start_migration")
+    async def start_migration(self, interaction: Interaction, button: ui.Button):
+        await interaction.response.send_modal(MigrationModal(self.bot))
 
-        record = await self.bot.db.verifications.find_one({"user_id": user.id})
-        if not record:
-            await interaction.response.send_message("❌ Geen e-mailadres gevonden voor deze gebruiker.", ephemeral=True)
-            return
-
-        try:
-            decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-            await interaction.response.send_message(f"E-mailadres: {decrypted_email}", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
-
-    @app_commands.command(name="unverify", description="Verwijder een verificatie en kick de gebruiker")
-    @app_commands.describe(
-        email="Het e-mailadres om te verwijderen (optioneel)",
-        user="De gebruiker om te unverifiëren (optioneel)"
+class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
+    old_email = ui.TextInput(
+        label="Je oude HoGent e-mailadres",
+        placeholder="voorbeeld@student.hogent.be",
+        required=True
     )
-    async def unverify(self, interaction: Interaction, email: str = None, user: discord.Member = None):
-        # Only moderators
-        if not any(role.name == "Moderator" for role in interaction.user.roles):
-            await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
-            return
 
-        # Must provide either email or user
-        if not email and not user:
-            await interaction.response.send_message("❌ Je moet een e-mailadres of gebruiker opgeven.", ephemeral=True)
-            return
+    def __init__(self, bot):
+        super().__init__()
+        self.bot = bot
 
-        # Find record
-        record = None
-        if user:
-            # Search by user ID
-            record = await self.bot.db.verifications.find_one({"user_id": user.id})
-        else:
-            # Search by email (decrypt all records)
-            all_records = self.bot.db.verifications.find({})
-            async for r in all_records:
-                try:
-                    decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
-                    if decrypted_email == email:
-                        record = r
-                        break
-                except Exception:
-                    # Skip invalid encrypted emails or corrupted records
-                    continue
-        
-        if not record:
-            search_term = f"gebruiker {user.mention}" if user else f"e-mailadres {email}"
-            await interaction.response.send_message(f"❌ Geen verificatie gevonden voor {search_term}.", ephemeral=True)
-            return
-            
-        guild = interaction.guild
-        member = guild.get_member(record["user_id"])
-        
-        # Remove verification from database
-        await self.bot.db.verifications.delete_one({"_id": record["_id"]})
+    async def on_submit(self, interaction: Interaction):
+        old_email = self.old_email.value.strip()
+        user_id = interaction.user.id
 
-        # Check if target is a moderator
-        is_moderator = member and any(role.name == "Moderator" for role in member.roles)
-        
-        # Try to kick if not a moderator
-        kicked = False
-        if member and not is_moderator:
-            try:
-                # Create a permanent invite before kicking
-                invite = None
-                try:
-                    # Try to create invite from the first available text channel
-                    for channel in guild.text_channels:
-                        if channel.permissions_for(guild.me).create_instant_invite:
-                            invite = await channel.create_invite(
-                                max_age=0,  # Permanent invite
-                                max_uses=0,  # Unlimited uses
-                                reason="Invite voor gekickte gebruiker om terug te keren"
-                            )
-                            break
-                except Exception:
-                    # If invite creation fails, continue with kick anyway
-                    pass
-                
-                # Send DM with invite before kicking
-                try:
-                    dm_message = "Je verificatie is ingetrokken door een moderator en je bent gekickt van de server."
-                    if invite:
-                        dm_message += f"\n\nJe kunt terugkeren via deze uitnodiging: {invite.url}\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
-                    else:
-                        dm_message += "\n\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
-                    
-                    await member.send(dm_message)
-                except Exception:
-                    # If DM fails, continue with kick anyway
-                    pass
-                
-                # Kick the user
-                await member.kick(reason="Verificatie ingetrokken door moderator.")
-                kicked = True
-            except Exception:
-                pass
-
-        # Send appropriate response
-        if is_moderator:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
-        elif kicked:
-            await interaction.response.send_message("✅ Gebruiker gekickt en verificatie ingetrokken.", ephemeral=True)
-        elif member:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker kon niet gekickt worden.", ephemeral=True)
-        else:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
-
-    @app_commands.command(name="migrate_old_verification", description="Migreer van het oude verificatiesysteem (alleen voor ex-studenten)")
-    @app_commands.describe(old_email="Je oude HoGent e-mailadres dat je vroeger gebruikte")
-    async def migrate_old_verification(self, interaction: Interaction, old_email: str):
         # Check if user is already verified in new system
-        existing_record = await self.bot.db.verifications.find_one({"user_id": interaction.user.id})
+        existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
             await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
@@ -294,13 +210,15 @@ class Verification(commands.Cog):
             email_hash = hashlib.sha256(old_email.encode()).hexdigest()
 
             # Check if this user was verified with this email in the old system
-            old_record = await old_email_data.find_one({"_id": interaction.user.id, "emailHash": email_hash})
+            old_record = await old_email_data.find_one({"_id": user_id, "emailHash": email_hash})
             
             if not old_record:
                 await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
                 return
 
             # Check if email bounces (indicating user is no longer a student)
+            await interaction.followup.send("🔄 Bezig met controleren of je e-mailadres nog actief is... Dit kan enkele minuten duren.", ephemeral=True)
+            
             bounce_result = await self._check_email_bounce(old_email)
             
             if bounce_result == "bounced":
@@ -310,20 +228,26 @@ class Verification(commands.Cog):
                 
                 # Store in new system
                 await self.bot.db.verifications.insert_one({
-                    "user_id": interaction.user.id,
+                    "user_id": user_id,
                     "encrypted_email": encrypted_email
                 })
+                
+                # Assign verified role
+                guild = interaction.guild
+                role = discord.utils.get(guild.roles, name="Verified")
+                if role:
+                    await interaction.user.add_roles(role)
                 
                 await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
                 
             elif bounce_result == "delivered" or bounce_result == "no_bounce_yet":
-                await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.", ephemeral=True)
+                await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.\n\n💬 Heb je problemen? DM de bot voor ondersteuning!", ephemeral=True)
                 
             else:  # delayed, unknown, send_failed
-                await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.", ephemeral=True)
+                await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
 
         except Exception as e:
-            await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.", ephemeral=True)
+            await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
             print(f"Migration error: {e}")
 
     async def _check_email_bounce(self, email_address: str) -> str:
@@ -540,6 +464,126 @@ This test helps verify email deliverability without requiring any action from yo
         if action in ("delivered", "relayed", "expanded"):
             return "delivered"
         return "unknown"
+
+class Verification(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)")
+    @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
+    async def get_email(self, interaction: Interaction, user: discord.Member):
+        # Check for Moderator role
+        if not any(role.name == "Moderator" for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
+            return
+
+        record = await self.bot.db.verifications.find_one({"user_id": user.id})
+        if not record:
+            await interaction.response.send_message("❌ Geen e-mailadres gevonden voor deze gebruiker.", ephemeral=True)
+            return
+
+        try:
+            decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
+            await interaction.response.send_message(f"E-mailadres: {decrypted_email}", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
+
+    @app_commands.command(name="unverify", description="Verwijder een verificatie en kick de gebruiker")
+    @app_commands.describe(
+        email="Het e-mailadres om te verwijderen (optioneel)",
+        user="De gebruiker om te unverifiëren (optioneel)"
+    )
+    async def unverify(self, interaction: Interaction, email: str = None, user: discord.Member = None):
+        # Only moderators
+        if not any(role.name == "Moderator" for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
+            return
+
+        # Must provide either email or user
+        if not email and not user:
+            await interaction.response.send_message("❌ Je moet een e-mailadres of gebruiker opgeven.", ephemeral=True)
+            return
+
+        # Find record
+        record = None
+        if user:
+            # Search by user ID
+            record = await self.bot.db.verifications.find_one({"user_id": user.id})
+        else:
+            # Search by email (decrypt all records)
+            all_records = self.bot.db.verifications.find({})
+            async for r in all_records:
+                try:
+                    decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
+                    if decrypted_email == email:
+                        record = r
+                        break
+                except Exception:
+                    # Skip invalid encrypted emails or corrupted records
+                    continue
+        
+        if not record:
+            search_term = f"gebruiker {user.mention}" if user else f"e-mailadres {email}"
+            await interaction.response.send_message(f"❌ Geen verificatie gevonden voor {search_term}.", ephemeral=True)
+            return
+            
+        guild = interaction.guild
+        member = guild.get_member(record["user_id"])
+        
+        # Remove verification from database
+        await self.bot.db.verifications.delete_one({"_id": record["_id"]})
+
+        # Check if target is a moderator
+        is_moderator = member and any(role.name == "Moderator" for role in member.roles)
+        
+        # Try to kick if not a moderator
+        kicked = False
+        if member and not is_moderator:
+            try:
+                # Create a permanent invite before kicking
+                invite = None
+                try:
+                    # Try to create invite from the first available text channel
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).create_instant_invite:
+                            invite = await channel.create_invite(
+                                max_age=0,  # Permanent invite
+                                max_uses=0,  # Unlimited uses
+                                reason="Invite voor gekickte gebruiker om terug te keren"
+                            )
+                            break
+                except Exception:
+                    # If invite creation fails, continue with kick anyway
+                    pass
+                
+                # Send DM with invite before kicking
+                try:
+                    dm_message = "Je verificatie is ingetrokken door een moderator en je bent gekickt van de server."
+                    if invite:
+                        dm_message += f"\n\nJe kunt terugkeren via deze uitnodiging: {invite.url}\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
+                    else:
+                        dm_message += "\n\nJe kunt jezelf opnieuw verifiëren als je dat wilt."
+                    
+                    await member.send(dm_message)
+                except Exception:
+                    # If DM fails, continue with kick anyway
+                    pass
+                
+                # Kick the user
+                await member.kick(reason="Verificatie ingetrokken door moderator.")
+                kicked = True
+            except Exception:
+                pass
+
+        # Send appropriate response
+        if is_moderator:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
+        elif kicked:
+            await interaction.response.send_message("✅ Gebruiker gekickt en verificatie ingetrokken.", ephemeral=True)
+        elif member:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker kon niet gekickt worden.", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
