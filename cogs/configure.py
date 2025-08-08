@@ -1115,6 +1115,11 @@ class Configure(commands.Cog):
         """Open the configuration interface."""
         try:
             self.bot.log.info(f"Configure command called by {interaction.user} ({interaction.user.id}) in guild {interaction.guild_id}")
+            
+            # Defer the response immediately to prevent timeout
+            await interaction.response.defer(ephemeral=not visible)
+            self.bot.log.debug("Response deferred")
+            
             self.bot.log.debug(f"Bot guild_id: {getattr(self.bot, 'guild_id', 'NOT_SET')}")
             self.bot.log.debug(f"Bot guild: {getattr(self.bot, 'guild', 'NOT_SET')}")
             
@@ -1124,23 +1129,18 @@ class Configure(commands.Cog):
             self.bot.log.debug("Creating main embed...")
             embed = await view.create_main_embed()
             
-            self.bot.log.debug("Sending response...")
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=not visible)
+            self.bot.log.debug("Sending followup...")
+            await interaction.followup.send(embed=embed, view=view, ephemeral=not visible)
             self.bot.log.info("Configure command completed successfully")
             
         except Exception as e:
             self.bot.log.error(f"Error in configure command: {e}", exc_info=True)
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(
-                        "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
-                        ephemeral=True
-                    )
-                else:
-                    await interaction.followup.send(
-                        "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
-                        ephemeral=True
-                    )
+                # Since we always defer the response, use followup
+                await interaction.followup.send(
+                    "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
+                    ephemeral=True
+                )
             except Exception as followup_error:
                 self.bot.log.error(f"Failed to send error message: {followup_error}")
 
@@ -1332,6 +1332,7 @@ class RoleMenuSetupView(discord.ui.View):
             view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
             config_embed = await view.create_embed()
             
+            # Send confirmation message and update original message
             await interaction.response.send_message(embed=embed, ephemeral=True)
             await interaction.edit_original_response(embed=config_embed, view=view)
             
