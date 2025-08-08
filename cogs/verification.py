@@ -226,10 +226,11 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 fernet = Fernet(ENCRYPTION_KEY.encode())
                 encrypted_email = fernet.encrypt(old_email.encode()).decode()
                 
-                # Store in new system
+                # Store in new system with migration flag
                 await self.bot.db.verifications.insert_one({
                     "user_id": user_id,
-                    "encrypted_email": encrypted_email
+                    "encrypted_email": encrypted_email,
+                    "migrated": True
                 })
                 
                 # Assign verified role
@@ -484,7 +485,16 @@ class Verification(commands.Cog):
 
         try:
             decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-            await interaction.response.send_message(f"E-mailadres: {decrypted_email}", ephemeral=True)
+            
+            # Check if this is a migrated account
+            is_migrated = record.get('migrated', False)
+            
+            if is_migrated:
+                message = f"📧 E-mailadres: {decrypted_email}\n🔄 **Gemigreerd** van het oude systeem"
+            else:
+                message = f"📧 E-mailadres: {decrypted_email}\n✅ Nieuw verificatiesysteem"
+            
+            await interaction.response.send_message(message, ephemeral=True)
         except Exception as e:
             await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
 
