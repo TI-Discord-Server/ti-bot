@@ -49,7 +49,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
 
         if not EMAIL_REGEX.match(email):
             await interaction.response.send_message(
-                "❌ Dit is geen geldig HoGent studentenmailadres.", ephemeral=True
+                "❌ Dit is geen geldig HOGENT studentenmailadres.", ephemeral=True
             )
             return
 

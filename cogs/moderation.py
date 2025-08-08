@@ -948,7 +948,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             embed = discord.Embed(
                 title="Verificatie vereist",
                 description=(
-                    "Om toegang te krijgen tot deze server moet je een student zijn van HoGent.\n"
+                    "Om toegang te krijgen tot deze server moet je een student zijn van HOGENT.\n"
                     "Je moet verifiëren met een geldig studentenmailadres. Je ontvangt een code per mail, "
                     "die je hieronder moet invullen om toegang te krijgen.\n"
                     "Je e-mailadres wordt opgeslagen in onze database zolang je op de server blijft. "
