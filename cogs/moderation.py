@@ -7,6 +7,8 @@ from typing import Optional
 import pymongo
 import time
 import pytz  # Importeer de pytz library
+from utils.has_role import has_role
+from utils.has_admin import has_admin
 
 # Definieer de gewenste timezone (GMT+1)
 TIMEZONE = pytz.timezone('Europe/Amsterdam')
@@ -14,22 +16,40 @@ TIMEZONE = pytz.timezone('Europe/Amsterdam')
 
 def is_moderator():
     """
-    Controleert of de gebruiker een moderator is. Een moderator is de bot owner of iemand met 'manage_guild' permissies.
+    Dynamic moderator check that uses the configured moderator role ID.
+    Falls back to admin permissions if no moderator role is configured.
     """
+    import functools
+    
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
+            if interaction.guild is None:
+                await interaction.response.send_message(
+                    "This command can only be used in a server.", ephemeral=True
+                )
+                return None
 
-    async def predicate(interaction: discord.Interaction):
-        """Predicate om te controleren of de user een moderator is."""
-        settings = await interaction.client.db.settings.find_one({"_id": "mod_settings"})
-        if not settings:
-            print("Geen mod settings gevonden in de database! De 'is_moderator' check zal falen.")
-            return False
-        moderator_id = settings.get("moderator_id")
-        return (
-            interaction.user.id == moderator_id
-            or interaction.user.guild_permissions.manage_guild
-        )
+            # Always allow users with administrator permissions
+            if any(r.permissions.administrator for r in interaction.user.roles):
+                return await func(self, interaction, *args, **kwargs)
+            
+            # Check for configured moderator role
+            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
+            if settings and "moderator_role_id" in settings:
+                moderator_role_id = settings["moderator_role_id"]
+                if any(r.id == moderator_role_id for r in interaction.user.roles):
+                    return await func(self, interaction, *args, **kwargs)
+            
+            # No permission
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om deze command te gebruiken. Je hebt moderator rechten nodig.", 
+                ephemeral=True
+            )
+            return None
 
-    return commands.check(predicate)
+        return wrapper
+    return decorator
 
 
 class ModCommands(commands.Cog, name="ModCommands"):

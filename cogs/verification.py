@@ -473,8 +473,21 @@ class Verification(commands.Cog):
     @app_commands.command(name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)")
     @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
     async def get_email(self, interaction: Interaction, user: discord.Member):
-        # Check for Moderator role
-        if not any(role.name == "Moderator" for role in interaction.user.roles):
+        # Check for moderator permissions
+        has_permission = False
+        
+        # Always allow administrators
+        if any(r.permissions.administrator for r in interaction.user.roles):
+            has_permission = True
+        else:
+            # Check for configured moderator role
+            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
+            if settings and "moderator_role_id" in settings:
+                moderator_role_id = settings["moderator_role_id"]
+                if any(r.id == moderator_role_id for r in interaction.user.roles):
+                    has_permission = True
+        
+        if not has_permission:
             await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
             return
 
@@ -504,8 +517,21 @@ class Verification(commands.Cog):
         user="De gebruiker om te unverifiëren (optioneel)"
     )
     async def unverify(self, interaction: Interaction, email: str = None, user: discord.Member = None):
-        # Only moderators
-        if not any(role.name == "Moderator" for role in interaction.user.roles):
+        # Check for moderator permissions
+        has_permission = False
+        
+        # Always allow administrators
+        if any(r.permissions.administrator for r in interaction.user.roles):
+            has_permission = True
+        else:
+            # Check for configured moderator role
+            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
+            if settings and "moderator_role_id" in settings:
+                moderator_role_id = settings["moderator_role_id"]
+                if any(r.id == moderator_role_id for r in interaction.user.roles):
+                    has_permission = True
+        
+        if not has_permission:
             await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
             return
 
@@ -541,7 +567,18 @@ class Verification(commands.Cog):
         member = guild.get_member(record["user_id"])
         
         # Check if target is a moderator
-        is_moderator = member and any(role.name == "Moderator" for role in member.roles)
+        is_moderator = False
+        if member:
+            # Check if target has admin permissions
+            if any(r.permissions.administrator for r in member.roles):
+                is_moderator = True
+            else:
+                # Check if target has configured moderator role
+                settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
+                if settings and "moderator_role_id" in settings:
+                    moderator_role_id = settings["moderator_role_id"]
+                    if any(r.id == moderator_role_id for r in member.roles):
+                        is_moderator = True
         
         # Send initial response immediately
         if is_moderator:

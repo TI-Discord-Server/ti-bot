@@ -238,8 +238,19 @@ class ServerConfigView(BaseConfigView):
     @discord.ui.button(label="Ontwikkelaars beheren", style=discord.ButtonStyle.primary, emoji="👨‍💻")
     async def manage_developers(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage developer IDs."""
-        modal = DeveloperIdsModal(self.bot, self.user_id, self.visible)
-        await interaction.response.send_modal(modal)
+        embed = discord.Embed(
+            title="👨‍💻 Ontwikkelaars Beheren",
+            description=(
+                "Gebruik de volgende slash commands om ontwikkelaars te beheren:\n\n"
+                "• `/add_developer <user>` - Voeg een ontwikkelaar toe\n"
+                "• `/remove_developer <user>` - Verwijder een ontwikkelaar\n"
+                "• `/list_developers` - Toon alle ontwikkelaars\n\n"
+                "Deze commands gebruiken Discord's gebruiker autocomplete voor een betere ervaring."
+            ),
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Alleen administrators kunnen ontwikkelaars beheren")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 class ModmailConfigView(BaseConfigView):
@@ -494,19 +505,6 @@ class VerificationConfigView(BaseConfigView):
             inline=True
         )
         
-        # Unverified role
-        unverified_role_id = settings.get("unverified_role_id", "Niet ingesteld")
-        if unverified_role_id != "Niet ingesteld":
-            unverified_role_name = f"<@&{unverified_role_id}>"
-        else:
-            unverified_role_name = "Niet ingesteld"
-            
-        embed.add_field(
-            name="❌ Niet-geverifieerde Rol",
-            value=f"`{unverified_role_id}`\n**Rol:** {unverified_role_name}",
-            inline=True
-        )
-        
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
     
@@ -521,16 +519,7 @@ class VerificationConfigView(BaseConfigView):
         )
         await interaction.response.edit_message(embed=embed, view=view)
     
-    @discord.ui.button(label="Niet-geverifieerde Rol", style=discord.ButtonStyle.danger, emoji="❌")
-    async def set_unverified_role(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set unverified role."""
-        view = RoleSelectView(self.bot, self.user_id, "verification_settings", "unverified_role_id")
-        embed = discord.Embed(
-            title="❌ Niet-geverifieerde Rol Selecteren",
-            description="Selecteer de rol die niet-geverifieerde gebruikers krijgen.",
-            color=discord.Color.red()
-        )
-        await interaction.response.edit_message(embed=embed, view=view)
+
 
 
 class ModerationConfigView(BaseConfigView):
@@ -827,42 +816,6 @@ class GuildIdModal(discord.ui.Modal):
         except ValueError:
             await interaction.response.send_message("❌ Ongeldige server ID. Voer een geldig nummer in.", ephemeral=True)
 
-
-class DeveloperIdsModal(discord.ui.Modal):
-    """Modal for setting developer IDs."""
-    
-    def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(title="Ontwikkelaars Beheren")
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-        self.dev_ids_input = discord.ui.TextInput(
-            label="Ontwikkelaar IDs",
-            placeholder="Voer gebruiker IDs in, gescheiden door komma's...",
-            required=True,
-            style=discord.TextStyle.paragraph,
-            max_length=1000
-        )
-        self.add_item(self.dev_ids_input)
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            id_strings = [id_str.strip() for id_str in self.dev_ids_input.value.split(",")]
-            dev_ids = [int(id_str) for id_str in id_strings if id_str]
-            
-            await self.bot.db.settings.update_one(
-                {"_id": "server_settings"},
-                {"$set": {"developer_ids": dev_ids}},
-                upsert=True
-            )
-            
-            view = ServerConfigView(self.bot, self.user_id, self.visible)
-            embed = await view.create_embed()
-            await interaction.response.edit_message(embed=embed, view=view)
-            
-        except ValueError:
-            await interaction.response.send_message("❌ Ongeldige gebruiker IDs. Voer geldige nummers in, gescheiden door komma's.", ephemeral=True)
 
 
 class ConfessionTimesModal(discord.ui.Modal):
