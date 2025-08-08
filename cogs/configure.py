@@ -627,19 +627,78 @@ class RolesChannelsConfigView(BaseConfigView):
             timestamp=datetime.datetime.now()
         )
         
+        # Get role selector configuration
+        role_config = await self.bot.db.role_selector.find_one({"_id": "config"})
+        categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+        
+        # Role menu status
+        if role_config and role_config.get("message_id"):
+            channel_id = role_config.get("channel_id")
+            channel_name = f"<#{channel_id}>" if channel_id else "Onbekend kanaal"
+            embed.add_field(
+                name="📋 Rol Menu Status",
+                value=f"**Actief in:** {channel_name}\n**Message ID:** `{role_config.get('message_id')}`",
+                inline=True
+            )
+        else:
+            embed.add_field(
+                name="📋 Rol Menu Status",
+                value="Niet ingesteld",
+                inline=True
+            )
+        
+        # Categories count
+        category_count = 0
+        total_roles = 0
+        if categories_doc:
+            categories = categories_doc.get("categories", [])
+            category_count = len(categories)
+            total_roles = sum(len(cat.get("roles", [])) for cat in categories)
+        
         embed.add_field(
-            name="ℹ️ Informatie",
+            name="📊 Statistieken",
+            value=f"**Categorieën:** {category_count}\n**Totaal rollen:** {total_roles}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔧 Beheer Opties",
             value=(
-                "Deze instellingen worden automatisch beheerd door de rol en kanaal menu systemen.\n"
-                "Gebruik de setup commando's om deze systemen in te stellen:\n"
-                "• `/setup component:Role Menu`\n"
-                "• `/setup component:Channel Menu`"
+                "Gebruik de knoppen hieronder om:\n"
+                "• Rol categorieën beheren\n"
+                "• Rollen toevoegen/verwijderen\n"
+                "• Rol menu instellen"
             ),
             inline=False
         )
         
-        embed.set_footer(text="Deze categorie heeft momenteel geen configureerbare instellingen")
+        embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
+    
+    @discord.ui.button(label="Categorieën Beheren", style=discord.ButtonStyle.primary, emoji="📁")
+    async def manage_categories(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Manage role categories."""
+        view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
+        embed = await view.create_embed()
+        await interaction.response.edit_message(embed=embed, view=view)
+    
+    @discord.ui.button(label="Rollen Beheren", style=discord.ButtonStyle.secondary, emoji="🎭")
+    async def manage_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Manage roles in categories."""
+        view = RoleManagementView(self.bot, self.user_id, self.visible)
+        embed = await view.create_embed()
+        await interaction.response.edit_message(embed=embed, view=view)
+    
+    @discord.ui.button(label="Menu Instellen", style=discord.ButtonStyle.success, emoji="📋")
+    async def setup_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Setup role menu in a channel."""
+        view = RoleMenuSetupView(self.bot, self.user_id, self.visible)
+        embed = discord.Embed(
+            title="📋 Rol Menu Instellen",
+            description="Selecteer een kanaal waar het rol menu geplaatst moet worden.",
+            color=discord.Color.green()
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 # Channel and Role Selection Views
@@ -1087,6 +1146,511 @@ class Configure(commands.Cog):
 
 
 
+
+
+# Role Management Views
+class RoleCategoryManagementView(BaseConfigView):
+    """View for managing role categories."""
+    
+    async def create_embed(self):
+        """Create category management embed."""
+        embed = discord.Embed(
+            title="📁 Categorie Beheer",
+            description="Beheer rol categorieën",
+            color=discord.Color.blue(),
+            timestamp=datetime.datetime.now()
+        )
+        
+        # Get categories
+        categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+        if categories_doc:
+            categories = categories_doc.get("categories", [])
+            if categories:
+                category_list = []
+                for i, category in enumerate(categories, 1):
+                    role_count = len(category.get("roles", []))
+                    category_list.append(f"{i}. **{category['name']}** ({role_count} rollen)")
+                
+                embed.add_field(
+                    name="📋 Huidige Categorieën",
+                    value="\n".join(category_list),
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="📋 Huidige Categorieën",
+                    value="Geen categorieën gevonden",
+                    inline=False
+                )
+        else:
+            embed.add_field(
+                name="📋 Huidige Categorieën",
+                value="Geen categorieën gevonden",
+                inline=False
+            )
+        
+        embed.set_footer(text="Gebruik de knoppen om categorieën toe te voegen of te verwijderen")
+        return embed
+    
+    @discord.ui.button(label="Categorie Toevoegen", style=discord.ButtonStyle.success, emoji="➕")
+    async def add_category(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Add a new category."""
+        modal = AddCategoryModal(self.bot, self.user_id, self.visible)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Categorie Verwijderen", style=discord.ButtonStyle.danger, emoji="➖")
+    async def remove_category(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Remove a category."""
+        modal = RemoveCategoryModal(self.bot, self.user_id, self.visible)
+        await interaction.response.send_modal(modal)
+
+
+class RoleManagementView(BaseConfigView):
+    """View for managing roles in categories."""
+    
+    async def create_embed(self):
+        """Create role management embed."""
+        embed = discord.Embed(
+            title="🎭 Rol Beheer",
+            description="Beheer rollen in categorieën",
+            color=discord.Color.purple(),
+            timestamp=datetime.datetime.now()
+        )
+        
+        # Get categories and their roles
+        categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+        if categories_doc:
+            categories = categories_doc.get("categories", [])
+            if categories:
+                for category in categories:
+                    roles = category.get("roles", [])
+                    if roles:
+                        role_list = []
+                        for role in roles:
+                            emoji = role.get("emoji", "")
+                            name = role.get("name", "")
+                            role_name = role.get("role_name", "")
+                            role_list.append(f"{emoji} {name} → @{role_name}")
+                        
+                        embed.add_field(
+                            name=f"📁 {category['name']}",
+                            value="\n".join(role_list),
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name=f"📁 {category['name']}",
+                            value="Geen rollen",
+                            inline=False
+                        )
+            else:
+                embed.add_field(
+                    name="ℹ️ Geen Categorieën",
+                    value="Voeg eerst categorieën toe voordat je rollen kunt beheren.",
+                    inline=False
+                )
+        else:
+            embed.add_field(
+                name="ℹ️ Geen Categorieën",
+                value="Voeg eerst categorieën toe voordat je rollen kunt beheren.",
+                inline=False
+            )
+        
+        embed.set_footer(text="Gebruik de knoppen om rollen toe te voegen of te verwijderen")
+        return embed
+    
+    @discord.ui.button(label="Rol Toevoegen", style=discord.ButtonStyle.success, emoji="➕")
+    async def add_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Add a role to a category."""
+        modal = AddRoleModal(self.bot, self.user_id, self.visible)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Rol Verwijderen", style=discord.ButtonStyle.danger, emoji="➖")
+    async def remove_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Remove a role from a category."""
+        modal = RemoveRoleModal(self.bot, self.user_id, self.visible)
+        await interaction.response.send_modal(modal)
+
+
+class RoleMenuSetupView(discord.ui.View):
+    """View for setting up role menu in a channel."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        # Add channel select
+        select = discord.ui.ChannelSelect(
+            placeholder="Selecteer een kanaal voor het rol menu...",
+            channel_types=[discord.ChannelType.text]
+        )
+        select.callback = self.channel_select_callback
+        self.add_item(select)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            return False
+        return True
+    
+    async def channel_select_callback(self, interaction: discord.Interaction):
+        """Handle channel selection for role menu setup."""
+        channel = interaction.data['values'][0]
+        channel_id = int(channel)
+        
+        try:
+            # Get the role selector cog
+            role_selector_cog = self.bot.get_cog("RoleSelector")
+            if not role_selector_cog:
+                await interaction.response.send_message("❌ Rol selector systeem niet gevonden.", ephemeral=True)
+                return
+            
+            # Update the role menu message
+            message = await role_selector_cog.update_role_menu_message(channel_id)
+            
+            if message:
+                embed = discord.Embed(
+                    title="✅ Rol Menu Ingesteld",
+                    description=f"Het rol menu is succesvol ingesteld in <#{channel_id}>",
+                    color=discord.Color.green()
+                )
+                embed.add_field(
+                    name="📋 Details",
+                    value=f"**Kanaal:** <#{channel_id}>\n**Message ID:** `{message.id}`",
+                    inline=False
+                )
+            else:
+                embed = discord.Embed(
+                    title="❌ Fout",
+                    description="Er is een fout opgetreden bij het instellen van het rol menu.",
+                    color=discord.Color.red()
+                )
+            
+            # Return to roles config
+            view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
+            config_embed = await view.create_embed()
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=config_embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error setting up role menu: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Er is een fout opgetreden bij het instellen van het rol menu.", ephemeral=True)
+
+
+# Role Management Modals
+class AddCategoryModal(discord.ui.Modal):
+    """Modal for adding a new role category."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Categorie Toevoegen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.name_input = discord.ui.TextInput(
+            label="Categorie Naam",
+            placeholder="Bijv. Campussen, Studiejaren, etc.",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.name_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            category_name = self.name_input.value.strip()
+            
+            # Get existing categories
+            categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+            categories = categories_doc.get("categories", []) if categories_doc else []
+            
+            # Check if category already exists
+            if any(cat["name"].lower() == category_name.lower() for cat in categories):
+                await interaction.response.send_message(f"❌ Categorie '{category_name}' bestaat al.", ephemeral=True)
+                return
+            
+            # Add new category
+            categories.append({"name": category_name, "roles": []})
+            
+            # Save to database
+            await self.bot.db.role_selector.update_one(
+                {"_id": "categories"},
+                {"$set": {"categories": categories}},
+                upsert=True
+            )
+            
+            # Update role menu if it exists
+            role_selector_cog = self.bot.get_cog("RoleSelector")
+            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+                await role_selector_cog.update_role_menu_message(
+                    role_selector_cog.role_menu_channel_id, 
+                    role_selector_cog.role_menu_message_id
+                )
+            
+            # Return to category management
+            view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error adding category: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Er is een fout opgetreden bij het toevoegen van de categorie.", ephemeral=True)
+
+
+class RemoveCategoryModal(discord.ui.Modal):
+    """Modal for removing a role category."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Categorie Verwijderen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.name_input = discord.ui.TextInput(
+            label="Categorie Naam",
+            placeholder="Exacte naam van de categorie om te verwijderen",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.name_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            category_name = self.name_input.value.strip()
+            
+            # Get existing categories
+            categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+            if not categories_doc:
+                await interaction.response.send_message("❌ Geen categorieën gevonden.", ephemeral=True)
+                return
+            
+            categories = categories_doc.get("categories", [])
+            
+            # Find and remove category
+            original_count = len(categories)
+            categories = [cat for cat in categories if cat["name"].lower() != category_name.lower()]
+            
+            if len(categories) == original_count:
+                await interaction.response.send_message(f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True)
+                return
+            
+            # Save to database
+            await self.bot.db.role_selector.update_one(
+                {"_id": "categories"},
+                {"$set": {"categories": categories}},
+                upsert=True
+            )
+            
+            # Update role menu if it exists
+            role_selector_cog = self.bot.get_cog("RoleSelector")
+            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+                await role_selector_cog.update_role_menu_message(
+                    role_selector_cog.role_menu_channel_id, 
+                    role_selector_cog.role_menu_message_id
+                )
+            
+            # Return to category management
+            view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error removing category: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Er is een fout opgetreden bij het verwijderen van de categorie.", ephemeral=True)
+
+
+class AddRoleModal(discord.ui.Modal):
+    """Modal for adding a role to a category."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Rol Toevoegen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.category_input = discord.ui.TextInput(
+            label="Categorie Naam",
+            placeholder="Naam van de categorie",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.category_input)
+        
+        self.role_name_input = discord.ui.TextInput(
+            label="Discord Rol Naam",
+            placeholder="Exacte naam van de Discord rol",
+            required=True,
+            max_length=100
+        )
+        self.add_item(self.role_name_input)
+        
+        self.display_name_input = discord.ui.TextInput(
+            label="Weergave Naam",
+            placeholder="Naam zoals getoond in het menu (optioneel)",
+            required=False,
+            max_length=100
+        )
+        self.add_item(self.display_name_input)
+        
+        self.emoji_input = discord.ui.TextInput(
+            label="Emoji",
+            placeholder="Emoji voor de rol (bijv. 🎮)",
+            required=True,
+            max_length=10
+        )
+        self.add_item(self.emoji_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            category_name = self.category_input.value.strip()
+            role_name = self.role_name_input.value.strip()
+            display_name = self.display_name_input.value.strip() or role_name
+            emoji = self.emoji_input.value.strip()
+            
+            # Verify the role exists
+            guild = interaction.guild
+            role = discord.utils.get(guild.roles, name=role_name)
+            if not role:
+                await interaction.response.send_message(f"❌ Rol '{role_name}' niet gevonden in deze server.", ephemeral=True)
+                return
+            
+            # Get existing categories
+            categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+            if not categories_doc:
+                await interaction.response.send_message("❌ Geen categorieën gevonden. Voeg eerst een categorie toe.", ephemeral=True)
+                return
+            
+            categories = categories_doc.get("categories", [])
+            
+            # Find the category
+            category_found = False
+            for category in categories:
+                if category["name"].lower() == category_name.lower():
+                    category_found = True
+                    
+                    # Check if role already exists in this category
+                    if any(r["role_name"] == role_name for r in category.get("roles", [])):
+                        await interaction.response.send_message(f"❌ Rol '{role_name}' bestaat al in categorie '{category_name}'.", ephemeral=True)
+                        return
+                    
+                    # Add the role
+                    if "roles" not in category:
+                        category["roles"] = []
+                    
+                    category["roles"].append({
+                        "name": display_name,
+                        "role_name": role_name,
+                        "emoji": emoji
+                    })
+                    break
+            
+            if not category_found:
+                await interaction.response.send_message(f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True)
+                return
+            
+            # Save to database
+            await self.bot.db.role_selector.update_one(
+                {"_id": "categories"},
+                {"$set": {"categories": categories}},
+                upsert=True
+            )
+            
+            # Update role menu if it exists
+            role_selector_cog = self.bot.get_cog("RoleSelector")
+            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+                await role_selector_cog.update_role_menu_message(
+                    role_selector_cog.role_menu_channel_id, 
+                    role_selector_cog.role_menu_message_id
+                )
+            
+            # Return to role management
+            view = RoleManagementView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error adding role: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Er is een fout opgetreden bij het toevoegen van de rol.", ephemeral=True)
+
+
+class RemoveRoleModal(discord.ui.Modal):
+    """Modal for removing a role from a category."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Rol Verwijderen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.category_input = discord.ui.TextInput(
+            label="Categorie Naam",
+            placeholder="Naam van de categorie",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.category_input)
+        
+        self.role_name_input = discord.ui.TextInput(
+            label="Rol Naam",
+            placeholder="Exacte naam van de rol om te verwijderen",
+            required=True,
+            max_length=100
+        )
+        self.add_item(self.role_name_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            category_name = self.category_input.value.strip()
+            role_name = self.role_name_input.value.strip()
+            
+            # Get existing categories
+            categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
+            if not categories_doc:
+                await interaction.response.send_message("❌ Geen categorieën gevonden.", ephemeral=True)
+                return
+            
+            categories = categories_doc.get("categories", [])
+            
+            # Find the category and remove the role
+            role_removed = False
+            for category in categories:
+                if category["name"].lower() == category_name.lower():
+                    original_count = len(category.get("roles", []))
+                    category["roles"] = [r for r in category.get("roles", []) if r["role_name"] != role_name]
+                    
+                    if len(category["roles"]) < original_count:
+                        role_removed = True
+                    break
+            
+            if not role_removed:
+                await interaction.response.send_message(f"❌ Rol '{role_name}' niet gevonden in categorie '{category_name}'.", ephemeral=True)
+                return
+            
+            # Save to database
+            await self.bot.db.role_selector.update_one(
+                {"_id": "categories"},
+                {"$set": {"categories": categories}},
+                upsert=True
+            )
+            
+            # Update role menu if it exists
+            role_selector_cog = self.bot.get_cog("RoleSelector")
+            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+                await role_selector_cog.update_role_menu_message(
+                    role_selector_cog.role_menu_channel_id, 
+                    role_selector_cog.role_menu_message_id
+                )
+            
+            # Return to role management
+            view = RoleManagementView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error removing role: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Er is een fout opgetreden bij het verwijderen van de rol.", ephemeral=True)
 
 
 async def setup(bot):
