@@ -89,30 +89,6 @@ class ConfigurationView(discord.ui.View):
         
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
-
-
-class BaseConfigView(discord.ui.View):
-    """Base class for configuration views."""
-    
-    def __init__(self, bot, user_id: int, visible: bool = True):
-        super().__init__(timeout=300)
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Check if user has permission to use this view."""
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
-            return False
-        return True
-    
-    @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary, row=4)
-    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Go back to main configuration menu."""
-        view = ConfigurationView(self.bot, self.user_id, self.visible)
-        embed = await self.create_main_embed()
-        await interaction.response.edit_message(embed=embed, view=view)
     
     async def create_main_embed(self):
         """Create the main configuration embed."""
@@ -144,6 +120,30 @@ class BaseConfigView(discord.ui.View):
         except Exception as e:
             self.bot.log.error(f"Error creating main embed: {e}", exc_info=True)
             raise
+
+
+class BaseConfigView(discord.ui.View):
+    """Base class for configuration views."""
+    
+    def __init__(self, bot, user_id: int, visible: bool = True):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Check if user has permission to use this view."""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            return False
+        return True
+    
+    @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary, row=4)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Go back to main configuration menu."""
+        view = ConfigurationView(self.bot, self.user_id, self.visible)
+        embed = await view.create_main_embed()
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class ServerConfigView(BaseConfigView):
