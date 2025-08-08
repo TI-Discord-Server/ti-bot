@@ -3,14 +3,22 @@ import random
 import string
 import asyncio
 import time
+import hashlib
+import imaplib
+import email
+import uuid
+import smtplib
 from typing import Dict, Optional
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui, Interaction
+from motor import motor_asyncio
 
 from utils.email_sender import send_email
-from env import ENCRYPTION_KEY  # Add this to your env.py and .env
+from env import ENCRYPTION_KEY, OLD_CONNECTION_STRING, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER
 from cryptography.fernet import Fernet
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@student\.hogent\.be$")
@@ -254,6 +262,284 @@ class Verification(commands.Cog):
             await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker kon niet gekickt worden.", ephemeral=True)
         else:
             await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
+
+    @app_commands.command(name="migrate_old_verification", description="Migreer van het oude verificatiesysteem (alleen voor ex-studenten)")
+    @app_commands.describe(old_email="Je oude HoGent e-mailadres dat je vroeger gebruikte")
+    async def migrate_old_verification(self, interaction: Interaction, old_email: str):
+        # Check if user is already verified in new system
+        existing_record = await self.bot.db.verifications.find_one({"user_id": interaction.user.id})
+        if existing_record:
+            await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
+            return
+
+        # Validate email format
+        if not EMAIL_REGEX.match(old_email):
+            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HoGent e-mailadres.", ephemeral=True)
+            return
+
+        # Check if old database connection is available
+        if not OLD_CONNECTION_STRING:
+            await interaction.response.send_message("❌ Migratie is momenteel niet beschikbaar.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # Connect to old database
+            old_client = motor_asyncio.AsyncIOMotorClient(OLD_CONNECTION_STRING)
+            old_db = old_client["TIBot"]
+            old_email_data = old_db["emailData"]
+
+            # Create hash of the provided email (same method as old system)
+            email_hash = hashlib.sha256(old_email.encode()).hexdigest()
+
+            # Check if this user was verified with this email in the old system
+            old_record = await old_email_data.find_one({"_id": interaction.user.id, "emailHash": email_hash})
+            
+            if not old_record:
+                await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
+                return
+
+            # Check if email bounces (indicating user is no longer a student)
+            bounce_result = await self._check_email_bounce(old_email)
+            
+            if bounce_result == "bounced":
+                # Email bounces - user is no longer a student, allow migration
+                fernet = Fernet(ENCRYPTION_KEY.encode())
+                encrypted_email = fernet.encrypt(old_email.encode()).decode()
+                
+                # Store in new system
+                await self.bot.db.verifications.insert_one({
+                    "user_id": interaction.user.id,
+                    "encrypted_email": encrypted_email
+                })
+                
+                await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
+                
+            elif bounce_result == "delivered" or bounce_result == "no_bounce_yet":
+                await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.", ephemeral=True)
+                
+            else:  # delayed, unknown, send_failed
+                await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.", ephemeral=True)
+
+        except Exception as e:
+            await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.", ephemeral=True)
+            print(f"Migration error: {e}")
+
+    async def _check_email_bounce(self, email_address: str) -> str:
+        """Check if an email bounces by sending a test email and monitoring for bounce responses"""
+        try:
+            # Generate unique test ID
+            test_id = str(uuid.uuid4())[:8]
+            
+            # Send test email
+            if not await self._send_test_email(email_address, test_id):
+                return "send_failed"
+            
+            # Wait and check for bounces
+            result = await self._monitor_bounces({test_id: email_address}, wait_minutes=5)
+            return result.get(email_address, "unknown")
+            
+        except Exception as e:
+            print(f"Bounce check error: {e}")
+            return "unknown"
+
+    async def _send_test_email(self, recipient: str, test_id: str) -> bool:
+        """Send a minimal test email with unique identifier"""
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = SMTP_EMAIL
+            msg['To'] = recipient
+            msg['Subject'] = f'Email verification test - {test_id}'
+            msg['Message-ID'] = f'<{test_id}@verification.test>'
+
+            body = f"""This is an automated email verification test.
+
+If you received this by mistake, please ignore it.
+Test ID: {test_id}
+
+This test helps verify email deliverability without requiring any action from you."""
+
+            msg.attach(MIMEText(body, 'plain'))
+
+            with smtplib.SMTP(SMTP_SERVER, 587) as server:
+                server.starttls()
+                server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                server.send_message(msg)
+
+            return True
+
+        except Exception as e:
+            print(f"Failed to send test email to {recipient}: {e}")
+            return False
+
+    async def _monitor_bounces(self, test_ids: dict, wait_minutes: int = 5) -> dict:
+        """Monitor for bounce responses using IMAP"""
+        results = {email_addr: "no_bounce_yet" for email_addr in test_ids.values()}
+        deadline = time.time() + wait_minutes * 60
+        poll_interval = 30  # seconds
+
+        # Determine IMAP server
+        if 'gmail' in SMTP_SERVER.lower():
+            imap_host = "imap.gmail.com"
+        elif 'outlook' in SMTP_SERVER.lower() or 'office365' in SMTP_SERVER.lower():
+            imap_host = "outlook.office365.com"
+        else:
+            imap_host = SMTP_SERVER.replace('smtp', 'imap')
+
+        while time.time() < deadline and any(v == "no_bounce_yet" for v in results.values()):
+            try:
+                with imaplib.IMAP4_SSL(imap_host) as imap:
+                    imap.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    imap.select("INBOX")
+
+                    # Search recent messages
+                    since_str = time.strftime("%d-%b-%Y", time.gmtime(time.time() - 86400))
+                    typ, data = imap.search(None, 'SINCE', since_str)
+
+                    if typ == 'OK' and data[0]:
+                        for num in data[0].split():
+                            typ2, msgdata = imap.fetch(num, '(RFC822)')
+                            if typ2 != 'OK' or not msgdata or not msgdata[0]:
+                                continue
+
+                            msg = email.message_from_bytes(msgdata[0][1])
+
+                            if not self._looks_like_dsn(msg):
+                                continue
+
+                            match = self._message_matches_test(msg, test_ids)
+                            if not match:
+                                continue
+
+                            email_addr, matched_test_id = match
+                            if results[email_addr] != "no_bounce_yet":
+                                continue
+
+                            # Parse DSN status
+                            dsn_info = self._extract_dsn_status(msg)
+                            if dsn_info:
+                                results[email_addr] = self._classify_from_dsn(dsn_info)
+                            else:
+                                # Fallback text analysis
+                                all_text = (msg.get('Subject', '') + " " + str(msg)).lower()
+                                if "5.1.1" in all_text or "user unknown" in all_text or "recipient not found" in all_text:
+                                    results[email_addr] = "bounced"
+                                elif "4." in all_text or "temporar" in all_text:
+                                    results[email_addr] = "delayed"
+                                else:
+                                    results[email_addr] = "unknown"
+
+                    imap.logout()
+            except Exception as e:
+                print(f"Error checking bounces: {e}")
+
+            await asyncio.sleep(poll_interval)
+
+        return results
+
+    def _looks_like_dsn(self, msg) -> bool:
+        """Check if message looks like a delivery status notification"""
+        rp = (msg.get('Return-Path') or "").strip()
+        ctype = (msg.get_content_type() or "").lower()
+        ctype_full = (msg.get('Content-Type') or "").lower()
+
+        # RFC-compliant DSN markers
+        if rp == "<>" and ctype == "multipart/report" and "report-type=delivery-status" in ctype_full:
+            return True
+
+        # Heuristic fallback for non-compliant DSNs
+        subj = (msg.get('Subject') or "").lower()
+        bounce_hints = ["undeliverable", "delivery status notification", "mail delivery failed",
+                        "message not delivered", "delivery failure", "undelivered mail returned to sender"]
+        if any(h in subj for h in bounce_hints):
+            return True
+
+        if (msg.get('Auto-Submitted') or "").lower().startswith("auto-"):
+            return True
+
+        return False
+
+    def _extract_dsn_status(self, msg):
+        """Extract DSN status information from message/delivery-status part"""
+        if not msg.is_multipart():
+            return None
+
+        for part in msg.walk():
+            if part.get_content_type() == "message/delivery-status":
+                try:
+                    payload = part.get_payload()
+                    blocks = payload if isinstance(payload, list) else [part]
+
+                    for blk in blocks:
+                        text = blk.as_string()
+                        action = re.search(r'(?im)^Action:\s*([^\r\n]+)', text)
+                        status = re.search(r'(?im)^Status:\s*([0-9]\.[0-9]\.[0-9])', text)
+                        diag = re.search(r'(?im)^Diagnostic-Code:\s*([^\r\n]+)', text)
+                        recip = re.search(r'(?im)^Final-Recipient:\s*rfc822;\s*([^\r\n\s]+)', text)
+
+                        if action or status or diag or recip:
+                            return {
+                                "action": (action.group(1).strip().lower() if action else None),
+                                "status": (status.group(1).strip() if status else None),
+                                "diagnostic": (diag.group(1).strip() if diag else None),
+                                "final_recipient": (recip.group(1).strip() if recip else None),
+                            }
+                except Exception:
+                    pass
+        return None
+
+    def _message_matches_test(self, msg, test_id_to_email: dict):
+        """Match received message to one of our sent tests"""
+        subject = msg.get('Subject', '')
+
+        # Get body text
+        body_text = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == "text/plain":
+                    try:
+                        body_text += part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    except Exception:
+                        pass
+        else:
+            try:
+                body_text = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+            except Exception:
+                pass
+
+        text = (subject + "\n" + body_text)
+
+        # Match via test_id token
+        for test_id, email_addr in test_id_to_email.items():
+            if test_id in text:
+                return (email_addr, test_id)
+
+        # If DSN, try to pull Final-Recipient
+        dsn = self._extract_dsn_status(msg)
+        if dsn and dsn.get("final_recipient"):
+            for test_id, email_addr in test_id_to_email.items():
+                if dsn["final_recipient"].lower() == email_addr.lower():
+                    return (email_addr, test_id)
+
+        # Heuristic: look for any of the emails in message
+        for test_id, email_addr in test_id_to_email.items():
+            if email_addr.lower() in text.lower():
+                return (email_addr, test_id)
+
+        return None
+
+    def _classify_from_dsn(self, dsn_info):
+        """Classify bounce type from DSN information"""
+        action = (dsn_info.get("action") or "").lower()
+        status = (dsn_info.get("status") or "")
+        if action == "failed" or status.startswith("5."):
+            return "bounced"
+        if action == "delayed" or status.startswith("4."):
+            return "delayed"
+        if action in ("delivered", "relayed", "expanded"):
+            return "delivered"
+        return "unknown"
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
