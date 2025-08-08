@@ -107,11 +107,15 @@ class Modmail(commands.Cog, name="modmail"):
             modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
             await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
         except Exception as e:
-            # If something goes wrong, try to send a followup (channel might still exist)
+            # Log the error for debugging
+            self.bot.log.error(f"Error closing thread: {str(e)}")
+            # Try to send a followup if the channel still exists
             try:
-                await interaction.followup.send(f"❌ Fout bij sluiten van ticket: {str(e)}", ephemeral=True)
+                if interaction.channel and not interaction.channel.is_closed():
+                    await interaction.followup.send(f"❌ Fout bij sluiten van ticket: {str(e)}", ephemeral=True)
             except:
-                # Channel was probably deleted, which is expected
+                # Channel was probably deleted during close operation, which is expected
+                # This is normal behavior when closing tickets
                 pass
 
     @command(name="generate_transcript", description="Maakt een transcript en stuurt het naar het log kanaal")

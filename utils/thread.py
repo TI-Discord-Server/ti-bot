@@ -1010,7 +1010,7 @@ class ThreadManager:
         self.cache = {}
 
     async def populate_cache(self) -> None:
-        for channel in self.bot.modmail_guild.text_channels:
+        for channel in self.bot.guild.text_channels:
             await self.find(channel=channel)
 
     def __len__(self):
