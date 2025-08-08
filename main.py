@@ -4,6 +4,7 @@ import contextlib
 import datetime
 import logging
 import os
+import signal
 import sys
 import traceback
 import typing
@@ -237,19 +238,35 @@ class Bot(commands.Bot):
         self.__started = False
         self.owner_ids: frozenset[int] = frozenset()  # Will be loaded from database
         self._guild_id: typing.Optional[int] = None  # Cached guild ID
+        self._shutdown_event = asyncio.Event()
 
         self.tree.error(self.on_application_command_error)
 
         # fix: we don't use self.run() as it uses asyncio.run, which replaces our event loop created above.
         #      as a result, we can't make aiohttp requests with self.session because requests are technically made
         #      between two different event loops, and it doesn't like that :(
+        
+        # Set up signal handlers for graceful shutdown
+        def signal_handler():
+            self.log.info("Received SIGTERM, initiating graceful shutdown...")
+            loop.create_task(self.graceful_shutdown())
+        
+        # Register signal handlers (SIGTERM for Kubernetes, SIGINT for Ctrl+C)
+        if hasattr(signal, 'SIGTERM'):
+            loop.add_signal_handler(signal.SIGTERM, signal_handler)
+        if hasattr(signal, 'SIGINT'):
+            loop.add_signal_handler(signal.SIGINT, signal_handler)
+        
         loop.run_until_complete(self.__init())
 
     async def __init(self):
         async with self:
             try:
+                # Start the bot
                 await self.start(self.token, reconnect=True)
             except KeyboardInterrupt:
+                self.log.info("Received KeyboardInterrupt, shutting down...")
+                await self.graceful_shutdown()
                 return
 
     async def __load_cogs(self) -> None:
@@ -734,6 +751,40 @@ class Bot(commands.Bot):
             await asyncio.sleep(1)
             sys.exit(1)
 
+    async def graceful_shutdown(self):
+        """Gracefully shutdown the bot and close all connections."""
+        self.log.info("Received shutdown signal, starting graceful shutdown...")
+        
+        try:
+            # Set shutdown event to signal other tasks
+            self._shutdown_event.set()
+            
+            # Close health check server
+            if hasattr(self, 'site') and self.site:
+                await asyncio.wait_for(self.site.stop(), timeout=5.0)
+                self.log.info("Health check server stopped")
+            
+            # Close aiohttp session
+            if hasattr(self, 'session') and self.session and not self.session.closed:
+                await asyncio.wait_for(self.session.close(), timeout=5.0)
+                self.log.info("HTTP session closed")
+            
+            # Close database connection
+            if hasattr(self, 'db') and self.db:
+                self.db.client.close()
+                self.log.info("Database connection closed")
+            
+            # Close Discord connection
+            await asyncio.wait_for(self.close(), timeout=10.0)
+            self.log.info("Discord connection closed")
+            
+        except asyncio.TimeoutError:
+            self.log.warning("Graceful shutdown timed out, forcing exit")
+        except Exception as e:
+            self.log.error(f"Error during graceful shutdown: {e}")
+        
+        self.log.info("Graceful shutdown completed")
+
     async def setup_health_check(self):
         async def health_handler(request):
             data = {
@@ -755,5 +806,16 @@ class Bot(commands.Bot):
         self.log.info("Health check endpoint started on http://0.0.0.0:3000/health")
 
 
+def main():
+    """Main entry point for the bot."""
+    try:
+        bot = Bot()
+    except KeyboardInterrupt:
+        print("Bot startup interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Failed to start bot: {e}")
+        sys.exit(1)
+
 if __name__ == "__main__":
-    Bot()
+    main()
