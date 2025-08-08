@@ -3,8 +3,5 @@ WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt
 
-# Define build argument for TLS (default is disabled)
-ARG ENABLE_TLS=false
-
 # Set the entrypoint based on the TLS argument
-ENTRYPOINT [ "sh", "-c", "if [ \"$ENABLE_TLS\" = \"true\" ]; then python /app/main.py --tls; else python /app/main.py; fi" ]
+ENTRYPOINT [ "python3", "/app/main.py --tls=$TLSENABLED" ]
