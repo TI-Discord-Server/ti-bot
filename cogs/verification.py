@@ -169,7 +169,7 @@ class MigrationView(ui.View):
 
 class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
     old_email = ui.TextInput(
-        label="Je oude HoGent e-mailadres",
+        label="Je oude HOGENT e-mailadres",
         placeholder="voorbeeld@student.hogent.be",
         required=True
     )
@@ -190,7 +190,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
 
         # Validate email format
         if not EMAIL_REGEX.match(old_email):
-            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HoGent e-mailadres.", ephemeral=True)
+            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
         # Check if old database connection is available
@@ -275,15 +275,15 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             msg = MIMEMultipart()
             msg['From'] = SMTP_EMAIL
             msg['To'] = recipient
-            msg['Subject'] = f'Email verification test - {test_id}'
+            msg['Subject'] = f'E-mail verificatie test - {test_id}'
             msg['Message-ID'] = f'<{test_id}@verification.test>'
 
-            body = f"""This is an automated email verification test.
+            body = f"""Dit is een geautomatiseerde e-mail verificatie test.
 
-If you received this by mistake, please ignore it.
+Als je deze e-mail per ongeluk hebt ontvangen, kun je deze negeren.
 Test ID: {test_id}
 
-This test helps verify email deliverability without requiring any action from you."""
+Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je actie hoeft te ondernemen."""
 
             msg.attach(MIMEText(body, 'plain'))
 
