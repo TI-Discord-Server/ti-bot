@@ -2,6 +2,10 @@
 thread by modmail-dev
 Source:
 https://github.com/modmail-dev/Modmail/blob/master/core/thread.py
+
+Note: "Thread" in this context refers to a modmail conversation thread,
+which is implemented using Discord channels (not Discord's thread feature).
+Each modmail conversation creates a dedicated Discord channel.
 """
 import asyncio
 import base64
@@ -1063,7 +1067,12 @@ class ThreadManager:
                     not thread.channel or not self.bot.get_channel(thread.channel.id)
                 ):
                     self.bot.log.warning("Found existing thread for %s but the channel is invalid.", recipient_id)
-                    await thread.close(closer=self.bot.user, silent=True, delete_channel=False)
+                    # Just remove from cache and set cancelled, don't try to close invalid channel
+                    thread.cancelled = True
+                    try:
+                        self.cache.pop(thread.id, None)
+                    except KeyError:
+                        pass
                     thread = None
         else:
 
