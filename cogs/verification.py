@@ -57,15 +57,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         all_records = self.bot.db.verifications.find({})
         async for record in all_records:
             try:
-                # Handle both old format (plaintext email) and new format (encrypted email)
-                if 'encrypted_email' in record:
-                    decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-                elif 'email' in record:
-                    # Old format - plaintext email
-                    decrypted_email = record['email']
-                else:
-                    continue
-                    
+                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
                 if decrypted_email == email:
                     await interaction.response.send_message(
                         "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
@@ -161,16 +153,7 @@ class Verification(commands.Cog):
             return
 
         try:
-            # Handle both old format (plaintext email) and new format (encrypted email)
-            if 'encrypted_email' in record:
-                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-            elif 'email' in record:
-                # Old format - plaintext email
-                decrypted_email = record['email']
-            else:
-                await interaction.response.send_message("❌ Geen geldig e-mailadres gevonden voor deze gebruiker.", ephemeral=True)
-                return
-                
+            decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
             await interaction.response.send_message(f"E-mailadres: {decrypted_email}", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
@@ -188,15 +171,7 @@ class Verification(commands.Cog):
         all_records = self.bot.db.verifications.find({})
         async for r in all_records:
             try:
-                # Handle both old format (plaintext email) and new format (encrypted email)
-                if 'encrypted_email' in r:
-                    decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
-                elif 'email' in r:
-                    # Old format - plaintext email
-                    decrypted_email = r['email']
-                else:
-                    continue
-                    
+                decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
                 if decrypted_email == email:
                     record = r
                     break
@@ -222,45 +197,6 @@ class Verification(commands.Cog):
             except Exception:
                 pass
         await interaction.response.send_message("✅ Gebruiker verwijderd en verificatie ingetrokken.", ephemeral=True)
-
-    @app_commands.command(name="migrate_emails", description="Migreer plaintext emails naar encrypted format (Moderator only)")
-    async def migrate_emails(self, interaction: Interaction):
-        # Only moderators
-        if not any(role.name == "Moderator" for role in interaction.user.roles):
-            await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-        
-        migrated_count = 0
-        error_count = 0
-        
-        # Find all records with plaintext emails
-        all_records = self.bot.db.verifications.find({"email": {"$exists": True}})
-        async for record in all_records:
-            try:
-                # Encrypt the plaintext email
-                encrypted_email = fernet.encrypt(record['email'].encode()).decode()
-                
-                # Update the record to use encrypted_email and remove plaintext email
-                await self.bot.db.verifications.update_one(
-                    {"_id": record["_id"]},
-                    {
-                        "$set": {"encrypted_email": encrypted_email},
-                        "$unset": {"email": "", "encrypted_id": ""}  # Remove old fields
-                    }
-                )
-                migrated_count += 1
-            except Exception as e:
-                error_count += 1
-                self.bot.log.error(f"Failed to migrate record {record.get('_id')}: {e}")
-        
-        await interaction.followup.send(
-            f"✅ Migratie voltooid!\n"
-            f"Gemigreerd: {migrated_count} records\n"
-            f"Fouten: {error_count} records",
-            ephemeral=True
-        )
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
