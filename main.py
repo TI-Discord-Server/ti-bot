@@ -632,8 +632,6 @@ class Bot(commands.Bot):
                     await respond(":hourglass: | Try again later!", ephemeral=True)
 
                 return
-
-                return
             elif isinstance(error.original, aiohttp.ClientOSError):
                 with contextlib.suppress(Exception):
                     await respond(":x: | An unknown error occurred!", ephemeral=True)
