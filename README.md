@@ -50,6 +50,7 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` a
 - `SMTP_EMAIL`: Het e-mailadres dat gebruikt wordt voor het versturen van verificatie-e-mails
 - `SMTP_SERVER`: De SMTP-server voor het versturen van e-mails (bijv. smtp.gmail.com)
 - `ENCRYPTION_KEY`: Een Fernet-encryptiesleutel voor het beveiligen van gevoelige gegevens
+- `OLD_CONNECTION_STRING`: MongoDB connection string voor oude database (optioneel, voor migratie van verificatiegegevens)
 
 **Voorbeeld (.env):**
 ```env
@@ -63,6 +64,7 @@ SMTP_PASSWORD='app_password_for_email' # App-specifiek wachtwoord voor e-mail
 SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
 SMTP_SERVER='smtp.gmail.com'
 ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.py script
+OLD_CONNECTION_STRING='mongodb://username:password@host:port/database' # Optioneel: voor migratie
 ```
 
 ### Fernet Encryptiesleutel Genereren
@@ -75,6 +77,20 @@ python3 generate_key.py
 ```
 
 Kopieer de gegenereerde sleutel naar je `.env` bestand als `ENCRYPTION_KEY='gegenereerde_sleutel'`.
+
+### Migratie van Oude Verificatiegegevens
+
+De bot ondersteunt migratie van verificatiegegevens uit een oude database. Dit is optioneel en alleen nodig als je gebruikers wilt migreren van een vorige versie van de bot.
+
+**Configuratie:**
+- Voeg `OLD_CONNECTION_STRING` toe aan je `.env` bestand met de MongoDB connection string van de oude database
+- De connection string moet het formaat hebben: `mongodb://username:password@host:port/database`
+- Als deze variabele niet is ingesteld, is de migratiefunctionaliteit uitgeschakeld
+
+**Gebruik:**
+- Gebruikers kunnen hun oude verificatie migreren via de verificatie-interface
+- Het systeem controleert automatisch op e-mail bounces en blokkeert migratie indien nodig
+- Gemigreerde gebruikers worden gemarkeerd in de database om dubbele migratie te voorkomen
 
 ### TLS Configuratie
 
