@@ -18,60 +18,20 @@ class Modmail(commands.Cog, name="modmail"):
         self.bot = bot
         self.db = bot.db
         self.settings_id = "modmail_settings"
-        self.modmail_category_id = 1344777249991426078
-        self.modmail_logs_channel_id = 1342592695540912199
 
     async def get_modmail_category_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
         if settings and "modmail_category_id" in settings:
             return settings["modmail_category_id"]
-        return self.modmail_category_id
+        return None
 
     async def get_modmail_logs_channel_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
         if settings and "modmail_channel_id" in settings:
             return settings["modmail_channel_id"]
-        return self.modmail_logs_channel_id
+        return None
 
-    @command(
-        name="set_modmail_settings",
-        description="Set modmail category and / or logs channel",
-    )
-    @has_admin()
-    async def set_modmail_settings(
-            self, interaction: discord.Interaction, category: discord.CategoryChannel = None, channel: discord.TextChannel = None
-    ):
-        if category is not None:
-            await self.db.settings.update_one(
-                {"_id": self.settings_id},
-                {"$set": {"modmail_category_id": category.id}},
-                upsert=True,
-            )
-            await interaction.response.send_message(
-                f"Modmail categorie is ingesteld op {category.mention}."
-            )
-        if channel is not None:
-            await self.db.settings.update_one(
-                {"_id": self.settings_id},
-                {"$set": {"modmail_channel_id": channel.id}},
-                upsert=True,
-            )
-            await interaction.response.send_message(
-                f"Modmail-logs kanaal is ingesteld op {channel.mention}."
-            )
 
-    @set_modmail_settings.error
-    async def set_modmail_settings_error(
-        self, interaction: discord.Interaction, error
-    ):
-        if isinstance(error, commands.CheckFailure):
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
-            )
 
     # @commands.command(usage="[after] [close message]")
     @command(name="close", description="Sluit het ticket")

@@ -11,14 +11,18 @@ class Reports(commands.Cog, name="reports"):
         self.bot = bot
         self.db = bot.db
         self.settings_id = "reports_settings"
-        self.moderator_role_id = 1342591576764977223  # Default moderator role ID
-        self.reports_channel_id = 1348653872767307816  # Default reports channel ID
 
     async def get_reports_channel_id(self):
         settings = await self.db.settings.find_one({"_id": self.settings_id})
         if settings and "reports_channel_id" in settings:
             return settings["reports_channel_id"]
-        return self.reports_channel_id  # Return default if not set in DB
+        return None
+
+    async def get_moderator_role_id(self):
+        settings = await self.db.settings.find_one({"_id": self.settings_id})
+        if settings and "moderator_role_id" in settings:
+            return settings["moderator_role_id"]
+        return None
 
     @command(name="report", description="Report a user or issue to the moderators.")
     @app_commands.describe(

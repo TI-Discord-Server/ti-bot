@@ -150,7 +150,13 @@ class Thread:
         # in case it creates a channel outside of category
         overwrites = {self.bot.guild.default_role: discord.PermissionOverwrite(read_messages=False)}
 
-        category = category or discord.utils.get(self.bot.guild.categories, id=int(1344777249991426078))
+        if category is None:
+            # Get modmail category from database
+            settings = await self.bot.db.settings.find_one({"_id": "modmail_settings"})
+            if settings and "modmail_category_id" in settings:
+                category = discord.utils.get(self.bot.guild.categories, id=settings["modmail_category_id"])
+            else:
+                self.bot.log.warning("No modmail category configured in database")
 
         if category is not None:
             overwrites = {}

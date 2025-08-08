@@ -10,11 +10,25 @@ class ConfessionCommands(commands.Cog):
         self.bot = bot
         self.tasks = ConfessionTasks(bot)
 
+    async def has_moderator_role(self, interaction: discord.Interaction) -> bool:
+        """Check if user has moderator role."""
+        settings = await self.bot.db.settings.find_one({"_id": "reports_settings"})
+        if not settings or "moderator_role_id" not in settings:
+            return interaction.user.guild_permissions.manage_guild
+        
+        moderator_role_id = settings["moderator_role_id"]
+        return any(role.id == moderator_role_id for role in interaction.user.roles)
+
     @app_commands.command(
         name="force_review", description="Force the review of confessions."
     )
-    @app_commands.checks.has_role(1342591576764977223)
     async def force_review(self, interaction: discord.Interaction):
+        if not await self.has_moderator_role(interaction):
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
+            )
+            return
+            
         await self.tasks.daily_review()
         await interaction.response.send_message(
             "Confession beoordeling is geforceerd.", ephemeral=True
@@ -26,8 +40,13 @@ class ConfessionCommands(commands.Cog):
     @app_commands.command(
         name="force_post", description="Forceer het posten van confessions."
     )
-    @app_commands.checks.has_role(1342591576764977223)
     async def force_post(self, interaction: discord.Interaction):
+        if not await self.has_moderator_role(interaction):
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
+            )
+            return
+            
         await interaction.response.send_message(
             "Forceren van confession posting...", ephemeral=True
         )
@@ -39,46 +58,7 @@ class ConfessionCommands(commands.Cog):
             f"{interaction.user} heeft handmatig een confession post getriggerd."
         )
 
-    @app_commands.command(
-        name="get_confession_settings",
-        description="Bekijk de huidige confession-instellingen (moderators only).",
-    )
-    @app_commands.checks.has_role(1342591576764977223)
-    async def get_confession_settings(self, interaction: discord.Interaction):
-        settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
 
-        if not settings:
-            await interaction.response.send_message(
-                "⚠️ Er zijn nog geen confession instellingen opgeslagen.", ephemeral=True
-            )
-            self.bot.log.warning(
-                "get_confession_settings werd opgevraagd, maar er zijn geen settings."
-            )
-            return
-
-        post_times = settings.get("post_times", [])
-        review_time = settings.get("review_time", "Niet ingesteld")
-        limit = settings.get("daily_review_limit", "Niet ingesteld")
-
-        embed = discord.Embed(
-            title="📋 Huidige Confession Instellingen", color=discord.Color.blurple()
-        )
-        embed.add_field(
-            name="📆 Review Tijd", value=f"`{review_time}` UTC", inline=False
-        )
-        embed.add_field(
-            name="🕒 Post Tijd(en)",
-            value=", ".join(f"`{t}`" for t in post_times) or "Geen tijden ingesteld",
-            inline=False,
-        )
-        embed.add_field(
-            name="📤 Aantal confessions per dag", value=f"`{limit}`", inline=False
-        )
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        self.bot.log.debug(
-            f"{interaction.user} heeft get_confession_settings opgevraagd."
-        )
 
 
 async def setup(bot):

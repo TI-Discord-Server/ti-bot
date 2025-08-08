@@ -7,12 +7,22 @@ from cogs.confessions.confession_view import ConfessionView
 class ConfessionTasks(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.review_channel_id = 1348669180840251465
-        self.public_channel_id = 1342592622224605345
         self.daily_review = None
         self.post_approved = None
 
         self.bot.loop.create_task(self.init_tasks())
+
+    async def get_review_channel_id(self):
+        settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
+        if settings and "review_channel_id" in settings:
+            return settings["review_channel_id"]
+        return None
+
+    async def get_public_channel_id(self):
+        settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
+        if settings and "public_channel_id" in settings:
+            return settings["public_channel_id"]
+        return None
 
     async def init_tasks(self):
         await self.update_review_schedule()
@@ -65,7 +75,12 @@ class ConfessionTasks(commands.Cog):
             settings["daily_review_limit"]
         )
 
-        review_channel = self.bot.get_channel(self.review_channel_id)
+        review_channel_id = await self.get_review_channel_id()
+        if not review_channel_id:
+            self.bot.log.error("Review kanaal ID niet geconfigureerd.")
+            return
+            
+        review_channel = self.bot.get_channel(review_channel_id)
         if not review_channel:
             self.bot.log.error("Reviewkanaal niet gevonden.")
             return
@@ -127,8 +142,15 @@ class ConfessionTasks(commands.Cog):
         await self.run_post_approved()
 
     async def run_post_approved(self):
-        review_channel = self.bot.get_channel(self.review_channel_id)
-        public_channel = self.bot.get_channel(self.public_channel_id)
+        review_channel_id = await self.get_review_channel_id()
+        public_channel_id = await self.get_public_channel_id()
+        
+        if not review_channel_id or not public_channel_id:
+            self.bot.log.error("Review of public kanaal ID niet geconfigureerd.")
+            return
+            
+        review_channel = self.bot.get_channel(review_channel_id)
+        public_channel = self.bot.get_channel(public_channel_id)
 
         if not review_channel or not public_channel:
             self.bot.log.error("Review- of public-channel niet gevonden.")

@@ -61,16 +61,7 @@ MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD)
 MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME)
 load_dotenv()
 
-DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS: Final[frozenset[int]] = frozenset(
-    [
-        123468845749895170,  # Quinten - @quintenvw
-        402102269509894144,  # Kobe - @k0be_
-        329293977494880257,  # Arthur - @arthurvg
-        925002667502239784,  # Jaak - @princessakina
-        337521371414396928,  # Warre - @warru
-        294146279456636929,  # Nyo - @itsnyoty
-    ]
-)
+# Developer IDs are now managed through the /configure command
 
 
 class Responder(Protocol):
@@ -244,9 +235,7 @@ class Bot(commands.Bot):
             )
 
         self.__started = False
-        self.owner_ids: frozenset[int] = (  # type: ignore
-            DEVELOPER_IDS__THIS_WILL_GIVE_OWNER_COG_PERMS
-        )
+        self.owner_ids: frozenset[int] = frozenset()  # Will be loaded from database
 
         self.tree.error(self.on_application_command_error)
 
@@ -275,6 +264,7 @@ class Bot(commands.Bot):
         await self.load_extension("cogs.confessions.confession_commands")
         await self.__load_cogs()
         await self.check_db_connection()
+        await self.load_developer_ids()
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
         # with contextlib.suppress(Exception):
@@ -304,16 +294,26 @@ class Bot(commands.Bot):
         """
         return discord.utils.get(self.guilds, id=self.guild_id)
 
+    async def get_guild_id(self) -> typing.Optional[int]:
+        """Get guild ID from database configuration."""
+        settings = await self.db.settings.find_one({"_id": "server_settings"})
+        if settings and "guild_id" in settings:
+            return settings["guild_id"]
+        return None
+
+    async def load_developer_ids(self):
+        """Load developer IDs from database configuration."""
+        settings = await self.db.settings.find_one({"_id": "server_settings"})
+        if settings and "developer_ids" in settings:
+            self.owner_ids = frozenset(settings["developer_ids"])
+            self.log.info(f"Loaded {len(self.owner_ids)} developer IDs from database")
+        else:
+            self.log.info("No developer IDs configured in database")
+
     @property
     def guild_id(self) -> typing.Optional[int]:
-        guild_id = 1334456602324897792
-        if guild_id is not None:
-            try:
-                return int(guild_id)
-            except ValueError:
-                self.log.error("Invalid GUILD_ID set.")
-        else:
-            self.log.info("No GUILD_ID set.")
+        """Synchronous property for backward compatibility."""
+        # This is a fallback - ideally use get_guild_id() for new code
         return None
 
     def get_guild_icon(
