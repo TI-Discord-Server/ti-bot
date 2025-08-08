@@ -536,20 +536,6 @@ class ModerationConfigView(BaseConfigView):
             timestamp=datetime.datetime.now()
         )
         
-        # Moderator ID (single user)
-        moderator_id = settings.get("moderator_id", "Niet ingesteld")
-        if moderator_id != "Niet ingesteld":
-            moderator = self.bot.get_user(moderator_id)
-            moderator_name = moderator.mention if moderator else f"Onbekende gebruiker ({moderator_id})"
-        else:
-            moderator_name = "Niet ingesteld"
-            
-        embed.add_field(
-            name="👤 Hoofd Moderator",
-            value=f"`{moderator_id}`\n**Gebruiker:** {moderator_name}",
-            inline=True
-        )
-        
         # Unban request settings
         unban_url = settings.get("unban_request_url", "Niet ingesteld")
         unban_channel_id = settings.get("unban_request_kanaal_id", "Niet ingesteld")
@@ -596,11 +582,7 @@ class ModerationConfigView(BaseConfigView):
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
     
-    @discord.ui.button(label="Hoofd Moderator", style=discord.ButtonStyle.primary, emoji="👤")
-    async def set_moderator(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set main moderator."""
-        modal = ModeratorIdModal(self.bot, self.user_id, self.visible)
-        await interaction.response.send_modal(modal)
+
     
     @discord.ui.button(label="Unban Instellingen", style=discord.ButtonStyle.primary, emoji="🔓")
     async def set_unban_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -953,40 +935,6 @@ class ConfessionTimesModal(discord.ui.Modal):
         except ValueError:
             await interaction.response.send_message("❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True)
 
-
-class ModeratorIdModal(discord.ui.Modal):
-    """Modal for setting moderator ID."""
-    
-    def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(title="Hoofd Moderator Instellen")
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-        self.moderator_id_input = discord.ui.TextInput(
-            label="Moderator Gebruiker ID",
-            placeholder="Voer de gebruiker ID van de hoofd moderator in...",
-            required=True,
-            max_length=20
-        )
-        self.add_item(self.moderator_id_input)
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            moderator_id = int(self.moderator_id_input.value)
-            
-            await self.bot.db.settings.update_one(
-                {"_id": "mod_settings"},
-                {"$set": {"moderator_id": moderator_id}},
-                upsert=True
-            )
-            
-            view = ModerationConfigView(self.bot, self.user_id, self.visible)
-            embed = await view.create_embed()
-            await interaction.response.edit_message(embed=embed, view=view)
-            
-        except ValueError:
-            await interaction.response.send_message("❌ Ongeldige gebruiker ID. Voer een geldig nummer in.", ephemeral=True)
 
 
 class UnbanSettingsModal(discord.ui.Modal):
