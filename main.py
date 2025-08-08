@@ -762,17 +762,17 @@ class Bot(commands.Bot):
             self.log.info("Discord connection closed - no new requests will be processed")
             
             # Close health check server
-            if hasattr(self, 'site') and self.site:
+            if hasattr(self, 'site') and self.site is not None:
                 await asyncio.wait_for(self.site.stop(), timeout=5.0)
                 self.log.info("Health check server stopped")
             
             # Close aiohttp session
-            if hasattr(self, 'session') and self.session and not self.session.closed:
+            if hasattr(self, 'session') and self.session is not None and not self.session.closed:
                 await asyncio.wait_for(self.session.close(), timeout=5.0)
                 self.log.info("HTTP session closed")
             
             # Close database connection
-            if hasattr(self, 'db') and self.db:
+            if hasattr(self, 'db') and self.db is not None:
                 self.db.client.close()
                 self.log.info("Database connection closed")
             
