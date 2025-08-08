@@ -276,6 +276,13 @@ class Bot(commands.Bot):
         if not self.__started:
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
+            
+            # Populate thread cache on startup
+            try:
+                await self.threads.populate_cache()
+                self.log.info("Thread cache populated successfully")
+            except Exception as e:
+                self.log.error(f"Failed to populate thread cache: {e}")
 
     @property
     def guild(self) -> typing.Optional[discord.Guild]:
