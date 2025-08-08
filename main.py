@@ -754,27 +754,51 @@ class Bot(commands.Bot):
         self.log.info("Received shutdown signal, starting graceful shutdown...")
         
         try:
-            # Set shutdown event to signal other tasks
+            # Step 1: Set shutdown event to mark health check as unhealthy
+            # This signals Kubernetes to stop routing traffic to this pod
             self._shutdown_event.set()
+            self.log.info("Health check marked as unhealthy - Kubernetes will stop routing traffic")
             
-            # Close Discord connection FIRST to stop accepting new requests
+            # Give Kubernetes a moment to detect unhealthy status and stop routing traffic
+            await asyncio.sleep(2.0)
+            
+            # Step 2: Close Discord connection to stop accepting new requests
             await asyncio.wait_for(self.close(), timeout=10.0)
             self.log.info("Discord connection closed - no new requests will be processed")
             
-            # Close health check server
-            if hasattr(self, 'site') and self.site is not None:
-                await asyncio.wait_for(self.site.stop(), timeout=5.0)
-                self.log.info("Health check server stopped")
+            # Step 3: Send shutdown progress logs (webhook logging still available)
+            self.log.info("Beginning final service cleanup...")
             
-            # Close aiohttp session
-            if hasattr(self, 'session') and self.session is not None and not self.session.closed:
-                await asyncio.wait_for(self.session.close(), timeout=5.0)
-                self.log.info("HTTP session closed")
-            
+            # Step 4: Close other services (but keep webhook logging available)
             # Close database connection
             if hasattr(self, 'db') and self.db is not None:
                 self.db.client.close()
                 self.log.info("Database connection closed")
+            
+            # Close bot's main aiohttp session (webhook handler has its own session)
+            if hasattr(self, 'session') and self.session is not None and not self.session.closed:
+                await asyncio.wait_for(self.session.close(), timeout=5.0)
+                self.log.info("Bot HTTP session closed")
+            
+            # Send final log message before closing webhook sessions
+            self.log.info("All services closed - shutting down webhook logging...")
+            
+            # Give time for final webhook logs to be sent
+            await asyncio.sleep(2.0)
+            
+            # Close webhook handler sessions
+            for handler in self.log.handlers:
+                if isinstance(handler, DiscordWebhookHandler):
+                    try:
+                        await handler.close()
+                        self.log.info("Webhook handler session closed")
+                    except Exception as e:
+                        print(f"Error closing webhook handler: {e}")  # Use print since logging might not work
+            
+            # Step 6: Finally close health check server completely
+            if hasattr(self, 'site') and self.site is not None:
+                await asyncio.wait_for(self.site.stop(), timeout=5.0)
+                self.log.info("Health check server stopped completely")
             
         except asyncio.TimeoutError:
             self.log.warning("Graceful shutdown timed out, forcing exit")
