@@ -330,6 +330,7 @@ class Bot(commands.Bot):
         await self.__load_cogs()
         await self.check_db_connection()
         await self.load_developer_ids()
+        await self.setup_health_check()
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
         # with contextlib.suppress(Exception):
@@ -338,7 +339,6 @@ class Bot(commands.Bot):
 
     async def on_ready(self) -> None:
         self.log.info("Ready called")
-        await self.setup_health_check()
 
         if not self.__started:
             self.__started = True
@@ -856,12 +856,16 @@ class Bot(commands.Bot):
 
     async def setup_health_check(self):
         async def health_handler(request):
+            is_ready = self.is_ready()
             data = {
-                "discord_connection": "connected" if self.is_ready() else "disconnected",
-                "discord_heartbeat_latency": f"{round(self.latency * 1000)} ms",
+                "status": "healthy" if is_ready else "starting",
+                "discord_connection": "connected" if is_ready else "disconnected",
+                "discord_heartbeat_latency": f"{round(self.latency * 1000)} ms" if is_ready else "N/A",
                 "uptime": str(datetime.datetime.now() - self.uptime)
             }
-            return web.json_response(data)
+            # Return 200 for healthy, 503 for starting (Kubernetes will wait for 200)
+            status_code = 200 if is_ready else 503
+            return web.json_response(data, status=status_code)
 
         app = web.Application()
         app.router.add_get('/health', health_handler)
@@ -870,7 +874,6 @@ class Bot(commands.Bot):
         await runner.setup()
         self.site = web.TCPSite(runner, '0.0.0.0', 3000)
 
-        await self.wait_until_ready()
         await self.site.start()
         self.log.info("Health check endpoint started on http://0.0.0.0:3000/health")
 

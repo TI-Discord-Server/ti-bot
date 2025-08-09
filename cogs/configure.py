@@ -93,14 +93,12 @@ class ConfigurationView(discord.ui.View):
     async def create_main_embed(self):
         """Create the main configuration embed."""
         try:
-            self.bot.log.debug("Creating main configuration embed...")
             embed = discord.Embed(
                 title="🔧 Bot Configuratie",
                 description="Selecteer een categorie om de instellingen te bekijken en aan te passen.",
                 color=discord.Color.blue(),
                 timestamp=datetime.datetime.now()
             )
-            self.bot.log.debug("Embed created, adding fields...")
             embed.add_field(
                 name="📋 Beschikbare Categorieën",
                 value=(
@@ -115,7 +113,6 @@ class ConfigurationView(discord.ui.View):
                 inline=False
             )
             embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
-            self.bot.log.debug("Main embed created successfully")
             return embed
         except Exception as e:
             self.bot.log.error(f"Error creating main embed: {e}", exc_info=True)
@@ -152,9 +149,7 @@ class ServerConfigView(BaseConfigView):
     async def create_embed(self):
         """Create server configuration embed."""
         try:
-            self.bot.log.debug("Creating server configuration embed...")
             settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
-            self.bot.log.debug(f"Retrieved server settings: {settings}")
             
             embed = discord.Embed(
                 title="🏠 Server Instellingen",
@@ -164,10 +159,8 @@ class ServerConfigView(BaseConfigView):
             )
             
             # Show current guild (auto-detected or configured)
-            self.bot.log.debug("Getting current guild info...")
             current_guild = self.bot.guild
             configured_guild_id = settings.get("guild_id", None)
-            self.bot.log.debug(f"Current guild: {current_guild}, Configured guild_id: {configured_guild_id}")
             
             if current_guild:
                 if configured_guild_id:
@@ -185,7 +178,6 @@ class ServerConfigView(BaseConfigView):
                 value=guild_status,
                 inline=False
             )
-            self.bot.log.debug("Added guild status field")
             
             # Show multi-guild info if applicable
             if len(self.bot.guilds) > 1:
@@ -194,10 +186,8 @@ class ServerConfigView(BaseConfigView):
                     value=f"Bot is in {len(self.bot.guilds)} servers. Configureer een specifieke server ID als de auto-detectie niet correct is.",
                     inline=False
                 )
-                self.bot.log.debug("Added multi-guild info field")
             
             # Developer IDs
-            self.bot.log.debug("Processing developer IDs...")
             dev_ids = settings.get("developer_ids", [])
             if dev_ids:
                 dev_mentions = []
@@ -219,10 +209,8 @@ class ServerConfigView(BaseConfigView):
                 value=dev_text,
                 inline=False
             )
-            self.bot.log.debug("Added developer IDs field")
             
             # Webhook logging format
-            self.bot.log.debug("Processing webhook logging format...")
             webhook_format = settings.get("webhook_log_format", "embed")
             format_emoji = "📋" if webhook_format == "embed" else "📝"
             format_description = "Rich embeds met kleuren en velden" if webhook_format == "embed" else "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format"
@@ -232,10 +220,8 @@ class ServerConfigView(BaseConfigView):
                 value=f"**Huidige modus:** {webhook_format.title()}\n{format_description}",
                 inline=False
             )
-            self.bot.log.debug("Added webhook logging format field")
             
             embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
-            self.bot.log.debug("Server configuration embed created successfully")
             return embed
             
         except Exception as e:
@@ -1186,18 +1172,9 @@ class Configure(commands.Cog):
             
             # Defer the response immediately to prevent timeout
             await interaction.response.defer(ephemeral=not visible)
-            self.bot.log.debug("Response deferred")
             
-            self.bot.log.debug(f"Bot guild_id: {getattr(self.bot, 'guild_id', 'NOT_SET')}")
-            self.bot.log.debug(f"Bot guild: {getattr(self.bot, 'guild', 'NOT_SET')}")
-            
-            self.bot.log.debug("Creating ConfigurationView...")
             view = ConfigurationView(self.bot, interaction.user.id, visible)
-            
-            self.bot.log.debug("Creating main embed...")
             embed = await view.create_main_embed()
-            
-            self.bot.log.debug("Sending followup...")
             await interaction.followup.send(embed=embed, view=view, ephemeral=not visible)
             self.bot.log.info("Configure command completed successfully")
             
