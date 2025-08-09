@@ -16,6 +16,7 @@ SMTP_EMAIL: Final[str] = cast(str, getenv("SMTP_EMAIL", "toegepasteinformaticadi
 SMTP_SERVER: Final[str] = cast(str, getenv("SMTP_SERVER", "smtp.gmail.com"))
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
+POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
 
 
 __all__: Final[Tuple[str, ...]] = (
@@ -30,4 +31,5 @@ __all__: Final[Tuple[str, ...]] = (
     "SMTP_SERVER",
     "ENCRYPTION_KEY",
     "OLD_CONNECTION_STRING",
+    "POD_UID",
 )

@@ -30,6 +30,7 @@ from env import (
     MONGODB_PORT,
     MONGODB_USERNAME,
     WEBHOOK_URL,
+    POD_UID,
 )
 from utils.errors import (
     ForbiddenAction,
@@ -63,6 +64,21 @@ MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME)
 load_dotenv()
 
 # Developer IDs are now managed through the /configure command
+
+
+class PodUidFormatter(logging.Formatter):
+    """Custom formatter that adds POD_UID prefix to log messages when available."""
+    
+    def format(self, record):
+        # Get the original formatted message
+        original_message = super().format(record)
+        
+        # Add POD_UID prefix if available (first 5 characters only)
+        if POD_UID:
+            pod_prefix = f"[{POD_UID[:5]}] "
+            return pod_prefix + original_message
+        
+        return original_message
 
 
 class Responder(Protocol):
@@ -104,6 +120,11 @@ class DiscordWebhookHandler(logging.Handler):
         try:
             webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
             msg = self.format(record)
+            
+            # Add POD_UID prefix if available (first 5 characters only)
+            if POD_UID:
+                pod_prefix = f"[{POD_UID[:5]}] "
+                msg = pod_prefix + msg
             
             # Get the current webhook format setting
             format_type = await self._get_webhook_format()
@@ -216,32 +237,37 @@ class Bot(commands.Bot):
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
         bot_log.setLevel(logging.INFO)
-        bot_log.addHandler(
-            RotatingFileHandler(
-                "bot.log",
-                encoding="utf-8",
-                mode="a",
-                maxBytes=1024 * 1024,
-                backupCount=1,
-            )
+        
+        # Create file handler with custom formatter
+        file_handler = RotatingFileHandler(
+            "bot.log",
+            encoding="utf-8",
+            mode="a",
+            maxBytes=1024 * 1024,
+            backupCount=1,
         )
+        file_handler.setFormatter(PodUidFormatter())
+        bot_log.addHandler(file_handler)
 
         self.log = bot_log
 
         discord_log = logging.getLogger("discord")
         discord_log.setLevel(logging.WARNING)
-        discord_log.addHandler(
-            RotatingFileHandler(
-                "bot.log",
-                encoding="utf-8",
-                mode="a",
-                maxBytes=1024 * 1024,
-                backupCount=1,
-            )
+        
+        # Create file handler with custom formatter for discord logs
+        discord_file_handler = RotatingFileHandler(
+            "bot.log",
+            encoding="utf-8",
+            mode="a",
+            maxBytes=1024 * 1024,
+            backupCount=1,
         )
+        discord_file_handler.setFormatter(PodUidFormatter())
+        discord_log.addHandler(discord_file_handler)
 
         # Add a console handler to log to the console as well.
         console_handler = logging.StreamHandler()
+        console_handler.setFormatter(PodUidFormatter())
         bot_log.addHandler(console_handler)
         discord_log.addHandler(console_handler)
 
