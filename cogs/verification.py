@@ -18,7 +18,7 @@ from discord import app_commands, ui, Interaction
 from motor import motor_asyncio
 
 from utils.email_sender import send_email
-from env import ENCRYPTION_KEY, OLD_CONNECTION_STRING, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER
+from env import ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER
 from cryptography.fernet import Fernet
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@student\.hogent\.be$")
@@ -193,24 +193,15 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
-        # Check if old database connection is available
-        if not OLD_CONNECTION_STRING:
-            await interaction.response.send_message("❌ Migratie is momenteel niet beschikbaar.", ephemeral=True)
-            return
-
         await interaction.response.defer(ephemeral=True)
 
         try:
-            # Connect to old database
-            old_client = motor_asyncio.AsyncIOMotorClient(OLD_CONNECTION_STRING)
-            old_db = old_client["TIBot"]
-            old_email_data = old_db["emailData"]
-
             # Create hash of the provided email (same method as old system)
             email_hash = hashlib.sha256(old_email.encode()).hexdigest()
 
-            # Check if this user was verified with this email in the old system
-            old_record = await old_email_data.find_one({"_id": user_id, "emailHash": email_hash})
+            # Check if this user was verified with this email in the old system (using migrated data)
+            old_emails_collection = self.bot.db["oldEmails"]
+            old_record = await old_emails_collection.find_one({"user_id": user_id, "email_hash": email_hash})
             
             if not old_record:
                 await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
