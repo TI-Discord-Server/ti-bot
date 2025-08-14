@@ -18,7 +18,7 @@ from discord import app_commands, ui, Interaction
 from motor import motor_asyncio
 
 from utils.email_sender import send_email
-from env import ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER
+from env import ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT
 from cryptography.fernet import Fernet
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@student\.hogent\.be$")
@@ -278,10 +278,16 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
 
             msg.attach(MIMEText(body, 'plain'))
 
-            with smtplib.SMTP(SMTP_SERVER, 587) as server:
-                server.starttls()
-                server.login(SMTP_EMAIL, SMTP_PASSWORD)
-                server.send_message(msg)
+            # Use SSL if port 465, otherwise use STARTTLS
+            if SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+                    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                    server.starttls()
+                    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    server.send_message(msg)
 
             return True
 
@@ -295,17 +301,13 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
         deadline = time.time() + wait_minutes * 60
         poll_interval = 30  # seconds
 
-        # Determine IMAP server
-        if 'gmail' in SMTP_SERVER.lower():
-            imap_host = "imap.gmail.com"
-        elif 'outlook' in SMTP_SERVER.lower() or 'office365' in SMTP_SERVER.lower():
-            imap_host = "outlook.office365.com"
-        else:
-            imap_host = SMTP_SERVER.replace('smtp', 'imap')
+        # Use configured IMAP server and port
+        imap_host = IMAP_SERVER
+        imap_port = IMAP_PORT
 
         while time.time() < deadline and any(v == "no_bounce_yet" for v in results.values()):
             try:
-                with imaplib.IMAP4_SSL(imap_host) as imap:
+                with imaplib.IMAP4_SSL(imap_host, imap_port) as imap:
                     imap.login(SMTP_EMAIL, SMTP_PASSWORD)
                     imap.select("INBOX")
 

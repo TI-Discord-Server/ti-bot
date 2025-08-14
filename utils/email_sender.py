@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 
-from env import (SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER)
+from env import (SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT)
 
 def send_email(
     to_addresses: List[str],
@@ -36,10 +36,16 @@ def send_email(
         msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, 587) as server:
-            server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.sendmail(msg["From"], to_addresses, msg.as_string())
+        # Use SSL if port 465, otherwise use STARTTLS
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+                server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                server.sendmail(msg["From"], to_addresses, msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                server.sendmail(msg["From"], to_addresses, msg.as_string())
     except Exception as e:
         # You can add logging here if desired
         raise Exception(f"Failed to send email: {e}")

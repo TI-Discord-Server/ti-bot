@@ -14,6 +14,9 @@ WEBHOOK_URL: Final[str] = cast(str, getenv("WEBHOOK_URL"))
 SMTP_PASSWORD: Final[str] = cast(str, getenv("SMTP_PASSWORD", ""))
 SMTP_EMAIL: Final[str] = cast(str, getenv("SMTP_EMAIL", "toegepasteinformaticadiscord@gmail.com"))
 SMTP_SERVER: Final[str] = cast(str, getenv("SMTP_SERVER", "smtp.gmail.com"))
+SMTP_PORT: Final[int] = int(cast(str, getenv("SMTP_PORT", "587")))
+IMAP_SERVER: Final[str] = cast(str, getenv("IMAP_SERVER", "imap.gmail.com"))
+IMAP_PORT: Final[int] = int(cast(str, getenv("IMAP_PORT", "993")))
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
@@ -29,6 +32,9 @@ __all__: Final[Tuple[str, ...]] = (
     "SMTP_PASSWORD",
     "SMTP_EMAIL",
     "SMTP_SERVER",
+    "SMTP_PORT",
+    "IMAP_SERVER",
+    "IMAP_PORT",
     "ENCRYPTION_KEY",
     "OLD_CONNECTION_STRING",
     "POD_UID",
