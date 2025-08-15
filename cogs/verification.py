@@ -125,20 +125,37 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         # Generate code and store in memory
         code = ''.join(random.choices(string.digits, k=CODE_LENGTH))
         pending_codes[user_id] = (code, email, time.time())
+        
+        # Try to send email first
+        email_sent = False
+        email_error = None
         try:
             send_email(
                 [email],
                 "Jouw verificatiecode voor de Discord-server",
                 f"Jouw verificatiecode is: {code}\nDeze code is 10 minuten geldig."
             )
-            await interaction.response.send_message(
-                "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
-                ephemeral=True
-            )
+            email_sent = True
         except Exception as e:
-            await interaction.response.send_message(
-                f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {e}", ephemeral=True
-            )
+            email_error = str(e)
+        
+        # Send appropriate response based on email sending result
+        try:
+            if email_sent:
+                await interaction.response.send_message(
+                    "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
+                    ephemeral=True
+                )
+            else:
+                # Remove the pending code since email failed
+                pending_codes.pop(user_id, None)
+                await interaction.response.send_message(
+                    f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {email_error}", ephemeral=True
+                )
+        except Exception as discord_error:
+            # If Discord response fails, log it but don't try to send another response
+            print(f"Discord interaction response failed: {discord_error}")
+            # If email was sent but Discord response failed, the user can still use the code
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
     code = ui.TextInput(label="Code", placeholder="6-cijferige code", required=True)
