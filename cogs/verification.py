@@ -232,6 +232,20 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
+        # Check if email is already used by another account in the new system
+        all_records = self.bot.db.verifications.find({})
+        async for record in all_records:
+            try:
+                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
+                if decrypted_email == old_email:
+                    await interaction.response.send_message(
+                        "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+                    )
+                    return
+            except Exception:
+                # Skip invalid encrypted emails or corrupted records
+                continue
+
         await interaction.response.defer(ephemeral=True)
 
         try:
