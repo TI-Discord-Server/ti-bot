@@ -99,16 +99,14 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
                 "Jouw verificatiecode voor de Discord-server",
                 f"Jouw verificatiecode is: {code}\nDeze code is 10 minuten geldig."
             )
+            await interaction.response.send_message(
+                "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
+                ephemeral=True
+            )
         except Exception as e:
             await interaction.response.send_message(
                 f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {e}", ephemeral=True
             )
-            return
-
-        await interaction.response.send_message(
-            "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
-            ephemeral=True
-        )
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
     code = ui.TextInput(label="Code", placeholder="6-cijferige code", required=True)
