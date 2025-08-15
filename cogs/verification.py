@@ -38,14 +38,38 @@ class VerificationView(ui.View):
 
     @ui.button(label="Stuur code", style=discord.ButtonStyle.primary, custom_id="send_code")
     async def send_code(self, interaction: Interaction, button: ui.Button):
+        # Check if user is already verified
+        existing_record = await self.bot.db.verifications.find_one({"user_id": interaction.user.id})
+        if existing_record:
+            await interaction.response.send_message(
+                "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
+            )
+            return
+        
         await interaction.response.send_modal(EmailModal(self.bot))
 
     @ui.button(label="Ik heb een code", style=discord.ButtonStyle.success, custom_id="have_code")
     async def have_code(self, interaction: Interaction, button: ui.Button):
+        # Check if user is already verified
+        existing_record = await self.bot.db.verifications.find_one({"user_id": interaction.user.id})
+        if existing_record:
+            await interaction.response.send_message(
+                "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
+            )
+            return
+        
         await interaction.response.send_modal(CodeModal(self.bot))
 
     @ui.button(label="Ik ben afgestudeerd", style=discord.ButtonStyle.secondary, custom_id="graduated", row=1)
     async def graduated(self, interaction: Interaction, button: ui.Button):
+        # Check if user is already verified
+        existing_record = await self.bot.db.verifications.find_one({"user_id": interaction.user.id})
+        if existing_record:
+            await interaction.response.send_message(
+                "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
+            )
+            return
+        
         embed = discord.Embed(
             title="Migratie voor Afgestudeerden",
             description="Deze optie is **alleen** voor studenten die:\n"
@@ -69,6 +93,14 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
     async def on_submit(self, interaction: Interaction):
         email = self.email.value.strip()
         user_id = interaction.user.id
+
+        # Check if user is already verified
+        existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
+        if existing_record:
+            await interaction.response.send_message(
+                "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
+            )
+            return
 
         if not EMAIL_REGEX.match(email):
             await interaction.response.send_message(
@@ -117,6 +149,15 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
     async def on_submit(self, interaction: Interaction):
         user_id = interaction.user.id
+        
+        # Check if user is already verified
+        existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
+        if existing_record:
+            await interaction.response.send_message(
+                "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
+            )
+            return
+        
         entry = pending_codes.get(user_id)
         if not entry:
             await interaction.response.send_message(
