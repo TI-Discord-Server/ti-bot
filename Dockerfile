@@ -4,4 +4,4 @@ COPY . .
 RUN pip install -r requirements.txt
 
 # Set the entrypoint based on the TLS argument  
-ENTRYPOINT ["/bin/sh", "-c", "python /app/main.py --tls=${TLSENABLED}"]
+ENTRYPOINT ["/bin/sh", "-c", "python /app/main.py --tls=${TLS_ENABLED}"]
