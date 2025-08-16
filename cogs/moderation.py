@@ -40,7 +40,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             return False
 
     @app_commands.command(name="kick", description="Kick een member van de server.")
-    @has_admin()
+    @has_role("The Council")
     async def kick(
         self,
         interaction: discord.Interaction,
@@ -169,6 +169,81 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="unban", description="Unban een gebruiker van de server.")
+    @has_admin()
+    @app_commands.describe(
+        user_id="Het Discord ID van de gebruiker om te unbannen",
+        reason="De reden voor het unbannen"
+    )
+    async def unban(
+        self,
+        interaction: discord.Interaction,
+        user_id: str,
+        reason: str = "Geen reden opgegeven",
+    ):
+        try:
+            # Convert string to int
+            user_id_int = int(user_id)
+            
+            # Try to get the user object
+            user = await self.bot.fetch_user(user_id_int)
+            
+            # Check if user is actually banned
+            try:
+                ban_entry = await interaction.guild.fetch_ban(user)
+            except discord.NotFound:
+                embed = discord.Embed(
+                    title="Gebruiker Niet Gebanned",
+                    description=f"Gebruiker {user.mention} ({user_id}) is niet gebanned.",
+                    color=discord.Color.orange(),
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            
+            # Unban the user
+            await interaction.guild.unban(user, reason=reason)
+            
+            embed = discord.Embed(
+                title="Gebruiker Ongebanned",
+                description=f"{user.mention} ({user_id}) is ongebanned. Reden: {reason}",
+                color=discord.Color.green(),
+            )
+            await interaction.response.send_message(embed=embed)
+            
+            # Log the infraction
+            await self.log_infraction(
+                interaction.guild.id, user.id, interaction.user.id, "unban", reason
+            )
+            
+        except ValueError:
+            embed = discord.Embed(
+                title="Ongeldig ID",
+                description="Het opgegeven gebruikers-ID is niet geldig.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except discord.errors.NotFound:
+            embed = discord.Embed(
+                title="Gebruiker Niet Gevonden",
+                description=f"Geen gebruiker gevonden met ID: {user_id}",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except discord.errors.Forbidden:
+            embed = discord.Embed(
+                title="Permissie Fout",
+                description="Ik heb geen permissie om gebruikers te unbannen.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except discord.errors.HTTPException:
+            embed = discord.Embed(
+                title="Fout",
+                description="Unbannen mislukt.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="mute", description="Mute een member in de server")
     @has_role("The Council")
@@ -512,7 +587,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="history", description="Laat de recente straffen van een member zien."
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(member="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, member: discord.Member):
         infractions = await self.bot.db.infractions.find(
@@ -552,7 +627,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="lockdown",
         description="Voorkom het versturen van berichten in een channel.",
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(
         channel="De channel om te lockdownen", reason="De reden voor de lockdown"
     )
@@ -584,7 +659,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="unlockdown",
         description="Unlock een gelockdown channel.",
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(
         channel="De channel om te unlocken", reason="De reden voor het unlocken"
     )
@@ -615,7 +690,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="slowmode", description="Stel slowmode in een channel in."
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(
         channel="De channel om slowmode in te stellen",
         seconds="De slowmode delay in seconden",
