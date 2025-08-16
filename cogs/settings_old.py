@@ -13,24 +13,7 @@ from utils.checks import developer
 TIMEZONE = pytz.timezone('Europe/Amsterdam')
 
 
-def is_moderator():
-    """
-    Controleert of de gebruiker een moderator is. Een moderator is de bot owner of iemand met 'manage_guild' permissies.
-    """
 
-    async def predicate(interaction: discord.Interaction):
-        """Predicate om te controleren of de user een moderator is."""
-        settings = await interaction.client.db.settings.find_one({"_id": "mod_settings"})
-        if not settings:
-            print("Geen mod settings gevonden in de database! De 'is_moderator' check zal falen.")
-            return False
-        moderator_id = settings.get("moderator_id")
-        return (
-            interaction.user.id == moderator_id
-            or interaction.user.guild_permissions.manage_guild
-        )
-
-    return commands.check(predicate)
 
 
 class SettingsCommands(commands.Cog, name="SettingsCommands"):

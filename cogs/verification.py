@@ -659,34 +659,25 @@ class Verification(commands.Cog):
         guild = interaction.guild
         member = guild.get_member(record["user_id"])
         
-        # Check if target is a moderator
-        is_moderator = False
+        # Check if target has admin permissions
+        has_admin_permission = False
         if member:
-            # Check if target has admin permissions
-            if any(r.permissions.administrator for r in member.roles):
-                is_moderator = True
-            else:
-                # Check if target has configured moderator role
-                settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
-                if settings and "moderator_role_id" in settings:
-                    moderator_role_id = settings["moderator_role_id"]
-                    if any(r.id == moderator_role_id for r in member.roles):
-                        is_moderator = True
+            has_admin_permission = any(r.permissions.administrator for r in member.roles)
         
         # Send initial response immediately
-        if is_moderator:
-            await interaction.response.send_message("✅ Verificatie ingetrokken. Moderator kon niet gekickt worden.", ephemeral=True)
+        if has_admin_permission:
+            await interaction.response.send_message("✅ Verificatie ingetrokken. Administrator kon niet gekickt worden.", ephemeral=True)
         elif not member:
             await interaction.response.send_message("✅ Verificatie ingetrokken. Gebruiker niet meer in de server.", ephemeral=True)
         else:
-            # User exists and is not a moderator - will attempt kick
+            # User exists and is not an admin - will attempt kick
             await interaction.response.send_message("🔄 Verificatie wordt ingetrokken en gebruiker wordt gekickt...", ephemeral=True)
         
         # Remove verification from database
         await self.bot.db.verifications.delete_one({"_id": record["_id"]})
         
-        # Try to kick if not a moderator and member exists
-        if member and not is_moderator:
+        # Try to kick if not an admin and member exists
+        if member and not has_admin_permission:
             kicked = False
             try:
                 # Create a permanent invite before kicking

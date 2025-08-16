@@ -14,42 +14,7 @@ from utils.has_admin import has_admin
 TIMEZONE = pytz.timezone('Europe/Amsterdam')
 
 
-def is_moderator():
-    """
-    Dynamic moderator check that uses the configured moderator role ID.
-    Falls back to admin permissions if no moderator role is configured.
-    """
-    import functools
-    
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
-            if interaction.guild is None:
-                await interaction.response.send_message(
-                    "This command can only be used in a server.", ephemeral=True
-                )
-                return None
 
-            # Always allow users with administrator permissions
-            if any(r.permissions.administrator for r in interaction.user.roles):
-                return await func(self, interaction, *args, **kwargs)
-            
-            # Check for configured moderator role
-            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
-            if settings and "moderator_role_id" in settings:
-                moderator_role_id = settings["moderator_role_id"]
-                if any(r.id == moderator_role_id for r in interaction.user.roles):
-                    return await func(self, interaction, *args, **kwargs)
-            
-            # No permission
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om deze command te gebruiken. Je hebt moderator rechten nodig.", 
-                ephemeral=True
-            )
-            return None
-
-        return wrapper
-    return decorator
 
 
 class ModCommands(commands.Cog, name="ModCommands"):
@@ -75,7 +40,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             return False
 
     @app_commands.command(name="kick", description="Kick een member van de server.")
-    @is_moderator()
+    @has_admin()
     async def kick(
         self,
         interaction: discord.Interaction,
@@ -125,7 +90,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="ban", description="Ban een member van de server.")
-    @is_moderator()
+    @has_admin()
     async def ban(
         self,
         interaction: discord.Interaction,
@@ -206,7 +171,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="mute", description="Mute een member in de server")
-    @is_moderator()
+    @has_role("The Council")
     async def mute(
         self,
         interaction: discord.Interaction,
@@ -275,7 +240,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="unmute", description="Unmute een member in de server."
     )
-    @is_moderator()
+    @has_role("The Council")
     async def unmute(
         self,
         interaction: discord.Interaction,
@@ -334,7 +299,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="warn", description="Waarschuw een user")
-    @is_moderator()
+    @has_role("The Council")
     async def warn(
         self,
         interaction: discord.Interaction,
@@ -375,7 +340,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="purge", description="Verwijdert messages uit het kanaal."
     )
-    @is_moderator()
+    @has_admin()
     async def purge(
         self,
         interaction: discord.Interaction,
@@ -420,7 +385,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="timeout", description="Timeout een member in de server"
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(
         member="De member om te timeouten",
         duration="De duration van de timeout (bijv. 1m, 5h, 1d). Max 28 dagen.",
@@ -501,7 +466,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="untimeout", description="Verwijdert timeout van een member"
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(
         member="De member om de timeout van te verwijderen",
         reason="De reden voor het verwijderen van de timeout",
@@ -547,7 +512,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="history", description="Laat de recente straffen van een member zien."
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(member="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, member: discord.Member):
         infractions = await self.bot.db.infractions.find(
@@ -587,7 +552,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="lockdown",
         description="Voorkom het versturen van berichten in een channel.",
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(
         channel="De channel om te lockdownen", reason="De reden voor de lockdown"
     )
@@ -619,7 +584,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="unlockdown",
         description="Unlock een gelockdown channel.",
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(
         channel="De channel om te unlocken", reason="De reden voor het unlocken"
     )
@@ -650,7 +615,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="slowmode", description="Stel slowmode in een channel in."
     )
-    @is_moderator()
+    @has_admin()
     @app_commands.describe(
         channel="De channel om slowmode in te stellen",
         seconds="De slowmode delay in seconden",
@@ -698,7 +663,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await self.infractions_collection.insert_one(infraction)
 
 @app_commands.context_menu(name="Verwijder Hieronder")
-@is_moderator()
+@has_admin()
 async def purge_below(interaction: discord.Interaction, message: discord.Message):
     try:
         await interaction.response.defer(ephemeral=True)
