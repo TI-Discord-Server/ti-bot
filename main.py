@@ -700,9 +700,10 @@ class Bot(commands.Bot):
                     description=interaction.command.qualified_name,  # type: ignore
                     colour=discord.Colour(0xFFFFFF),
                 )
+                avatar_url = interaction.user.display_avatar.url if interaction.user.display_avatar else None
                 em.set_author(
                     name="Critical Error",
-                    icon_url=interaction.user.display_avatar.url,
+                    icon_url=avatar_url,
                 )
                 em.set_footer(text="Please report this error to a developer!")
 
@@ -739,9 +740,10 @@ class Bot(commands.Bot):
                 msg += f" {command.usage}"
 
             em = discord.Embed(colour=discord.Colour(0xFFFFFF))
+            avatar_url = ctx.author.display_avatar.url if ctx.author.display_avatar else None
             em.set_author(
                 name=f"{command.full_parent_name} {command.name}",
-                icon_url=ctx.author.display_avatar.url,
+                icon_url=avatar_url,
             )
             em.add_field(
                 name="Usage",
@@ -776,9 +778,10 @@ class Bot(commands.Bot):
             e = discord.Embed(
                 description=ctx.message.content, colour=discord.Colour(0xFFFFFF)
             )
+            avatar_url = ctx.author.display_avatar.url if ctx.author.display_avatar else None
             e.set_author(
                 name="Critical Error",
-                icon_url=ctx.author.display_avatar.url,
+                icon_url=avatar_url,
             )
             e.set_footer(text="Please report this error to a developer!")
 
