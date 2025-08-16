@@ -200,18 +200,25 @@ class Reports(commands.Cog, name="reports"):
             "Je anonieme rapport is ingediend. Bedankt!", ephemeral=True
         )
 
-    # Context Menu Commands (Discord Apps)
-    @app_commands.context_menu(name="Report User")
-    async def report_user_context(self, interaction: discord.Interaction, user: discord.User):
-        """Report a user via context menu."""
-        await interaction.response.send_modal(ReportUserModal(self, user))
-
-    @app_commands.context_menu(name="Report Message")
-    async def report_message_context(self, interaction: discord.Interaction, message: discord.Message):
-        """Report a message via context menu."""
-        await interaction.response.send_modal(ReportMessageModal(self, message))
-
-
+    # Context Menu Commands will be added in cog_load
+    
+    async def cog_load(self):
+        """Add context menus when the cog loads."""
+        # Create context menu for reporting users
+        @app_commands.context_menu(name="Report User")
+        async def report_user_context(interaction: discord.Interaction, user: discord.User):
+            """Report a user via context menu."""
+            await interaction.response.send_modal(ReportUserModal(self, user))
+        
+        # Create context menu for reporting messages  
+        @app_commands.context_menu(name="Report Message")
+        async def report_message_context(interaction: discord.Interaction, message: discord.Message):
+            """Report a message via context menu."""
+            await interaction.response.send_modal(ReportMessageModal(self, message))
+        
+        # Add the context menus to the bot's command tree
+        self.bot.tree.add_command(report_user_context)
+        self.bot.tree.add_command(report_message_context)
 
 
 class ReportUserModal(discord.ui.Modal, title="Report User"):
