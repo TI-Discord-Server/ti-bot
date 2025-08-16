@@ -1787,15 +1787,15 @@ class UnbanRequestsConfigView(BaseConfigView):
                     )
             else:
                 embed.add_field(
-                    name="📋 Log Kanaal 2 (Archive)",
-                    value="❌ Niet ingesteld",
+                    name="📋 Log Kanaal 2 (Archive) - Optioneel",
+                    value="⚪ Niet ingesteld (optioneel)",
                     inline=False
                 )
             
-            # System status
-            all_configured = all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2])
-            status_emoji = "✅" if all_configured else "⚠️"
-            status_text = "Volledig geconfigureerd" if all_configured else "Configuratie incompleet"
+            # System status (archive channel is optional)
+            required_configured = all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1])
+            status_emoji = "✅" if required_configured else "⚠️"
+            status_text = "Volledig geconfigureerd" if required_configured else "Configuratie incompleet"
             
             embed.add_field(
                 name="🔧 Systeem Status",
@@ -1803,16 +1803,22 @@ class UnbanRequestsConfigView(BaseConfigView):
                 inline=False
             )
             
-            if all_configured:
+            if required_configured:
                 embed.add_field(
                     name="ℹ️ Gebruik",
                     value="Gebruik `/setup unban_request [kanaal]` om het unban request bericht te verzenden.",
                     inline=False
                 )
+                if not aanvragen_log_kanaal_id_2:
+                    embed.add_field(
+                        name="💡 Optioneel",
+                        value="Log Kanaal 2 (Archive) is optioneel en kan worden ingesteld voor extra archivering.",
+                        inline=False
+                    )
             else:
                 embed.add_field(
                     name="⚠️ Configuratie Vereist",
-                    value="Gebruik de knoppen hieronder om alle kanalen in te stellen voordat je het systeem kunt gebruiken.",
+                    value="Stel het Request Kanaal en Log Kanaal 1 in om het systeem te kunnen gebruiken. Log Kanaal 2 is optioneel.",
                     inline=False
                 )
             
@@ -1845,7 +1851,7 @@ class UnbanRequestsConfigView(BaseConfigView):
         )
         await interaction.response.edit_message(embed=embed, view=view)
     
-    @discord.ui.button(label="Log Kanaal 2", style=discord.ButtonStyle.secondary, emoji="📋")
+    @discord.ui.button(label="Log Kanaal 2 (Optioneel)", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the second log channel."""
         view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text")
@@ -1866,9 +1872,9 @@ class UnbanRequestsConfigView(BaseConfigView):
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
             aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
             
-            if not all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2]):
+            if not all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1]):
                 await interaction.response.send_message(
-                    "❌ Niet alle kanalen zijn ingesteld. Configureer eerst alle kanalen voordat je het bericht kunt verzenden.",
+                    "❌ Request Kanaal en Log Kanaal 1 zijn vereist. Configureer deze eerst voordat je het bericht kunt verzenden.",
                     ephemeral=True
                 )
                 return

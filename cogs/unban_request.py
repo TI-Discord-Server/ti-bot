@@ -66,7 +66,7 @@ class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
         embed.add_field(name="Recente Straffen", value=infraction_list, inline=False)
 
         kanaal1 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_1))
-        kanaal2 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_2))
+        kanaal2 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_2)) if self.aanvragen_log_kanaal_id_2 else None
 
         if kanaal1:
             # view = UnbanApprovalView(self.bot, self.user, interaction.guild)
@@ -76,10 +76,11 @@ class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
         else:
             print(f"Kanaal met ID {self.aanvragen_log_kanaal_id_1} niet gevonden.")
 
+        # Archive channel is optional
         if kanaal2:
             message2 = await kanaal2.send(embed=embed)
-        else:
-            print(f"Kanaal met ID {self.aanvragen_log_kanaal_id_2} niet gevonden.")
+        elif self.aanvragen_log_kanaal_id_2:
+            print(f"Archive kanaal met ID {self.aanvragen_log_kanaal_id_2} niet gevonden.")
 
         await interaction.followup.send("Je unban aanvraag is succesvol verzonden.  We zullen je aanvraag zo snel mogelijk beoordelen.", ephemeral=True)
 
@@ -103,7 +104,8 @@ class UnbanRequest(commands.Cog):
             self.aanvragen_log_kanaal_id_1 = None
             self.aanvragen_log_kanaal_id_2 = None
 
-        if self.unban_request_kanaal_id and self.aanvragen_log_kanaal_id_1 and self.aanvragen_log_kanaal_id_2:
+        # Only require the first two channels, archive channel is optional
+        if self.unban_request_kanaal_id and self.aanvragen_log_kanaal_id_1:
             if self.unban_view:
                 self.bot.remove_view(self.unban_view)
 

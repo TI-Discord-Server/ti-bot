@@ -227,10 +227,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                     "❌ Unban request systeem is niet geladen.", ephemeral=True)
                 return
             
-            # Check if settings are configured
-            if not (unban_cog.unban_request_kanaal_id and unban_cog.aanvragen_log_kanaal_id_1 and unban_cog.aanvragen_log_kanaal_id_2):
+            # Check if required settings are configured (archive channel is optional)
+            if not (unban_cog.unban_request_kanaal_id and unban_cog.aanvragen_log_kanaal_id_1):
                 await interaction.response.send_message(
-                    "❌ De unban aanvraag instellingen zijn nog niet ingesteld. Gebruik `/configure` en selecteer 'Unban Requests' om ze in te stellen.", 
+                    "❌ De unban aanvraag instellingen zijn nog niet volledig ingesteld. Gebruik `/configure` en selecteer 'Unban Requests' om ze in te stellen.", 
                     ephemeral=True)
                 return
             
