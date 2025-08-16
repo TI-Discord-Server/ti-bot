@@ -4,6 +4,7 @@ from discord.ext import commands
 from typing import Optional, Dict, Any, List
 import datetime
 from .developer_management import DeveloperManagementView
+from utils.timezone import now_utc
 
 
 class ConfigurationView(discord.ui.View):
@@ -1384,7 +1385,7 @@ class LogChannelsModal(discord.ui.Modal):
                     title="📋 Log Kanalen Validatie",
                     description="\n".join(validation_results),
                     color=discord.Color.blue() if update_data else discord.Color.orange(),
-                    timestamp=datetime.datetime.now()
+                    timestamp=now_utc()
                 )
                 
                 if update_data:

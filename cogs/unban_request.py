@@ -3,10 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 import pymongo
 import time
-import pytz
 import datetime
-
-TIMEZONE = pytz.timezone('Europe/Amsterdam')
+from utils.timezone import to_local
 
 
 class UnbanView(discord.ui.View):
@@ -49,7 +47,7 @@ class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
         ).sort("timestamp", pymongo.DESCENDING).limit(5).to_list(length=None)
         infraction_list = ""
         for infraction in infractions:
-            localized_timestamp = infraction['timestamp'].astimezone(TIMEZONE)
+            localized_timestamp = to_local(infraction['timestamp'])
             infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction['type'].capitalize()}**: {infraction['reason']}\n"
 
         if not infraction_list:

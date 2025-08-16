@@ -6,11 +6,8 @@ import re
 from typing import Optional
 import pymongo
 import time
-import pytz
 from utils.checks import developer
-
-# Definieer de gewenste timezone (GMT+1)
-TIMEZONE = pytz.timezone('Europe/Amsterdam')
+from utils.timezone import TIMEZONE
 
 
 

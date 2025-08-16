@@ -6,12 +6,9 @@ import re
 from typing import Optional
 import pymongo
 import time
-import pytz  # Importeer de pytz library
 from utils.has_role import has_role
 from utils.has_admin import has_admin
-
-# Definieer de gewenste timezone (GMT+1)
-TIMEZONE = pytz.timezone('Europe/Amsterdam')
+from utils.timezone import TIMEZONE, now_utc, format_local_time, to_local
 
 
 
@@ -49,14 +46,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
     ):
         """Kickt een member van de server met een optionele reden."""
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️ | Je bent gekickt.",
             description=f"Reden: {reason}",
             color=discord.Color.orange(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -99,14 +96,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
     ):
         """Bant een member van de server met een optionele reden."""
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️ | Je bent gebanned.",
             description=f"Reden: {reason}",
             color=discord.Color.dark_red(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -273,14 +270,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     pass
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️| Je bent gemute.",
             description=f"Reden: {reason}",
             color=discord.Color.dark_gray(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -335,14 +332,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
             return
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️ | Je bent geunmute.",
             description=f"Reden: {reason}",
             color=discord.Color.green(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -382,14 +379,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
         reason: str = "Geen reden opgegeven.",
     ):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️ | Je bent gewaarschuwd.",
             description=f"Reden: {reason}",
             color=discord.Color.yellow(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -497,14 +494,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"⚠️ | Je bent getimed out.",
             description=f"Reden: {reason}\nDuration: {duration}",
             color=discord.Color.dark_orange(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
         dm_sent = await self.send_dm_embed(member, dm_embed)
@@ -553,14 +550,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
         reason: str = "Geen reden opgegeven.",
     ):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        timestamp = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now_utc()
         dm_embed = discord.Embed(
             title=f"Je timeout is verwijderd in {interaction.guild.name}",
             description=f"Reden: {reason}",
             color=discord.Color.green(),
         )
         # Gebruik de timezone bij het formatteren van de tijd
-        dm_embed.set_footer(text=f"Tijd: {timestamp.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')}")
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
 
@@ -599,7 +596,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         )
         infraction_list = ""
         for infraction in infractions:
-            localized_timestamp = infraction['timestamp'].astimezone(TIMEZONE)
+            localized_timestamp = to_local(infraction['timestamp'])
             infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction['type'].capitalize()}**: {infraction['reason']}\n"
 
         if not infraction_list:
@@ -612,12 +609,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
         )
         embed.add_field(
             name="Join Date",
-            value=f"<t:{int(time.mktime(member.joined_at.astimezone(TIMEZONE).timetuple()))}:D>",
+            value=f"<t:{int(time.mktime(to_local(member.joined_at).timetuple()))}:D>",
             inline=False,
         )
         embed.add_field(
             name="Account Creation Date",
-            value=f"<t:{int(time.mktime(member.created_at.astimezone(TIMEZONE).timetuple()))}:D>",
+            value=f"<t:{int(time.mktime(to_local(member.created_at).timetuple()))}:D>",
             inline=False,
         )
 

@@ -1,11 +1,8 @@
 import discord
 from discord.ext import tasks, commands
 import datetime
-import pytz
 from cogs.confessions.confession_view import ConfessionView
-
-# Define Brussels timezone (same as Amsterdam)
-BRUSSELS_TZ = pytz.timezone('Europe/Brussels')
+from utils.timezone import LOCAL_TIMEZONE, local_time
 
 
 class ConfessionTasks(commands.Cog):
@@ -54,7 +51,7 @@ class ConfessionTasks(commands.Cog):
 
         try:
             hour, minute = map(int, review_time_str.split(":"))
-            review_time = datetime.time(hour=hour, minute=minute, tzinfo=BRUSSELS_TZ)
+            review_time = local_time(hour, minute)
 
             if self.daily_review and self.daily_review.is_running():
                 self.daily_review.cancel()
@@ -119,10 +116,9 @@ class ConfessionTasks(commands.Cog):
 
         try:
             times = [
-                datetime.time(
+                local_time(
                     hour=int(t.split(":")[0]),
-                    minute=int(t.split(":")[1]),
-                    tzinfo=BRUSSELS_TZ,
+                    minute=int(t.split(":")[1])
                 )
                 for t in post_times
             ]
