@@ -202,17 +202,34 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
         # Store in DB: user_id (plaintext), encrypted_email
         encrypted_email = fernet.encrypt(email.encode()).decode()
-        await self.bot.db.verifications.insert_one({
-            "user_id": user_id,
-            "encrypted_email": encrypted_email
-        })
+        try:
+            await self.bot.db.verifications.insert_one({
+                "user_id": user_id,
+                "encrypted_email": encrypted_email
+            })
+            self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
+        except Exception as e:
+            self.bot.log.error(f"Failed to store verification record for user {interaction.user} ({user_id}) with email {email}: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het opslaan van je verificatie. Probeer het opnieuw.",
+                ephemeral=True
+            )
+            return
+            
         pending_codes.pop(user_id, None)
 
         # Assign verified role (replace 'Verified' with your role name)
         guild = interaction.guild
         role = discord.utils.get(guild.roles, name="Verified")
         if role:
-            await interaction.user.add_roles(role)
+            try:
+                await interaction.user.add_roles(role)
+                self.bot.log.info(f"Assigned Verified role to user {interaction.user} ({user_id})")
+            except Exception as e:
+                self.bot.log.error(f"Failed to assign Verified role to user {interaction.user} ({user_id}): {e}", exc_info=True)
+        else:
+            self.bot.log.warning("Verified role not found in guild")
+            
         await interaction.response.send_message(
             "✅ Je bent succesvol geverifieerd! Je hebt nu toegang tot de server.",
             ephemeral=True
@@ -292,17 +309,29 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 encrypted_email = fernet.encrypt(old_email.encode()).decode()
                 
                 # Store in new system with migration flag
-                await self.bot.db.verifications.insert_one({
-                    "user_id": user_id,
-                    "encrypted_email": encrypted_email,
-                    "migrated": True
-                })
+                try:
+                    await self.bot.db.verifications.insert_one({
+                        "user_id": user_id,
+                        "encrypted_email": encrypted_email,
+                        "migrated": True
+                    })
+                    self.bot.log.info(f"Successfully migrated verification for user {interaction.user} ({user_id}) with email {old_email} (email bounced)")
+                except Exception as e:
+                    self.bot.log.error(f"Failed to store migrated verification record for user {interaction.user} ({user_id}) with email {old_email}: {e}", exc_info=True)
+                    await interaction.followup.send("❌ Er is een fout opgetreden bij het opslaan van je migratie. Probeer het opnieuw.", ephemeral=True)
+                    return
                 
                 # Assign verified role
                 guild = interaction.guild
                 role = discord.utils.get(guild.roles, name="Verified")
                 if role:
-                    await interaction.user.add_roles(role)
+                    try:
+                        await interaction.user.add_roles(role)
+                        self.bot.log.info(f"Assigned Verified role to migrated user {interaction.user} ({user_id})")
+                    except Exception as e:
+                        self.bot.log.error(f"Failed to assign Verified role to migrated user {interaction.user} ({user_id}): {e}", exc_info=True)
+                else:
+                    self.bot.log.warning("Verified role not found in guild during migration")
                 
                 await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
                 
@@ -674,7 +703,25 @@ class Verification(commands.Cog):
             await interaction.response.send_message("🔄 Verificatie wordt ingetrokken en gebruiker wordt gekickt...", ephemeral=True)
         
         # Remove verification from database
-        await self.bot.db.verifications.delete_one({"_id": record["_id"]})
+        try:
+            # Get email for logging before deletion
+            email_info = ""
+            try:
+                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
+                email_info = f" (email: {decrypted_email})"
+            except Exception:
+                email_info = " (email: [decryption failed])"
+            
+            result = await self.bot.db.verifications.delete_one({"_id": record["_id"]})
+            
+            if result.deleted_count > 0:
+                target_info = f"user {member} ({record['user_id']})" if member else f"user ID {record['user_id']}"
+                self.bot.log.info(f"Manually revoked verification for {target_info}{email_info} by admin {interaction.user} ({interaction.user.id})")
+            else:
+                self.bot.log.warning(f"Failed to delete verification record for user ID {record['user_id']} during manual revocation")
+                
+        except Exception as e:
+            self.bot.log.error(f"Error removing verification record during manual revocation for user ID {record['user_id']}: {e}", exc_info=True)
         
         # Try to kick if not an admin and member exists
         if member and not has_admin_permission:
@@ -722,19 +769,92 @@ class Verification(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        # Remove verification record when user leaves
-        await self.bot.db.verifications.delete_one({"user_id": member.id})
+        """Remove verification record when user leaves the server."""
+        try:
+            # Check if user had a verification record before removing
+            existing_record = await self.bot.db.verifications.find_one({"user_id": member.id})
+            
+            if existing_record:
+                # Decrypt email for logging (if possible)
+                try:
+                    decrypted_email = fernet.decrypt(existing_record['encrypted_email'].encode()).decode()
+                    email_info = f" (email: {decrypted_email})"
+                except Exception:
+                    email_info = " (email: [decryption failed])"
+                
+                # Remove verification record
+                result = await self.bot.db.verifications.delete_one({"user_id": member.id})
+                
+                if result.deleted_count > 0:
+                    self.bot.log.info(f"Removed verification record for user {member} ({member.id}) who left the server{email_info}")
+                else:
+                    self.bot.log.warning(f"Failed to remove verification record for user {member} ({member.id}) who left the server")
+            else:
+                self.bot.log.debug(f"User {member} ({member.id}) left the server but had no verification record")
+                
+        except Exception as e:
+            self.bot.log.error(f"Error removing verification record for user {member} ({member.id}) who left the server: {e}", exc_info=True)
 
     async def cleanup_orphaned_records(self):
         """Periodically clean up verification records for users no longer in the server."""
         await self.bot.wait_until_ready()
+        self.bot.log.info("Starting periodic verification records cleanup task")
+        
         while not self.bot.is_closed():
-            guild = self.bot.guilds[0]  # Adjust if you have multiple guilds
-            all_records = self.bot.db.verifications.find({})
-            async for record in all_records:
-                if not guild.get_member(record["user_id"]):
-                    await self.bot.db.verifications.delete_one({"user_id": record["user_id"]})
-            await asyncio.sleep(3600)  # Run every hour
+            try:
+                self.bot.log.debug("Running verification records cleanup check")
+                
+                if not self.bot.guilds:
+                    self.bot.log.warning("No guilds found for verification cleanup, skipping")
+                    await asyncio.sleep(3600)
+                    continue
+                
+                guild = self.bot.guilds[0]  # Adjust if you have multiple guilds
+                self.bot.log.debug(f"Checking verification records for guild: {guild.name} ({guild.id})")
+                
+                cleanup_count = 0
+                total_records = 0
+                
+                all_records = self.bot.db.verifications.find({})
+                async for record in all_records:
+                    total_records += 1
+                    user_id = record["user_id"]
+                    
+                    # Check if user is still in the server
+                    member = guild.get_member(user_id)
+                    if not member:
+                        # User is no longer in the server, remove their verification record
+                        try:
+                            # Try to decrypt email for logging
+                            email_info = ""
+                            try:
+                                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
+                                email_info = f" (email: {decrypted_email})"
+                            except Exception:
+                                email_info = " (email: [decryption failed])"
+                            
+                            # Remove the record
+                            result = await self.bot.db.verifications.delete_one({"user_id": user_id})
+                            
+                            if result.deleted_count > 0:
+                                cleanup_count += 1
+                                self.bot.log.info(f"Cleaned up orphaned verification record for user ID {user_id}{email_info} (no longer in server)")
+                            else:
+                                self.bot.log.warning(f"Failed to delete orphaned verification record for user ID {user_id}")
+                                
+                        except Exception as e:
+                            self.bot.log.error(f"Error cleaning up verification record for user ID {user_id}: {e}", exc_info=True)
+                
+                if cleanup_count > 0:
+                    self.bot.log.info(f"Verification cleanup completed: removed {cleanup_count} orphaned records out of {total_records} total records")
+                else:
+                    self.bot.log.debug(f"Verification cleanup completed: no orphaned records found ({total_records} total records checked)")
+                
+            except Exception as e:
+                self.bot.log.error(f"Error during verification records cleanup: {e}", exc_info=True)
+            
+            # Wait 1 hour before next cleanup
+            await asyncio.sleep(3600)
 
 async def setup(bot):
     cog = Verification(bot)
