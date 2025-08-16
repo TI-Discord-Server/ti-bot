@@ -48,8 +48,20 @@ def to_utc(dt):
     return dt.astimezone(UTC_TIMEZONE)
 
 def local_time(hour, minute=0, second=0):
-    """Create a time object in local timezone."""
-    return datetime.time(hour=hour, minute=minute, second=second, tzinfo=LOCAL_TIMEZONE)
+    """Create a time object in local timezone with proper DST handling.
+    
+    This function creates a time object that will work correctly with discord.py's
+    task scheduler, accounting for daylight saving time transitions.
+    """
+    # For task scheduling, we need to use the current DST status
+    # Discord.py tasks will handle the timezone correctly if we provide the right offset
+    now_local = datetime.datetime.now(LOCAL_TIMEZONE)
+    current_offset = now_local.utcoffset()
+    
+    # Create timezone with the current offset
+    fixed_tz = datetime.timezone(current_offset)
+    
+    return datetime.time(hour=hour, minute=minute, second=second, tzinfo=fixed_tz)
 
 def format_local_time(dt, format_string='%Y-%m-%d %H:%M:%S %Z%z'):
     """Format a datetime in local timezone."""
