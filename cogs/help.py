@@ -1,5 +1,5 @@
 import discord
-from discord import app_commands
+from discord.app_commands import command
 from discord.ext import commands
 
 
@@ -8,7 +8,7 @@ class Help(commands.Cog, name="help"):
         self.bot = bot
         self.bot.remove_command("help")  # Removes the built-in help command
 
-    @app_commands.command(name="help", description="Get a list of all available commands.")
+    @command(name="help", description="Get a list of all available commands.")
     async def help_command(self, interaction: discord.Interaction):
         """Displays a help menu with all available slash commands."""
         
@@ -64,6 +64,37 @@ class Help(commands.Cog, name="help"):
                     )
                 except:
                     pass  # Give up if everything fails
+
+    @command(name="debug_commands", description="Debug command to see registered commands")
+    async def debug_commands(self, interaction: discord.Interaction):
+        """Debug command to see what commands are registered."""
+        try:
+            commands = self.bot.tree.get_commands()
+            cogs = list(self.bot.cogs.keys())
+            
+            embed = discord.Embed(
+                title="🔧 Debug Info",
+                color=discord.Color.orange(),
+            )
+            
+            embed.add_field(
+                name="Registered Commands",
+                value=f"Found {len(commands)} commands:\n" + 
+                      "\n".join([f"- /{cmd.name}: {cmd.description}" for cmd in commands[:10]]) +
+                      (f"\n... and {len(commands) - 10} more" if len(commands) > 10 else ""),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Loaded Cogs",
+                value=f"Found {len(cogs)} cogs:\n" + ", ".join(cogs),
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(f"Debug error: {str(e)}", ephemeral=True)
 
 
 async def setup(bot):
