@@ -35,11 +35,31 @@ class Help(commands.Cog, name="help"):
                     inline=False,
                 )
             else:
-                # Loop through all registered slash commands
+                # Loop through all registered commands, filtering for slash commands only
+                slash_commands = []
+                context_menus = []
+                
                 for c in commands:
+                    # Check if it's a context menu command or slash command
+                    if hasattr(c, 'type') and c.type in [2, 3]:  # USER or MESSAGE context menu
+                        context_menus.append(c)
+                    elif hasattr(c, 'description'):  # Regular slash command
+                        slash_commands.append(c)
+                
+                # Add slash commands
+                for c in slash_commands:
                     embed.add_field(
                         name=f"/{c.name}",
                         value=c.description or "No description",
+                        inline=False,
+                    )
+                
+                # Add context menu info if any exist
+                if context_menus:
+                    context_names = [c.name for c in context_menus]
+                    embed.add_field(
+                        name="🖱️ Context Menu Commands",
+                        value=f"Right-click commands: {', '.join(context_names)}",
                         inline=False,
                     )
 
@@ -78,11 +98,34 @@ class Help(commands.Cog, name="help"):
                 color=discord.Color.orange(),
             )
             
+            # Separate different types of commands
+            slash_commands = []
+            context_menus = []
+            other_commands = []
+            
+            for cmd in commands:
+                if hasattr(cmd, 'type') and cmd.type in [2, 3]:  # Context menu
+                    context_menus.append(f"- {cmd.name} (type: {cmd.type})")
+                elif hasattr(cmd, 'description'):  # Slash command
+                    slash_commands.append(f"- /{cmd.name}: {cmd.description}")
+                else:
+                    other_commands.append(f"- {cmd.name} ({type(cmd).__name__})")
+            
+            command_info = []
+            if slash_commands:
+                command_info.append(f"**Slash Commands ({len(slash_commands)}):**\n" + "\n".join(slash_commands[:5]))
+                if len(slash_commands) > 5:
+                    command_info.append(f"... and {len(slash_commands) - 5} more slash commands")
+            
+            if context_menus:
+                command_info.append(f"**Context Menus ({len(context_menus)}):**\n" + "\n".join(context_menus))
+            
+            if other_commands:
+                command_info.append(f"**Other Commands ({len(other_commands)}):**\n" + "\n".join(other_commands))
+            
             embed.add_field(
                 name="Registered Commands",
-                value=f"Found {len(commands)} commands:\n" + 
-                      "\n".join([f"- /{cmd.name}: {cmd.description}" for cmd in commands[:10]]) +
-                      (f"\n... and {len(commands) - 10} more" if len(commands) > 10 else ""),
+                value=f"Found {len(commands)} total commands:\n\n" + "\n\n".join(command_info) if command_info else "No commands found",
                 inline=False
             )
             
