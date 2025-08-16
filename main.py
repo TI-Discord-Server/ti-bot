@@ -42,6 +42,9 @@ from utils.errors import (
     UnknownUser,
 )
 
+# Constants
+DEFAULT_GUILD_ID = 1334456602324897792  # Default guild ID fallback
+
 # Parse command line arguments
 def str_to_bool(v):
     """Convert string to boolean for argument parsing."""
@@ -384,11 +387,11 @@ class Bot(commands.Bot):
             self.log.info(f"Auto-detected guild ID {self._guild_id} (bot is in 1 guild)")
         elif len(self.guilds) > 1:
             # Bot is in multiple guilds - use default as fallback
-            self._guild_id = 1334456602324897792  # Default guild ID
+            self._guild_id = DEFAULT_GUILD_ID
             self.log.warning(f"Bot is in {len(self.guilds)} guilds, using default guild ID {self._guild_id}. Use /configure to change if needed.")
         else:
             # Bot is in no guilds - use default as fallback
-            self._guild_id = 1334456602324897792  # Default guild ID
+            self._guild_id = DEFAULT_GUILD_ID
             self.log.warning(f"Bot is not in any guilds, using default guild ID {self._guild_id}")
 
     async def load_developer_ids(self):

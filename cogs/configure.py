@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List
 import datetime
 from .developer_management import DeveloperManagementView
 from utils.timezone import now_utc
+from main import DEFAULT_GUILD_ID
 
 
 class ConfigurationView(discord.ui.View):
@@ -180,7 +181,7 @@ class ServerConfigView(BaseConfigView):
                     guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
             else:
                 # Fallback: show the guild_id even if guild object not found
-                guild_id = self.bot.guild_id or 1334456602324897792
+                guild_id = self.bot.guild_id or DEFAULT_GUILD_ID
                 guild_status = f"**Standaard:** Server ID `{guild_id}` (server niet gevonden)"
                 self.bot.log.warning(f"Guild object not found, using fallback guild_id: {guild_id}")
                 
