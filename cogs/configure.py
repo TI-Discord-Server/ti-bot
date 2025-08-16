@@ -863,8 +863,7 @@ class RolesChannelsConfigView(BaseConfigView):
             value=(
                 "Gebruik de knoppen hieronder om:\n"
                 "• Rol categorieën beheren\n"
-                "• Rollen toevoegen/verwijderen\n"
-                "• Rol menu instellen"
+                "• Rollen toevoegen/verwijderen"
             ),
             inline=False
         )
@@ -884,17 +883,6 @@ class RolesChannelsConfigView(BaseConfigView):
         """Manage roles in categories."""
         view = RoleManagementView(self.bot, self.user_id, self.visible)
         embed = await view.create_embed()
-        await interaction.response.edit_message(embed=embed, view=view)
-    
-    @discord.ui.button(label="Menu Instellen", style=discord.ButtonStyle.success, emoji="📋")
-    async def setup_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Setup role menu in a channel."""
-        view = RoleMenuSetupView(self.bot, self.user_id, self.visible)
-        embed = discord.Embed(
-            title="📋 Rol Menu Instellen",
-            description="Selecteer een kanaal waar het rol menu geplaatst moet worden.",
-            color=discord.Color.green()
-        )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -1586,74 +1574,6 @@ class RoleManagementView(BaseConfigView):
         modal = RemoveRoleModal(self.bot, self.user_id, self.visible)
         await interaction.response.send_modal(modal)
 
-
-class RoleMenuSetupView(discord.ui.View):
-    """View for setting up role menu in a channel."""
-    
-    def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(timeout=300)
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-        # Add channel select
-        select = discord.ui.ChannelSelect(
-            placeholder="Selecteer een kanaal voor het rol menu...",
-            channel_types=[discord.ChannelType.text]
-        )
-        select.callback = self.channel_select_callback
-        self.add_item(select)
-    
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
-            return False
-        return True
-    
-    async def channel_select_callback(self, interaction: discord.Interaction):
-        """Handle channel selection for role menu setup."""
-        channel = interaction.data['values'][0]
-        channel_id = int(channel)
-        
-        try:
-            # Get the role selector cog
-            role_selector_cog = self.bot.get_cog("RoleSelector")
-            if not role_selector_cog:
-                await interaction.response.send_message("❌ Rol selector systeem niet gevonden.", ephemeral=True)
-                return
-            
-            # Update the role menu message
-            message = await role_selector_cog.update_role_menu_message(channel_id)
-            
-            if message:
-                embed = discord.Embed(
-                    title="✅ Rol Menu Ingesteld",
-                    description=f"Het rol menu is succesvol ingesteld in <#{channel_id}>",
-                    color=discord.Color.green()
-                )
-                embed.add_field(
-                    name="📋 Details",
-                    value=f"**Kanaal:** <#{channel_id}>\n**Message ID:** `{message.id}`",
-                    inline=False
-                )
-            else:
-                embed = discord.Embed(
-                    title="❌ Fout",
-                    description="Er is een fout opgetreden bij het instellen van het rol menu.",
-                    color=discord.Color.red()
-                )
-            
-            # Return to roles config
-            view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
-            config_embed = await view.create_embed()
-            
-            # Send confirmation message and update original message
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            await interaction.edit_original_response(embed=config_embed, view=view)
-            
-        except Exception as e:
-            self.bot.log.error(f"Error setting up role menu: {e}", exc_info=True)
-            await interaction.response.send_message("❌ Er is een fout opgetreden bij het instellen van het rol menu.", ephemeral=True)
 
 
 # Role Management Modals
