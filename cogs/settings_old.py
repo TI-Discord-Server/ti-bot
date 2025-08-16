@@ -7,6 +7,7 @@ from typing import Optional
 import pymongo
 import time
 import pytz
+from utils.checks import developer
 
 # Definieer de gewenste timezone (GMT+1)
 TIMEZONE = pytz.timezone('Europe/Amsterdam')
@@ -169,7 +170,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             ephemeral=True)
 
     @app_commands.command(name="setup", description="Stel verschillende bot componenten in.")
-    @is_moderator()
+    @developer()
     @app_commands.describe(
         component="Het component om in te stellen",
         channel="Het kanaal waar het component moet worden ingesteld (optioneel, gebruikt huidige kanaal als niet opgegeven)"
