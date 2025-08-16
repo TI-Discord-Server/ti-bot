@@ -3,7 +3,6 @@ from discord import app_commands
 from discord.app_commands import command
 from discord.ext import commands
 import datetime
-from utils.has_admin import has_admin
 
 
 class Reports(commands.Cog, name="reports"):
@@ -213,71 +212,7 @@ class Reports(commands.Cog, name="reports"):
         """Report a message via context menu."""
         await interaction.response.send_modal(ReportMessageModal(self, message))
 
-    @command(
-        name="set_report_channel",
-        description="Stel het kanaal in waar rapporten naartoe gestuurd moeten worden (Alleen moderators).",
-    )
-    @has_admin()
-    async def set_report_channel(
-        self, interaction: discord.Interaction, channel: discord.TextChannel
-    ):
-        """
-        Set the channel where reports should be sent.
-        """
-        # Update the reports channel ID in the settings collection
-        await self.db.settings.update_one(
-            {"_id": self.settings_id},  # Filter by the specific ID
-            {"$set": {"reports_channel_id": channel.id}},  # Update or set the field
-            upsert=True,  # Create the document if it doesn't exist
-        )
 
-        await interaction.response.send_message(
-            f"Rapportage kanaal is ingesteld op {channel.mention}."
-        )
-
-    @command(
-        name="set_moderator_role",
-        description="Stel de moderator rol in die genotificeerd wordt bij rapporten (Alleen moderators).",
-    )
-    @has_admin()
-    async def set_moderator_role(
-        self, interaction: discord.Interaction, role: discord.Role
-    ):
-        """
-        Set the moderator role that gets notified for reports.
-        """
-        # Update the moderator role ID in the settings collection
-        await self.db.settings.update_one(
-            {"_id": self.settings_id},  # Filter by the specific ID
-            {"$set": {"moderator_role_id": role.id}},  # Update or set the field
-            upsert=True,  # Create the document if it doesn't exist
-        )
-
-        await interaction.response.send_message(
-            f"Moderator rol is ingesteld op {role.mention}."
-        )
-
-    @set_report_channel.error
-    async def set_report_channel_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, commands.CheckFailure):
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
-            )
-
-    @set_moderator_role.error
-    async def set_moderator_role_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, commands.CheckFailure):
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                f"Er is een fout opgetreden: {str(error)}", ephemeral=True
-            )
 
 
 class ReportUserModal(discord.ui.Modal, title="Report User"):
