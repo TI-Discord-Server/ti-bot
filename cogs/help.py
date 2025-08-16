@@ -46,13 +46,73 @@ class Help(commands.Cog, name="help"):
                     elif hasattr(c, 'description'):  # Regular slash command
                         slash_commands.append(c)
                 
-                # Add slash commands
+                # Group commands by cog/category to avoid the 25 field limit
+                command_groups = {}
                 for c in slash_commands:
-                    embed.add_field(
-                        name=f"/{c.name}",
-                        value=c.description or "No description",
-                        inline=False,
-                    )
+                    # Try to get the cog name from the command
+                    cog_name = getattr(c, 'module', 'General')
+                    if cog_name.startswith('cogs.'):
+                        cog_name = cog_name.split('.')[-1].title()
+                    
+                    if cog_name not in command_groups:
+                        command_groups[cog_name] = []
+                    command_groups[cog_name].append(c)
+                
+                # If we have too many groups, combine them into a single field
+                # Discord limit is 25 fields, so we need to be conservative
+                if len(command_groups) > 15:  # Leave room for context menus and potential field splits
+                    command_list = []
+                    for c in slash_commands:
+                        command_list.append(f"**/{c.name}** - {c.description or 'No description'}")
+                    
+                    # Split into chunks to avoid hitting character limits
+                    chunk_size = 20
+                    for i in range(0, len(command_list), chunk_size):
+                        chunk = command_list[i:i + chunk_size]
+                        field_name = f"📋 Commands ({i+1}-{min(i+chunk_size, len(command_list))})"
+                        embed.add_field(
+                            name=field_name,
+                            value="\n".join(chunk),
+                            inline=False
+                        )
+                else:
+                    # Add commands grouped by category
+                    field_count = 0
+                    max_fields = 24  # Leave room for context menus
+                    
+                    for cog_name, cog_commands in command_groups.items():
+                        if field_count >= max_fields:
+                            break
+                            
+                        command_list = []
+                        for c in cog_commands:
+                            command_list.append(f"**/{c.name}** - {c.description or 'No description'}")
+                        
+                        # Check if the field value would be too long (Discord limit is 1024 chars)
+                        field_value = "\n".join(command_list)
+                        if len(field_value) > 1000:  # Leave some buffer
+                            # Split into multiple fields if too long
+                            chunk_size = 5
+                            for i in range(0, len(command_list), chunk_size):
+                                if field_count >= max_fields:
+                                    break
+                                chunk = command_list[i:i + chunk_size]
+                                chunk_value = "\n".join(chunk)
+                                if len(chunk_value) <= 1000:
+                                    field_name = f"📁 {cog_name}" if i == 0 else f"📁 {cog_name} (cont.)"
+                                    embed.add_field(
+                                        name=field_name,
+                                        value=chunk_value,
+                                        inline=False
+                                    )
+                                    field_count += 1
+                        else:
+                            embed.add_field(
+                                name=f"📁 {cog_name}",
+                                value=field_value,
+                                inline=False
+                            )
+                            field_count += 1
                 
                 # Add context menu info if any exist
                 if context_menus:
