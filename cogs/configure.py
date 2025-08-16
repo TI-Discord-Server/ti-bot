@@ -930,43 +930,105 @@ class ChannelSelectView(discord.ui.View):
     
     async def channel_select_callback(self, interaction: discord.Interaction):
         """Handle channel selection."""
-        channel = interaction.data['values'][0]
-        channel_id = int(channel)
-        
-        await self.bot.db.settings.update_one(
-            {"_id": self.settings_id},
-            {"$set": {self.field_name: channel_id}},
-            upsert=True
-        )
-        
-        # Return to appropriate config view
-        if self.settings_id == "modmail_settings":
-            config_view = ModmailConfigView(self.bot, self.user_id, True)
-        elif self.settings_id == "confession_settings":
-            config_view = ConfessionsConfigView(self.bot, self.user_id, True)
-        elif self.settings_id == "reports_settings":
-            config_view = ReportsConfigView(self.bot, self.user_id, True)
-        else:
-            config_view = ConfigurationView(self.bot, self.user_id, True)
-        
-        embed = await config_view.create_embed()
-        await interaction.response.edit_message(embed=embed, view=config_view)
+        try:
+            channel = interaction.data['values'][0]
+            channel_id = int(channel)
+            
+            self.bot.log.info(f"Channel selected by {interaction.user} ({interaction.user.id}): {channel_id} for field {self.field_name} in {self.settings_id}")
+            
+            # Validate the selected channel
+            selected_channel = self.bot.get_channel(channel_id)
+            if selected_channel:
+                self.bot.log.info(f"Selected channel: {selected_channel.name} ({channel_id}) in guild {selected_channel.guild.name if selected_channel.guild else 'Unknown'}")
+                
+                # Check if channel is in correct guild
+                if hasattr(selected_channel, 'guild') and selected_channel.guild and self.bot.guild_id:
+                    if selected_channel.guild.id != self.bot.guild_id:
+                        self.bot.log.warning(f"Selected channel {channel_id} is in different guild: {selected_channel.guild.id} vs expected {self.bot.guild_id}")
+            else:
+                self.bot.log.warning(f"Selected channel {channel_id} not found in bot cache")
+            
+            await self.bot.db.settings.update_one(
+                {"_id": self.settings_id},
+                {"$set": {self.field_name: channel_id}},
+                upsert=True
+            )
+            
+            self.bot.log.info(f"Successfully updated {self.settings_id}.{self.field_name} to {channel_id}")
+            
+            # Return to appropriate config view based on settings_id and field_name
+            if self.settings_id == "modmail_settings":
+                config_view = ModmailConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "confession_settings":
+                config_view = ConfessionsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "reports_settings":
+                config_view = ReportsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "mod_settings":
+                # For mod_settings, determine the correct view based on field name
+                if self.field_name in ["unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"]:
+                    config_view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+                    self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
+                else:
+                    config_view = ModerationConfigView(self.bot, self.user_id, True)
+                    self.bot.log.debug(f"Returning to ModerationConfigView for field {self.field_name}")
+            else:
+                config_view = ConfigurationView(self.bot, self.user_id, True)
+                self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
+            
+            embed = await config_view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=config_view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in channel_select_callback: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het instellen van het kanaal:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary)
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go back to the appropriate config view."""
-        # Determine which config view to return to based on settings_id
-        if self.settings_id == "modmail_settings":
-            view = ModmailConfigView(self.bot, self.user_id, True)
-        elif self.settings_id == "confession_settings":
-            view = ConfessionsConfigView(self.bot, self.user_id, True)
-        elif self.settings_id == "reports_settings":
-            view = ReportsConfigView(self.bot, self.user_id, True)
-        else:
-            view = ConfigurationView(self.bot, self.user_id, True)
-        
-        embed = await view.create_embed()
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            self.bot.log.debug(f"Back button clicked for {self.settings_id}.{self.field_name}")
+            
+            # Determine which config view to return to based on settings_id and field_name
+            if self.settings_id == "modmail_settings":
+                view = ModmailConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "confession_settings":
+                view = ConfessionsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "reports_settings":
+                view = ReportsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "mod_settings":
+                # For mod_settings, determine the correct view based on field name
+                if self.field_name in ["unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"]:
+                    view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+                    self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
+                else:
+                    view = ModerationConfigView(self.bot, self.user_id, True)
+                    self.bot.log.debug(f"Returning to ModerationConfigView for field {self.field_name}")
+            else:
+                view = ConfigurationView(self.bot, self.user_id, True)
+                self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
+            
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     async def on_timeout(self):
         """Handle timeout."""
@@ -1919,7 +1981,9 @@ class UnbanRequestsConfigView(BaseConfigView):
     async def create_embed(self):
         """Create unban requests configuration embed."""
         try:
+            self.bot.log.debug("Creating unban requests configuration embed")
             settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
+            self.bot.log.debug(f"Retrieved mod_settings for unban requests: {settings}")
             
             embed = discord.Embed(
                 title="🔓 Unban Requests Instellingen",
@@ -1931,19 +1995,29 @@ class UnbanRequestsConfigView(BaseConfigView):
             # Unban request channel
             unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
             if unban_request_kanaal_id:
-                channel = self.bot.get_channel(unban_request_kanaal_id)
-                if channel:
+                try:
+                    channel = self.bot.get_channel(unban_request_kanaal_id)
+                    if channel:
+                        embed.add_field(
+                            name="📝 Unban Request Kanaal",
+                            value=f"{channel.mention} (`{channel.id}`)",
+                            inline=False
+                        )
+                        self.bot.log.debug(f"Found unban request channel: {channel.name} ({unban_request_kanaal_id})")
+                    else:
+                        embed.add_field(
+                            name="📝 Unban Request Kanaal",
+                            value=f"⚠️ Kanaal niet gevonden (`{unban_request_kanaal_id}`)",
+                            inline=False
+                        )
+                        self.bot.log.warning(f"Unban request channel {unban_request_kanaal_id} not found or not accessible")
+                except Exception as e:
                     embed.add_field(
                         name="📝 Unban Request Kanaal",
-                        value=f"{channel.mention} (`{channel.id}`)",
+                        value=f"❌ Fout bij ophalen kanaal (`{unban_request_kanaal_id}`)",
                         inline=False
                     )
-                else:
-                    embed.add_field(
-                        name="📝 Unban Request Kanaal",
-                        value=f"⚠️ Kanaal niet gevonden (`{unban_request_kanaal_id}`)",
-                        inline=False
-                    )
+                    self.bot.log.error(f"Error getting unban request channel {unban_request_kanaal_id}: {e}")
             else:
                 embed.add_field(
                     name="📝 Unban Request Kanaal",
@@ -1954,19 +2028,29 @@ class UnbanRequestsConfigView(BaseConfigView):
             # Log channel 1
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
             if aanvragen_log_kanaal_id_1:
-                channel = self.bot.get_channel(aanvragen_log_kanaal_id_1)
-                if channel:
+                try:
+                    channel = self.bot.get_channel(aanvragen_log_kanaal_id_1)
+                    if channel:
+                        embed.add_field(
+                            name="📋 Log Kanaal 1 (Staff)",
+                            value=f"{channel.mention} (`{channel.id}`)",
+                            inline=False
+                        )
+                        self.bot.log.debug(f"Found unban log channel 1: {channel.name} ({aanvragen_log_kanaal_id_1})")
+                    else:
+                        embed.add_field(
+                            name="📋 Log Kanaal 1 (Staff)",
+                            value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_1}`)",
+                            inline=False
+                        )
+                        self.bot.log.warning(f"Unban log channel 1 {aanvragen_log_kanaal_id_1} not found or not accessible")
+                except Exception as e:
                     embed.add_field(
                         name="📋 Log Kanaal 1 (Staff)",
-                        value=f"{channel.mention} (`{channel.id}`)",
+                        value=f"❌ Fout bij ophalen kanaal (`{aanvragen_log_kanaal_id_1}`)",
                         inline=False
                     )
-                else:
-                    embed.add_field(
-                        name="📋 Log Kanaal 1 (Staff)",
-                        value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_1}`)",
-                        inline=False
-                    )
+                    self.bot.log.error(f"Error getting unban log channel 1 {aanvragen_log_kanaal_id_1}: {e}")
             else:
                 embed.add_field(
                     name="📋 Log Kanaal 1 (Staff)",
@@ -1977,19 +2061,29 @@ class UnbanRequestsConfigView(BaseConfigView):
             # Log channel 2
             aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
             if aanvragen_log_kanaal_id_2:
-                channel = self.bot.get_channel(aanvragen_log_kanaal_id_2)
-                if channel:
+                try:
+                    channel = self.bot.get_channel(aanvragen_log_kanaal_id_2)
+                    if channel:
+                        embed.add_field(
+                            name="📋 Log Kanaal 2 (Archive)",
+                            value=f"{channel.mention} (`{channel.id}`)",
+                            inline=False
+                        )
+                        self.bot.log.debug(f"Found unban log channel 2: {channel.name} ({aanvragen_log_kanaal_id_2})")
+                    else:
+                        embed.add_field(
+                            name="📋 Log Kanaal 2 (Archive)",
+                            value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_2}`)",
+                            inline=False
+                        )
+                        self.bot.log.warning(f"Unban log channel 2 {aanvragen_log_kanaal_id_2} not found or not accessible")
+                except Exception as e:
                     embed.add_field(
                         name="📋 Log Kanaal 2 (Archive)",
-                        value=f"{channel.mention} (`{channel.id}`)",
+                        value=f"❌ Fout bij ophalen kanaal (`{aanvragen_log_kanaal_id_2}`)",
                         inline=False
                     )
-                else:
-                    embed.add_field(
-                        name="📋 Log Kanaal 2 (Archive)",
-                        value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_2}`)",
-                        inline=False
-                    )
+                    self.bot.log.error(f"Error getting unban log channel 2 {aanvragen_log_kanaal_id_2}: {e}")
             else:
                 embed.add_field(
                     name="📋 Log Kanaal 2 (Archive) - Optioneel",
@@ -2037,35 +2131,77 @@ class UnbanRequestsConfigView(BaseConfigView):
     @discord.ui.button(label="Request Kanaal", style=discord.ButtonStyle.secondary, emoji="📝")
     async def set_request_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the unban request channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "unban_request_kanaal_id", "text")
-        embed = discord.Embed(
-            title="📝 Unban Request Kanaal Selecteren",
-            description="Selecteer het kanaal waar gebruikers unban aanvragen kunnen indienen.",
-            color=discord.Color.blue()
-        )
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            self.bot.log.info(f"Unban request channel button clicked by {interaction.user} ({interaction.user.id})")
+            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "unban_request_kanaal_id", "text")
+            embed = discord.Embed(
+                title="📝 Unban Request Kanaal Selecteren",
+                description="Selecteer het kanaal waar gebruikers unban aanvragen kunnen indienen.",
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            self.bot.log.debug("Unban request channel selection view sent successfully")
+        except Exception as e:
+            self.bot.log.error(f"Error opening unban request channel selection: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     @discord.ui.button(label="Log Kanaal 1", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the first log channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_1", "text")
-        embed = discord.Embed(
-            title="📋 Log Kanaal 1 (Staff) Selecteren",
-            description="Selecteer het kanaal waar staff unban aanvragen kan beoordelen. Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
-            color=discord.Color.blue()
-        )
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            self.bot.log.info(f"Unban log channel 1 button clicked by {interaction.user} ({interaction.user.id})")
+            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_1", "text")
+            embed = discord.Embed(
+                title="📋 Log Kanaal 1 (Staff) Selecteren",
+                description="Selecteer het kanaal waar staff unban aanvragen kan beoordelen. Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            self.bot.log.debug("Unban log channel 1 selection view sent successfully")
+        except Exception as e:
+            self.bot.log.error(f"Error opening unban log channel 1 selection: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     @discord.ui.button(label="Log Kanaal 2 (Optioneel)", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the second log channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text")
-        embed = discord.Embed(
-            title="📋 Log Kanaal 2 (Archive) Selecteren",
-            description="Selecteer het kanaal voor archivering van unban aanvragen. Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
-            color=discord.Color.blue()
-        )
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            self.bot.log.info(f"Unban log channel 2 button clicked by {interaction.user} ({interaction.user.id})")
+            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text")
+            embed = discord.Embed(
+                title="📋 Log Kanaal 2 (Archive) Selecteren",
+                description="Selecteer het kanaal voor archivering van unban aanvragen. Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            self.bot.log.debug("Unban log channel 2 selection view sent successfully")
+        except Exception as e:
+            self.bot.log.error(f"Error opening unban log channel 2 selection: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     @discord.ui.button(label="Setup Bericht", style=discord.ButtonStyle.success, emoji="🚀", row=1)
     async def setup_unban_message(self, interaction: discord.Interaction, button: discord.ui.Button):
