@@ -61,27 +61,43 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         try:
             await member.kick(reason=reason)
+            self.bot.log.info(f"User {member.name} ({member.id}) kicked by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
+            
             embed = discord.Embed(
                 title="Member gekickt",
                 description=f"{member.mention} is gekickt. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            await self.log_infraction(
-                interaction.guild.id, member.id, interaction.user.id, "kick", reason
-            )
+            
+            try:
+                await self.log_infraction(
+                    interaction.guild.id, member.id, interaction.user.id, "kick", reason
+                )
+            except Exception as e:
+                self.bot.log.error(f"Failed to log kick infraction for {member.name} ({member.id}): {e}")
 
-        except discord.errors.Forbidden:
+        except discord.errors.Forbidden as e:
+            self.bot.log.error(f"Permission denied when trying to kick {member.name} ({member.id}): {e}")
             embed = discord.Embed(
                 title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te kicken.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.HTTPException:
+        except discord.errors.HTTPException as e:
+            self.bot.log.error(f"HTTP error when trying to kick {member.name} ({member.id}): {e}")
             embed = discord.Embed(
-                title="Fout",
-                description="Kicken mislukt.",
+                title="Discord API Fout",
+                description=f"Kicken mislukt door Discord API fout: {str(e)}",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error when trying to kick {member.name} ({member.id}): {e}", exc_info=True)
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description=f"Er is een onverwachte fout opgetreden bij het kicken: {str(e)}",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -110,11 +126,13 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await interaction.response.defer(ephemeral=True)
 
         try:
+            # Try to send DM with unban request link
+            dm_success = False
             try:
                 channel = await member.create_dm()
                 view = discord.ui.View()
                 settings = await self.settings_collection.find_one({"_id": "mod_settings"})
-                unban_request_url = settings.get("unban_request_url", "https://example.com/unban_request")
+                unban_request_url = settings.get("unban_request_url", "https://example.com/unban_request") if settings else "https://example.com/unban_request"
                 button = discord.ui.Button(
                     label="Request Unban", style=discord.ButtonStyle.link, url=unban_request_url
                 )
@@ -128,14 +146,20 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     ),
                     view=view,
                 )
-
                 dm_success = True
+                self.bot.log.debug(f"DM sent successfully to {member.name} ({member.id}) for ban notification")
             except discord.errors.Forbidden:
-                print(f"Kon geen DM sturen naar {member.name}.")
+                self.bot.log.info(f"Could not send DM to {member.name} ({member.id}) - DMs disabled or blocked")
+                dm_success = False
+            except Exception as e:
+                self.bot.log.warning(f"Failed to send DM to {member.name} ({member.id}): {e}")
                 dm_success = False
 
+            # Perform the ban
             await member.ban(reason=reason)
+            self.bot.log.info(f"User {member.name} ({member.id}) banned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
 
+            # Send success message
             embed = discord.Embed(
                 title="Member gebanned",
                 description=f"{member.mention} is gebanned. Reden: {reason}",
@@ -148,21 +172,36 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 embed.set_footer(text="Kon gebruiker niet via DM informeren.")
 
             await interaction.followup.send(embed=embed, ephemeral=False)
-            await self.log_infraction(
-                interaction.guild.id, member.id, interaction.user.id, "ban", reason
-            )
+            
+            # Log the infraction
+            try:
+                await self.log_infraction(
+                    interaction.guild.id, member.id, interaction.user.id, "ban", reason
+                )
+            except Exception as e:
+                self.bot.log.error(f"Failed to log ban infraction for {member.name} ({member.id}): {e}")
 
-        except discord.errors.Forbidden:
+        except discord.errors.Forbidden as e:
+            self.bot.log.error(f"Permission denied when trying to ban {member.name} ({member.id}): {e}")
             embed = discord.Embed(
                 title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te bannen.",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
-        except discord.errors.HTTPException:
+        except discord.errors.HTTPException as e:
+            self.bot.log.error(f"HTTP error when trying to ban {member.name} ({member.id}): {e}")
             embed = discord.Embed(
-                title="Fout",
-                description="Bannen mislukt.",
+                title="Discord API Fout",
+                description=f"Bannen mislukt door Discord API fout: {str(e)}",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error when trying to ban {member.name} ({member.id}): {e}", exc_info=True)
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description=f"Er is een onverwachte fout opgetreden bij het bannen: {str(e)}",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -200,6 +239,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             
             # Unban the user
             await interaction.guild.unban(user, reason=reason)
+            self.bot.log.info(f"User {user.name} ({user.id}) unbanned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
             
             embed = discord.Embed(
                 title="Gebruiker Ongebanned",
@@ -209,35 +249,50 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed)
             
             # Log the infraction
-            await self.log_infraction(
-                interaction.guild.id, user.id, interaction.user.id, "unban", reason
-            )
+            try:
+                await self.log_infraction(
+                    interaction.guild.id, user.id, interaction.user.id, "unban", reason
+                )
+            except Exception as e:
+                self.bot.log.error(f"Failed to log unban infraction for {user.name} ({user.id}): {e}")
             
-        except ValueError:
+        except ValueError as e:
+            self.bot.log.warning(f"Invalid user ID provided for unban: {user_id} by {interaction.user.name} ({interaction.user.id})")
             embed = discord.Embed(
                 title="Ongeldig ID",
                 description="Het opgegeven gebruikers-ID is niet geldig.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.NotFound:
+        except discord.errors.NotFound as e:
+            self.bot.log.warning(f"User not found for unban: {user_id} by {interaction.user.name} ({interaction.user.id}): {e}")
             embed = discord.Embed(
                 title="Gebruiker Niet Gevonden",
                 description=f"Geen gebruiker gevonden met ID: {user_id}",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.Forbidden:
+        except discord.errors.Forbidden as e:
+            self.bot.log.error(f"Permission denied when trying to unban user {user_id}: {e}")
             embed = discord.Embed(
                 title="Permissie Fout",
                 description="Ik heb geen permissie om gebruikers te unbannen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.HTTPException:
+        except discord.errors.HTTPException as e:
+            self.bot.log.error(f"HTTP error when trying to unban user {user_id}: {e}")
             embed = discord.Embed(
-                title="Fout",
-                description="Unbannen mislukt.",
+                title="Discord API Fout",
+                description=f"Unbannen mislukt door Discord API fout: {str(e)}",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error when trying to unban user {user_id}: {e}", exc_info=True)
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description=f"Er is een onverwachte fout opgetreden bij het unbannen: {str(e)}",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
