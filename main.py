@@ -320,6 +320,9 @@ class Bot(commands.Bot):
                 return
 
     async def __load_cogs(self) -> None:
+        # Configure jishaku to use database developers only
+        os.environ["JISHAKU_NO_UNDERSCORE"] = "True"
+        os.environ["JISHAKU_NO_DM_TRACEBACK"] = "True"
         await self.load_extension("jishaku")
         for m in [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]:
             if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
@@ -402,6 +405,26 @@ class Bot(commands.Bot):
             self.log.info(f"Loaded {len(self.owner_ids)} developer IDs from database")
         else:
             self.log.info("No developer IDs configured in database")
+
+    async def is_owner(self, user: discord.abc.User) -> bool:
+        """Check if a user is a developer/owner of the bot."""
+        # First check if developer IDs are configured in database
+        settings = await self.db.settings.find_one({"_id": "server_settings"})
+        developer_ids = settings.get("developer_ids", []) if settings else []
+        
+        if developer_ids:
+            return user.id in developer_ids
+        
+        # If no developers configured, fallback to server admins
+        guild_id = await self.get_guild_id()
+        if guild_id:
+            guild = self.get_guild(guild_id)
+            if guild:
+                member = guild.get_member(user.id)
+                if member and member.guild_permissions.administrator:
+                    return True
+        
+        return False
 
     @property
     def guild_id(self) -> typing.Optional[int]:
