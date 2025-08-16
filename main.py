@@ -333,6 +333,11 @@ class Bot(commands.Bot):
         discord_log = logging.getLogger("discord")
         discord_log.setLevel(logging.WARNING)
         
+        # Suppress discord.py webhook rate limit messages specifically
+        discord_webhook_log = logging.getLogger("discord.webhook")
+        discord_webhook_log.setLevel(logging.ERROR)  # Only show errors, not warnings
+        discord_webhook_log.propagate = False  # Don't propagate to parent discord logger
+        
         # Create file handler with custom formatter for discord logs
         discord_file_handler = RotatingFileHandler(
             "bot.log",
