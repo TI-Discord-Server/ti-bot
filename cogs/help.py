@@ -6,7 +6,8 @@ from discord.ext import commands
 class Help(commands.Cog, name="help"):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.remove_command("help")  # Removes the built-in help command
+        # Note: remove_command only affects prefix commands, not slash commands
+        # self.bot.remove_command("help")  # Removes the built-in help command
 
     @command(name="help", description="Get a list of all available commands.")
     async def help_command(self, interaction: discord.Interaction):
