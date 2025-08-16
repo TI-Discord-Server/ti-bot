@@ -17,6 +17,13 @@ SMTP_SERVER: Final[str] = cast(str, getenv("SMTP_SERVER", "smtp.gmail.com"))
 SMTP_PORT: Final[int] = int(cast(str, getenv("SMTP_PORT", "587")))
 IMAP_SERVER: Final[str] = cast(str, getenv("IMAP_SERVER", "imap.gmail.com"))
 IMAP_PORT: Final[int] = int(cast(str, getenv("IMAP_PORT", "993")))
+# Migration-specific email settings (for bounce checking with Gmail)
+MIGRATION_SMTP_PASSWORD: Final[str] = cast(str, getenv("MIGRATION_SMTP_PASSWORD", ""))
+MIGRATION_SMTP_EMAIL: Final[str] = cast(str, getenv("MIGRATION_SMTP_EMAIL", ""))
+MIGRATION_SMTP_SERVER: Final[str] = cast(str, getenv("MIGRATION_SMTP_SERVER", "smtp.gmail.com"))
+MIGRATION_SMTP_PORT: Final[int] = int(cast(str, getenv("MIGRATION_SMTP_PORT", "587")))
+MIGRATION_IMAP_SERVER: Final[str] = cast(str, getenv("MIGRATION_IMAP_SERVER", "imap.gmail.com"))
+MIGRATION_IMAP_PORT: Final[int] = int(cast(str, getenv("MIGRATION_IMAP_PORT", "993")))
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
@@ -35,6 +42,12 @@ __all__: Final[Tuple[str, ...]] = (
     "SMTP_PORT",
     "IMAP_SERVER",
     "IMAP_PORT",
+    "MIGRATION_SMTP_PASSWORD",
+    "MIGRATION_SMTP_EMAIL",
+    "MIGRATION_SMTP_SERVER",
+    "MIGRATION_SMTP_PORT",
+    "MIGRATION_IMAP_SERVER",
+    "MIGRATION_IMAP_PORT",
     "ENCRYPTION_KEY",
     "OLD_CONNECTION_STRING",
     "POD_UID",

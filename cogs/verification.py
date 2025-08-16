@@ -18,7 +18,11 @@ from discord import app_commands, ui, Interaction
 from motor import motor_asyncio
 
 from utils.email_sender import send_email
-from env import ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT
+from env import (
+    ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT,
+    MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD, MIGRATION_SMTP_SERVER, MIGRATION_SMTP_PORT,
+    MIGRATION_IMAP_SERVER, MIGRATION_IMAP_PORT
+)
 from cryptography.fernet import Fernet
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@student\.hogent\.be$")
@@ -312,9 +316,35 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
             print(f"Migration error: {e}")
 
+    def _validate_migration_credentials(self) -> bool:
+        """Validate that migration email credentials are properly configured"""
+        required_vars = [
+            MIGRATION_SMTP_EMAIL,
+            MIGRATION_SMTP_PASSWORD,
+            MIGRATION_SMTP_SERVER,
+            MIGRATION_IMAP_SERVER
+        ]
+        
+        if not all(required_vars):
+            return False
+            
+        # Check if migration credentials are different from regular credentials
+        # This ensures we're using separate accounts for migration vs normal verification
+        if (MIGRATION_SMTP_EMAIL == SMTP_EMAIL and 
+            MIGRATION_SMTP_PASSWORD == SMTP_PASSWORD and
+            MIGRATION_SMTP_SERVER == SMTP_SERVER):
+            print("Warning: Migration credentials are identical to regular SMTP credentials")
+            
+        return True
+
     async def _check_email_bounce(self, email_address: str) -> str:
         """Check if an email bounces by sending a test email and monitoring for bounce responses"""
         try:
+            # Validate migration credentials first
+            if not self._validate_migration_credentials():
+                print("Migration email credentials not properly configured")
+                return "send_failed"
+                
             # Generate unique test ID
             test_id = str(uuid.uuid4())[:8]
             
@@ -331,10 +361,10 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             return "unknown"
 
     async def _send_test_email(self, recipient: str, test_id: str) -> bool:
-        """Send a minimal test email with unique identifier"""
+        """Send a minimal test email with unique identifier using migration credentials"""
         try:
             msg = MIMEMultipart()
-            msg['From'] = SMTP_EMAIL
+            msg['From'] = MIGRATION_SMTP_EMAIL
             msg['To'] = recipient
             msg['Subject'] = f'E-mail verificatie test - {test_id}'
             msg['Message-ID'] = f'<{test_id}@verification.test>'
@@ -349,14 +379,14 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
             msg.attach(MIMEText(body, 'plain'))
 
             # Use SSL if port 465, otherwise use STARTTLS
-            if SMTP_PORT == 465:
-                with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
-                    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            if MIGRATION_SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(MIGRATION_SMTP_SERVER, MIGRATION_SMTP_PORT) as server:
+                    server.login(MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD)
                     server.send_message(msg)
             else:
-                with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                with smtplib.SMTP(MIGRATION_SMTP_SERVER, MIGRATION_SMTP_PORT) as server:
                     server.starttls()
-                    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    server.login(MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD)
                     server.send_message(msg)
 
             return True
@@ -371,14 +401,14 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
         deadline = time.time() + wait_minutes * 60
         poll_interval = 30  # seconds
 
-        # Use configured IMAP server and port
-        imap_host = IMAP_SERVER
-        imap_port = IMAP_PORT
+        # Use migration-specific IMAP server and port
+        imap_host = MIGRATION_IMAP_SERVER
+        imap_port = MIGRATION_IMAP_PORT
 
         while time.time() < deadline and any(v == "no_bounce_yet" for v in results.values()):
             try:
                 with imaplib.IMAP4_SSL(imap_host, imap_port) as imap:
-                    imap.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    imap.login(MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD)
                     imap.select("INBOX")
 
                     # Search recent messages
