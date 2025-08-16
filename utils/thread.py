@@ -260,7 +260,8 @@ class Thread:
             footer = f"User ID: {user.id}"
 
         if member is not None:
-            embed.set_author(name=str(user), icon_url=member.display_avatar.url, url=log_url)
+            avatar_url = member.display_avatar.url if member.display_avatar else None
+            embed.set_author(name=str(user), icon_url=avatar_url, url=log_url)
 
             joined = discord.utils.format_dt(member.joined_at, "R")
             user_info.append(f"joined {joined}")
@@ -271,7 +272,8 @@ class Thread:
                 embed.add_field(name="Rollen", value=role_names, inline=True)
             embed.set_footer(text=footer)
         else:
-            embed.set_author(name=str(user), icon_url=user.display_avatar.url, url=log_url)
+            avatar_url = user.display_avatar.url if user.display_avatar else None
+            embed.set_author(name=str(user), icon_url=avatar_url, url=log_url)
             embed.set_footer(text=f"{footer} • (niet in hoofdserver)")
 
         embed.description += ", ".join(user_info)
@@ -784,7 +786,7 @@ class Thread:
         if anonymous:
             avatar_url = self.bot.user.avatar.url
         else:
-            avatar_url = author.display_avatar.url
+            avatar_url = author.display_avatar.url if author.display_avatar else None
 
         embed = discord.Embed(description=message.content)
         embed.timestamp = message.created_at
