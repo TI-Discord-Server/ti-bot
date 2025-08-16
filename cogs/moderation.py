@@ -340,7 +340,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="purge", description="Verwijdert messages uit het kanaal."
     )
-    @has_admin()
+    @has_role("The Council")
     async def purge(
         self,
         interaction: discord.Interaction,
@@ -385,7 +385,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="timeout", description="Timeout een member in de server"
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(
         member="De member om te timeouten",
         duration="De duration van de timeout (bijv. 1m, 5h, 1d). Max 28 dagen.",
@@ -466,7 +466,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="untimeout", description="Verwijdert timeout van een member"
     )
-    @has_admin()
+    @has_role("The Council")
     @app_commands.describe(
         member="De member om de timeout van te verwijderen",
         reason="De reden voor het verwijderen van de timeout",
@@ -663,7 +663,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await self.infractions_collection.insert_one(infraction)
 
 @app_commands.context_menu(name="Verwijder Hieronder")
-@has_admin()
+@has_role("The Council")
 async def purge_below(interaction: discord.Interaction, message: discord.Message):
     try:
         await interaction.response.defer(ephemeral=True)
