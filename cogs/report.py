@@ -1,6 +1,5 @@
 import discord
 from discord import app_commands
-from discord.app_commands import command
 from discord.ext import commands
 import datetime
 
@@ -23,7 +22,7 @@ class Reports(commands.Cog, name="reports"):
             return settings["moderator_role_id"]
         return None
 
-    @command(name="report", description="Rapporteer een gebruiker of probleem aan de moderators.")
+    @app_commands.command(name="report", description="Rapporteer een gebruiker of probleem aan de moderators.")
     @app_commands.describe(
         user="De gebruiker die je wilt rapporteren",
         reason="De reden van je melding",
@@ -112,7 +111,7 @@ class Reports(commands.Cog, name="reports"):
             "Je rapport is ingediend. Bedankt!", ephemeral=True
         )
 
-    @command(name="report_anonymous", description="Rapporteer een gebruiker of probleem anoniem aan de moderators.")
+    @app_commands.command(name="report_anonymous", description="Rapporteer een gebruiker of probleem anoniem aan de moderators.")
     @app_commands.describe(
         user="De gebruiker die je wilt rapporteren",
         reason="De reden van je melding",
