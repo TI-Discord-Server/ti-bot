@@ -30,6 +30,7 @@ from env import (
     MONGODB_PORT,
     MONGODB_USERNAME,
     WEBHOOK_URL,
+    WEBHOOK_SILENT_RETRIES,
     POD_UID,
 )
 from utils.errors import (
@@ -101,6 +102,24 @@ class DiscordWebhookHandler(logging.Handler):
         self.max_delay = 60.0  # Maximum delay in seconds
         self.failed_attempts = 0
         self.last_failure_time = 0
+        self.silent_retries = WEBHOOK_SILENT_RETRIES  # Use environment variable
+        
+        # Create a file-only logger for webhook status messages
+        self._file_logger = logging.getLogger('webhook_status')
+        self._file_logger.setLevel(logging.INFO)
+        # Only add file handler if it doesn't already exist
+        if not self._file_logger.handlers:
+            file_handler = RotatingFileHandler(
+                "webhook_status.log",
+                encoding="utf-8",
+                mode="a",
+                maxBytes=1024 * 1024,
+                backupCount=1,
+            )
+            file_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s'))
+            self._file_logger.addHandler(file_handler)
+            # Prevent propagation to avoid webhook loops
+            self._file_logger.propagate = False
 
     async def _ensure_session(self):
         # Create the ClientSession only when needed and within an async context.
@@ -181,24 +200,29 @@ class DiscordWebhookHandler(logging.Handler):
                     if attempt < self.max_retries:
                         # Calculate exponential backoff delay
                         delay = min(self.base_delay * (2 ** attempt), self.max_delay)
-                        print(f"[WEBHOOK] Rate limited (attempt {attempt + 1}/{self.max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        # Use file-only logger to avoid webhook loops
+                        if not self.silent_retries:
+                            self._file_logger.warning(f"WEBHOOK Rate limited (attempt {attempt + 1}/{self.max_retries + 1}). Waiting {delay:.1f}s before retry...")
                         await asyncio.sleep(delay)
                         continue
                     else:
-                        print(f"[WEBHOOK] Max retries ({self.max_retries}) exceeded for webhook {webhook.id}. Dropping log message.")
+                        if not self.silent_retries:
+                            self._file_logger.error(f"WEBHOOK Max retries ({self.max_retries}) exceeded for webhook {webhook.id}. Dropping log message.")
                         return
                 else:
                     # Other HTTP error, don't retry
                     self.failed_attempts += 1
                     self.last_failure_time = current_time
-                    print(f"[WEBHOOK] HTTP error {e.status}: {e.text}")
+                    if not self.silent_retries:
+                        self._file_logger.error(f"WEBHOOK HTTP error {e.status}: {e.text}")
                     return
                     
             except Exception as e:
                 # Other error, don't retry
                 self.failed_attempts += 1
                 self.last_failure_time = current_time
-                print(f"[WEBHOOK] Unexpected error: {e}")
+                if not self.silent_retries:
+                    self._file_logger.error(f"WEBHOOK Unexpected error: {e}")
                 return
 
     def _get_color(self, levelname):

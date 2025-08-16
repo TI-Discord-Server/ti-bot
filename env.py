@@ -11,6 +11,7 @@ MONGODB_IP_ADDRESS: Final[str] = cast(str, getenv("MONGODB_IP_ADDRESS"))
 MONGODB_PORT: Final[str] = cast(str, getenv("MONGODB_PORT", "27017"))
 MONGODB_USERNAME: Final[str] = cast(str, getenv("MONGODB_USERNAME", "dev"))
 WEBHOOK_URL: Final[str] = cast(str, getenv("WEBHOOK_URL"))
+WEBHOOK_SILENT_RETRIES: Final[bool] = getenv("WEBHOOK_SILENT_RETRIES", "false").lower() in ("true", "1", "yes")
 SMTP_PASSWORD: Final[str] = cast(str, getenv("SMTP_PASSWORD", ""))
 SMTP_EMAIL: Final[str] = cast(str, getenv("SMTP_EMAIL", "toegepasteinformaticadiscord@gmail.com"))
 SMTP_SERVER: Final[str] = cast(str, getenv("SMTP_SERVER", "smtp.gmail.com"))
@@ -36,6 +37,7 @@ __all__: Final[Tuple[str, ...]] = (
     "MONGODB_PORT",
     "MONGODB_USERNAME",
     "WEBHOOK_URL",
+    "WEBHOOK_SILENT_RETRIES",
     "SMTP_PASSWORD",
     "SMTP_EMAIL",
     "SMTP_SERVER",
