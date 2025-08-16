@@ -43,131 +43,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
         self.bot = bot
         self.settings_collection = self.bot.db["settings"]
 
-    @app_commands.command(name="set_mod_setting", description="Stel een moderator of bot setting in.")
-    @is_moderator()
-    @app_commands.describe(
-        setting_name="De setting om aan te passen",
-        setting_value="De waarde voor de setting (gebruik HH:MM voor tijden, komma's voor meerdere tijden)"
-    )
-    @app_commands.choices(setting_name=[
-        app_commands.Choice(name="moderator_id", value="moderator_id"),
-        app_commands.Choice(name="unban_request_url", value="unban_request_url"),
-        app_commands.Choice(name="unban_request_kanaal_id", value="unban_request_kanaal_id"),
-        app_commands.Choice(name="aanvragen_log_kanaal_id_1", value="aanvragen_log_kanaal_id_1"),
-        app_commands.Choice(name="aanvragen_log_kanaal_id_2", value="aanvragen_log_kanaal_id_2"),
-        app_commands.Choice(name="confession_review_time", value="confession_review_time"),
-        app_commands.Choice(name="confession_post_times", value="confession_post_times"),
-    ])
-    async def set_mod_setting(self, interaction: discord.Interaction,
-                                setting_name: str,
-                                setting_value: str):
-        """Stelt een moderator setting in."""
-        valid_settings = {
-            "moderator_id": "moderator_id",
-            "unban_request_url": "unban_request_url",
-            "unban_request_kanaal_id": "unban_request_kanaal_id",
-            "aanvragen_log_kanaal_id_1": "aanvragen_log_kanaal_id_1",
-            "aanvragen_log_kanaal_id_2": "aanvragen_log_kanaal_id_2",
-            "confession_review_time": "confession_review_time",
-            "confession_post_times": "confession_post_times",
-        }
 
-        if setting_name not in valid_settings:
-            return await interaction.response.send_message(
-                f"Ongeldige setting naam. Geldige settings zijn: {', '.join(valid_settings.keys())}",
-                ephemeral=True)
-
-        # Handle confession settings with special validation
-        if setting_name == "confession_review_time":
-            try:
-                hour, minute = map(int, setting_value.strip().split(":"))
-                if not (0 <= hour < 24 and 0 <= minute < 60):
-                    raise ValueError
-                formatted_time = f"{hour:02}:{minute:02}"
-                
-                await self.bot.db.settings.update_one(
-                    {"_id": "confession_settings"},
-                    {"$set": {"review_time": formatted_time}},
-                    upsert=True
-                )
-                
-                # Update schedule if confession tasks exist
-                try:
-                    confession_cog = self.bot.get_cog("ConfessionCommands")
-                    if confession_cog and hasattr(confession_cog, 'tasks'):
-                        await confession_cog.tasks.update_review_schedule()
-                except Exception as e:
-                    self.bot.log.warning(f"Could not update confession review schedule: {e}")
-                
-                await interaction.response.send_message(
-                    f"✅ Confession review tijd ingesteld op '{formatted_time}' UTC.",
-                    ephemeral=True)
-                return
-                
-            except ValueError:
-                return await interaction.response.send_message(
-                    "❌ Ongeldige tijdsnotatie. Gebruik **HH:MM (24-uur formaat)**.",
-                    ephemeral=True)
-        
-        elif setting_name == "confession_post_times":
-            post_times_list = setting_value.split(",")
-            formatted_post_times = []
-            
-            for time in post_times_list:
-                try:
-                    hour, minute = map(int, time.strip().split(":"))
-                    if not (0 <= hour < 24 and 0 <= minute < 60):
-                        raise ValueError
-                    formatted_post_times.append(f"{hour:02}:{minute:02}")
-                except ValueError:
-                    return await interaction.response.send_message(
-                        "❌ Ongeldige post-tijden. Gebruik **HH:MM (24-uur formaat) en scheid met komma's**.",
-                        ephemeral=True)
-            
-            if not formatted_post_times:
-                return await interaction.response.send_message(
-                    "❌ Je moet minstens **één** post-tijd instellen.",
-                    ephemeral=True)
-            
-            await self.bot.db.settings.update_one(
-                {"_id": "confession_settings"},
-                {"$set": {
-                    "post_times": formatted_post_times,
-                    "daily_review_limit": len(formatted_post_times)
-                }},
-                upsert=True
-            )
-            
-            # Update schedule if confession tasks exist
-            try:
-                confession_cog = self.bot.get_cog("ConfessionCommands")
-                if confession_cog and hasattr(confession_cog, 'tasks'):
-                    await confession_cog.tasks.update_post_schedule()
-            except Exception as e:
-                self.bot.log.warning(f"Could not update confession post schedule: {e}")
-            
-            await interaction.response.send_message(
-                f"✅ Confession post-tijden ingesteld op: `{', '.join(formatted_post_times)}` UTC\n"
-                f"Aantal confessions per dag: `{len(formatted_post_times)}`",
-                ephemeral=True)
-            return
-        
-        # Handle regular mod settings
-        try:
-            if setting_name in ("moderator_id", "unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"):
-                setting_value = int(setting_value)
-        except ValueError:
-            return await interaction.response.send_message(f"De '{setting_name}' moet een getal zijn.", ephemeral=True)
-
-        await self.settings_collection.update_one(
-            {"_id": "mod_settings"},
-            {"$set": {setting_name: setting_value}},
-            upsert=True,
-        )
-
-        await interaction.response.send_message(
-            f"Setting '{setting_name}' is ingesteld op '{setting_value}'.",
-            ephemeral=True)
 
     @app_commands.command(name="setup", description="Stel verschillende bot componenten in.")
     @developer()
@@ -354,7 +230,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             # Check if settings are configured
             if not (unban_cog.unban_request_kanaal_id and unban_cog.aanvragen_log_kanaal_id_1 and unban_cog.aanvragen_log_kanaal_id_2):
                 await interaction.response.send_message(
-                    "❌ De unban aanvraag instellingen zijn nog niet ingesteld. Gebruik `/set_mod_setting` om ze in te stellen.", 
+                    "❌ De unban aanvraag instellingen zijn nog niet ingesteld. Gebruik `/configure` en selecteer 'Unban Requests' om ze in te stellen.", 
                     ephemeral=True)
                 return
             

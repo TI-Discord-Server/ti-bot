@@ -1812,7 +1812,7 @@ class UnbanRequestsConfigView(BaseConfigView):
             else:
                 embed.add_field(
                     name="⚠️ Configuratie Vereist",
-                    value="Stel alle kanalen in met `/set_mod_setting` voordat je het systeem kunt gebruiken.",
+                    value="Gebruik de knoppen hieronder om alle kanalen in te stellen voordat je het systeem kunt gebruiken.",
                     inline=False
                 )
             
@@ -1826,59 +1826,35 @@ class UnbanRequestsConfigView(BaseConfigView):
     @discord.ui.button(label="Request Kanaal", style=discord.ButtonStyle.secondary, emoji="📝")
     async def set_request_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the unban request channel."""
+        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "unban_request_kanaal_id", "text")
         embed = discord.Embed(
-            title="📝 Unban Request Kanaal Instellen",
-            description=(
-                "Gebruik het volgende commando om het unban request kanaal in te stellen:\n\n"
-                f"`/set_mod_setting unban_request_kanaal_id {interaction.channel.id}`\n\n"
-                "Dit kanaal wordt gebruikt voor gebruikers om unban aanvragen in te dienen."
-            ),
+            title="📝 Unban Request Kanaal Selecteren",
+            description="Selecteer het kanaal waar gebruikers unban aanvragen kunnen indienen.",
             color=discord.Color.blue()
         )
-        embed.add_field(
-            name="💡 Tip",
-            value="Je kunt elk kanaal ID gebruiken, niet alleen het huidige kanaal.",
-            inline=False
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.edit_message(embed=embed, view=view)
     
     @discord.ui.button(label="Log Kanaal 1", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the first log channel."""
+        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_1", "text")
         embed = discord.Embed(
-            title="📋 Log Kanaal 1 (Staff) Instellen",
-            description=(
-                "Gebruik het volgende commando om het eerste log kanaal in te stellen:\n\n"
-                f"`/set_mod_setting aanvragen_log_kanaal_id_1 {interaction.channel.id}`\n\n"
-                "Dit kanaal wordt gebruikt voor staff om unban aanvragen te beoordelen."
-            ),
+            title="📋 Log Kanaal 1 (Staff) Selecteren",
+            description="Selecteer het kanaal waar staff unban aanvragen kan beoordelen. Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
             color=discord.Color.blue()
         )
-        embed.add_field(
-            name="💡 Tip",
-            value="Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
-            inline=False
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.edit_message(embed=embed, view=view)
     
     @discord.ui.button(label="Log Kanaal 2", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the second log channel."""
+        view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text")
         embed = discord.Embed(
-            title="📋 Log Kanaal 2 (Archive) Instellen",
-            description=(
-                "Gebruik het volgende commando om het tweede log kanaal in te stellen:\n\n"
-                f"`/set_mod_setting aanvragen_log_kanaal_id_2 {interaction.channel.id}`\n\n"
-                "Dit kanaal wordt gebruikt voor archivering van unban aanvragen."
-            ),
+            title="📋 Log Kanaal 2 (Archive) Selecteren",
+            description="Selecteer het kanaal voor archivering van unban aanvragen. Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
             color=discord.Color.blue()
         )
-        embed.add_field(
-            name="💡 Tip",
-            value="Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
-            inline=False
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.edit_message(embed=embed, view=view)
     
     @discord.ui.button(label="Setup Bericht", style=discord.ButtonStyle.success, emoji="🚀", row=1)
     async def setup_unban_message(self, interaction: discord.Interaction, button: discord.ui.Button):
