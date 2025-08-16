@@ -15,7 +15,20 @@ def has_role(role, error_message=None):
 
     def decorator(func):
         @functools.wraps(func)
-        async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
+        async def wrapper(*args, **kwargs):
+            # Handle both regular commands (self, interaction, ...) and context menu commands (interaction, target, ...)
+            if len(args) >= 2 and hasattr(args[0], '__class__') and hasattr(args[1], 'response'):
+                # Regular command: (self, interaction, ...)
+                self, interaction = args[0], args[1]
+                remaining_args = args[2:]
+            elif len(args) >= 1 and hasattr(args[0], 'response'):
+                # Context menu command: (interaction, target, ...)
+                interaction = args[0]
+                remaining_args = args[1:]
+                self = None
+            else:
+                raise ValueError("Unable to determine command type from arguments")
+
             if interaction.guild is None:
                 await interaction.response.send_message(
                     "This command can only be used in a server.", ephemeral=True
@@ -53,9 +66,21 @@ def has_role(role, error_message=None):
                 # Use custom error message or default
                 message = error_message or "You don't have permission to use this command."
                 await interaction.response.send_message(message, ephemeral=True)
+                # Log permission denied attempt
+                if hasattr(interaction, 'command') and interaction.command:
+                    command_name = interaction.command.name
+                else:
+                    command_name = func.__name__
+                print(f"Permission denied: User {interaction.user.name} ({interaction.user.id}) tried to use {command_name} without required role '{role}'")
                 return None
 
-            return await func(self, interaction, *args, **kwargs)
+            # Call the original function with the correct arguments
+            if self is not None:
+                # Regular command: call with self, interaction, and remaining args
+                return await func(self, interaction, *remaining_args, **kwargs)
+            else:
+                # Context menu command: call with interaction and remaining args
+                return await func(interaction, *remaining_args, **kwargs)
 
         return wrapper
 
