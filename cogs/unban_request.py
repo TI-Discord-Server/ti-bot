@@ -79,13 +79,13 @@ class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
             await message1.add_reaction("✅")
             await message1.add_reaction("❌")
         else:
-            print(f"Kanaal met ID {self.aanvragen_log_kanaal_id_1} niet gevonden.")
+            self.bot.log.warning(f"Kanaal met ID {self.aanvragen_log_kanaal_id_1} niet gevonden.")
 
         # Archive channel is optional
         if kanaal2:
             message2 = await kanaal2.send(embed=embed)
         elif self.aanvragen_log_kanaal_id_2:
-            print(f"Archive kanaal met ID {self.aanvragen_log_kanaal_id_2} niet gevonden.")
+            self.bot.log.warning(f"Archive kanaal met ID {self.aanvragen_log_kanaal_id_2} niet gevonden.")
 
         await interaction.followup.send("Je unban aanvraag is succesvol verzonden.  We zullen je aanvraag zo snel mogelijk beoordelen.", ephemeral=True)
 

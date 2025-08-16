@@ -158,7 +158,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
                 )
         except Exception as discord_error:
             # If Discord response fails, log it but don't try to send another response
-            print(f"Discord interaction response failed: {discord_error}")
+            self.bot.log.error(f"Discord interaction response failed: {discord_error}")
             # If email was sent but Discord response failed, the user can still use the code
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
@@ -343,7 +343,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
 
         except Exception as e:
             await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
-            print(f"Migration error: {e}")
+            self.bot.log.error(f"Migration error: {e}", exc_info=True)
 
     def _validate_migration_credentials(self) -> bool:
         """Validate that migration email credentials are properly configured"""
@@ -362,7 +362,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         if (MIGRATION_SMTP_EMAIL == SMTP_EMAIL and 
             MIGRATION_SMTP_PASSWORD == SMTP_PASSWORD and
             MIGRATION_SMTP_SERVER == SMTP_SERVER):
-            print("Warning: Migration credentials are identical to regular SMTP credentials")
+            self.bot.log.warning("Migration credentials are identical to regular SMTP credentials")
             
         return True
 
@@ -371,7 +371,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         try:
             # Validate migration credentials first
             if not self._validate_migration_credentials():
-                print("Migration email credentials not properly configured")
+                self.bot.log.error("Migration email credentials not properly configured")
                 return "send_failed"
                 
             # Generate unique test ID
@@ -386,7 +386,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             return result.get(email_address, "unknown")
             
         except Exception as e:
-            print(f"Bounce check error: {e}")
+            self.bot.log.error(f"Bounce check error: {e}", exc_info=True)
             return "unknown"
 
     async def _send_test_email(self, recipient: str, test_id: str) -> bool:
@@ -421,7 +421,7 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
             return True
 
         except Exception as e:
-            print(f"Failed to send test email to {recipient}: {e}")
+            self.bot.log.error(f"Failed to send test email to {recipient}: {e}", exc_info=True)
             return False
 
     async def _monitor_bounces(self, test_ids: dict, wait_minutes: int = 5) -> dict:
@@ -479,7 +479,7 @@ Deze test helpt bij het verifiëren van e-mail bezorgbaarheid zonder dat je acti
 
                     imap.logout()
             except Exception as e:
-                print(f"Error checking bounces: {e}")
+                self.bot.log.error(f"Error checking bounces: {e}", exc_info=True)
 
             await asyncio.sleep(poll_interval)
 

@@ -245,7 +245,7 @@ class CourseSelect(discord.ui.Select):
                 ephemeral=True
             )
         except Exception as e:
-            print(f"Error in CourseSelect callback: {e}")
+            self.bot.log.error(f"Error in CourseSelect callback: {e}", exc_info=True)
             await interaction.followup.send(
                 f"❌ Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
                 ephemeral=True
@@ -279,7 +279,7 @@ class ChannelMenu(commands.Cog):
                 guild_id not in self.channel_role_cache or 
                 current_time - self.cache_last_updated.get(guild_id, 0) > 300):
                 
-                print(f"Building/refreshing channel-role cache for guild {guild.name}")
+                self.bot.log.debug(f"Building/refreshing channel-role cache for guild {guild.name}")
                 mapping = {}
                 
                 # Get all year categories
@@ -308,7 +308,7 @@ class ChannelMenu(commands.Cog):
                 
                 self.channel_role_cache[guild_id] = mapping
                 self.cache_last_updated[guild_id] = current_time
-                print(f"Cache updated with {len(mapping)} channel-role mappings")
+                self.bot.log.debug(f"Cache updated with {len(mapping)} channel-role mappings")
             
             return self.channel_role_cache.get(guild_id, {})
     

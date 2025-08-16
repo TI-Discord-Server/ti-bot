@@ -711,12 +711,9 @@ class Bot(commands.Bot):
 
                 return
             else:
-                print(
-                    "".join(
-                        traceback.format_exception(
-                            type(error), error, error.__traceback__
-                        )
-                    )
+                self.log.error(
+                    "Unhandled application command error",
+                    exc_info=(type(error), error, error.__traceback__)
                 )
                 em = discord.Embed(
                     title=interaction.command.qualified_name,  # type: ignore
@@ -793,10 +790,9 @@ class Bot(commands.Bot):
 
             return
         elif isinstance(error, commands.CommandInvokeError):
-            print(
-                "".join(
-                    traceback.format_exception(type(error), error, error.__traceback__)
-                )
+            self.log.error(
+                "Command invoke error",
+                exc_info=(type(error), error, error.__traceback__)
             )
             e = discord.Embed(
                 description=ctx.message.content, colour=discord.Colour(0xFFFFFF)
