@@ -58,7 +58,55 @@ class ConfessionCommands(commands.Cog):
             f"{interaction.user} heeft handmatig een confession post getriggerd."
         )
 
-
+    @app_commands.command(
+        name="setup_submit_message", description="Post het submit confession bericht in het publieke kanaal."
+    )
+    async def setup_submit_message(self, interaction: discord.Interaction):
+        if not await self.has_moderator_role(interaction):
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
+            )
+            return
+        
+        # Get public channel
+        public_channel_id = await self.tasks.get_public_channel_id()
+        if not public_channel_id:
+            await interaction.response.send_message(
+                "❌ Publiek kanaal niet geconfigureerd. Gebruik `/configure` om het in te stellen.", 
+                ephemeral=True
+            )
+            return
+        
+        public_channel = self.bot.get_channel(public_channel_id)
+        if not public_channel:
+            await interaction.response.send_message(
+                "❌ Publiek kanaal niet gevonden.", ephemeral=True
+            )
+            return
+        
+        await interaction.response.send_message(
+            "Submit bericht wordt geplaatst...", ephemeral=True
+        )
+        
+        try:
+            # Delete previous submit message and post new one
+            await self.tasks._delete_previous_submit_message(public_channel)
+            await self.tasks._post_submit_message(public_channel)
+            
+            await interaction.followup.send(
+                f"✅ Submit bericht succesvol geplaatst in {public_channel.mention}!", 
+                ephemeral=True
+            )
+            self.bot.log.info(
+                f"{interaction.user} heeft handmatig een submit bericht geplaatst in {public_channel.name}."
+            )
+            
+        except Exception as e:
+            self.bot.log.error(f"Error setting up submit message: {e}")
+            await interaction.followup.send(
+                f"❌ Er is een fout opgetreden bij het plaatsen van het submit bericht: {str(e)}", 
+                ephemeral=True
+            )
 
 
 async def setup(bot):

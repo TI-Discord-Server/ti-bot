@@ -193,12 +193,19 @@ class ConfessionTasks(commands.Cog):
                 await self.bot.db.confessions.count_documents({"status": "posted"}) + 1
             )
 
+            # Delete previous submit message if it exists
+            await self._delete_previous_submit_message(public_channel)
+
+            # Post the confession
             embed = discord.Embed(
                 title=f"Confession #{posted_count}",
                 description=confession["content"],
                 color=discord.Color.green(),
             )
             await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+
+            # Post new submit message
+            await self._post_submit_message(public_channel)
 
             await self.bot.db.confessions.update_one(
                 {"_id": confession["_id"]},
@@ -224,6 +231,67 @@ class ConfessionTasks(commands.Cog):
             self.bot.log.info(
                 f"Confession {confession['_id']} blijft onder review vanwege gelijke stemmen."
             )
+
+    async def _delete_previous_submit_message(self, public_channel):
+        """Delete the previous submit confession message if it exists."""
+        try:
+            # Get the stored submit message ID from database
+            settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
+            if not settings or "submit_message_id" not in settings:
+                return
+            
+            submit_message_id = settings["submit_message_id"]
+            if not submit_message_id:
+                return
+            
+            # Try to fetch and delete the message
+            try:
+                submit_message = await public_channel.fetch_message(submit_message_id)
+                await submit_message.delete()
+                self.bot.log.debug(f"Deleted previous submit message {submit_message_id}")
+            except discord.NotFound:
+                self.bot.log.debug(f"Previous submit message {submit_message_id} not found (already deleted)")
+            except discord.Forbidden:
+                self.bot.log.warning(f"No permission to delete submit message {submit_message_id}")
+            except Exception as e:
+                self.bot.log.error(f"Error deleting submit message {submit_message_id}: {e}")
+                
+        except Exception as e:
+            self.bot.log.error(f"Error in _delete_previous_submit_message: {e}")
+
+    async def _post_submit_message(self, public_channel):
+        """Post a new submit confession message and store its ID."""
+        try:
+            # Create submit embed
+            embed = discord.Embed(
+                title="📝 Submit a Confession",
+                description="Click the button below to submit an anonymous confession.",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="ℹ️ How it works",
+                value=(
+                    "• Your confession will be reviewed by moderators\n"
+                    "• If approved, it will be posted anonymously\n"
+                    "• All submissions are completely anonymous"
+                ),
+                inline=False
+            )
+            
+            # Post the message with confession view
+            submit_message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+            
+            # Store the message ID in database
+            await self.bot.db.settings.update_one(
+                {"_id": "confession_settings"},
+                {"$set": {"submit_message_id": submit_message.id}},
+                upsert=True
+            )
+            
+            self.bot.log.debug(f"Posted new submit message {submit_message.id}")
+            
+        except Exception as e:
+            self.bot.log.error(f"Error posting submit message: {e}")
 
 
 async def setup(bot):
