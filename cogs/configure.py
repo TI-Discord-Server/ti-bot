@@ -66,6 +66,12 @@ class ConfigurationView(discord.ui.View):
                 value="roles_channels",
                 description="Rol en kanaal menu instellingen",
                 emoji="🎭"
+            ),
+            discord.SelectOption(
+                label="Unban Requests",
+                value="unban_requests",
+                description="Unban aanvraag systeem instellingen",
+                emoji="🔓"
             )
         ]
     )
@@ -87,6 +93,8 @@ class ConfigurationView(discord.ui.View):
             view = ModerationConfigView(self.bot, self.user_id, self.visible)
         elif category == "roles_channels":
             view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
+        elif category == "unban_requests":
+            view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
         
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
@@ -109,7 +117,8 @@ class ConfigurationView(discord.ui.View):
                     "🚨 **Reports** - Report systeem instellingen\n"
                     "✅ **Verificatie** - Verificatie systeem instellingen\n"
                     "🛡️ **Moderatie** - Moderatie instellingen\n"
-                    "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen"
+                    "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen\n"
+                    "🔓 **Unban Requests** - Unban aanvraag systeem instellingen"
                 ),
                 inline=False
             )
@@ -1697,6 +1706,232 @@ class RemoveRoleModal(discord.ui.Modal):
         except Exception as e:
             self.bot.log.error(f"Error removing role: {e}", exc_info=True)
             await interaction.response.send_message("❌ Er is een fout opgetreden bij het verwijderen van de rol.", ephemeral=True)
+
+
+class UnbanRequestsConfigView(BaseConfigView):
+    """Unban requests configuration view."""
+    
+    async def create_embed(self):
+        """Create unban requests configuration embed."""
+        try:
+            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
+            
+            embed = discord.Embed(
+                title="🔓 Unban Requests Instellingen",
+                description="Configuratie voor het unban aanvraag systeem",
+                color=discord.Color.orange(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            # Unban request channel
+            unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
+            if unban_request_kanaal_id:
+                channel = self.bot.get_channel(unban_request_kanaal_id)
+                if channel:
+                    embed.add_field(
+                        name="📝 Unban Request Kanaal",
+                        value=f"{channel.mention} (`{channel.id}`)",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="📝 Unban Request Kanaal",
+                        value=f"⚠️ Kanaal niet gevonden (`{unban_request_kanaal_id}`)",
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="📝 Unban Request Kanaal",
+                    value="❌ Niet ingesteld",
+                    inline=False
+                )
+            
+            # Log channel 1
+            aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
+            if aanvragen_log_kanaal_id_1:
+                channel = self.bot.get_channel(aanvragen_log_kanaal_id_1)
+                if channel:
+                    embed.add_field(
+                        name="📋 Log Kanaal 1 (Staff)",
+                        value=f"{channel.mention} (`{channel.id}`)",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="📋 Log Kanaal 1 (Staff)",
+                        value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_1}`)",
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="📋 Log Kanaal 1 (Staff)",
+                    value="❌ Niet ingesteld",
+                    inline=False
+                )
+            
+            # Log channel 2
+            aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
+            if aanvragen_log_kanaal_id_2:
+                channel = self.bot.get_channel(aanvragen_log_kanaal_id_2)
+                if channel:
+                    embed.add_field(
+                        name="📋 Log Kanaal 2 (Archive)",
+                        value=f"{channel.mention} (`{channel.id}`)",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="📋 Log Kanaal 2 (Archive)",
+                        value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_2}`)",
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="📋 Log Kanaal 2 (Archive)",
+                    value="❌ Niet ingesteld",
+                    inline=False
+                )
+            
+            # System status
+            all_configured = all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2])
+            status_emoji = "✅" if all_configured else "⚠️"
+            status_text = "Volledig geconfigureerd" if all_configured else "Configuratie incompleet"
+            
+            embed.add_field(
+                name="🔧 Systeem Status",
+                value=f"{status_emoji} {status_text}",
+                inline=False
+            )
+            
+            if all_configured:
+                embed.add_field(
+                    name="ℹ️ Gebruik",
+                    value="Gebruik `/setup unban_request [kanaal]` om het unban request bericht te verzenden.",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="⚠️ Configuratie Vereist",
+                    value="Stel alle kanalen in met `/set_mod_setting` voordat je het systeem kunt gebruiken.",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
+            return embed
+            
+        except Exception as e:
+            self.bot.log.error(f"Error creating unban requests configuration embed: {e}", exc_info=True)
+            raise
+    
+    @discord.ui.button(label="Request Kanaal", style=discord.ButtonStyle.secondary, emoji="📝")
+    async def set_request_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set the unban request channel."""
+        embed = discord.Embed(
+            title="📝 Unban Request Kanaal Instellen",
+            description=(
+                "Gebruik het volgende commando om het unban request kanaal in te stellen:\n\n"
+                f"`/set_mod_setting unban_request_kanaal_id {interaction.channel.id}`\n\n"
+                "Dit kanaal wordt gebruikt voor gebruikers om unban aanvragen in te dienen."
+            ),
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="💡 Tip",
+            value="Je kunt elk kanaal ID gebruiken, niet alleen het huidige kanaal.",
+            inline=False
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Log Kanaal 1", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def set_log_channel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set the first log channel."""
+        embed = discord.Embed(
+            title="📋 Log Kanaal 1 (Staff) Instellen",
+            description=(
+                "Gebruik het volgende commando om het eerste log kanaal in te stellen:\n\n"
+                f"`/set_mod_setting aanvragen_log_kanaal_id_1 {interaction.channel.id}`\n\n"
+                "Dit kanaal wordt gebruikt voor staff om unban aanvragen te beoordelen."
+            ),
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="💡 Tip",
+            value="Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
+            inline=False
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Log Kanaal 2", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def set_log_channel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set the second log channel."""
+        embed = discord.Embed(
+            title="📋 Log Kanaal 2 (Archive) Instellen",
+            description=(
+                "Gebruik het volgende commando om het tweede log kanaal in te stellen:\n\n"
+                f"`/set_mod_setting aanvragen_log_kanaal_id_2 {interaction.channel.id}`\n\n"
+                "Dit kanaal wordt gebruikt voor archivering van unban aanvragen."
+            ),
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="💡 Tip",
+            value="Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
+            inline=False
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Setup Bericht", style=discord.ButtonStyle.success, emoji="🚀", row=1)
+    async def setup_unban_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Setup the unban request message."""
+        try:
+            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
+            
+            unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
+            aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
+            aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
+            
+            if not all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2]):
+                await interaction.response.send_message(
+                    "❌ Niet alle kanalen zijn ingesteld. Configureer eerst alle kanalen voordat je het bericht kunt verzenden.",
+                    ephemeral=True
+                )
+                return
+            
+            # Get the unban cog and send the message
+            unban_cog = self.bot.get_cog("UnbanRequest")
+            if not unban_cog:
+                await interaction.response.send_message(
+                    "❌ Unban request systeem is niet geladen.",
+                    ephemeral=True
+                )
+                return
+            
+            channel = self.bot.get_channel(unban_request_kanaal_id)
+            if not channel:
+                await interaction.response.send_message(
+                    f"❌ Unban request kanaal niet gevonden (ID: {unban_request_kanaal_id}).",
+                    ephemeral=True
+                )
+                return
+            
+            embed = discord.Embed(
+                title="Unban Aanvragen",
+                description="Klik op de knop hieronder om een unban aan te vragen.",
+                color=discord.Color.blue()
+            )
+            
+            await channel.send(embed=embed, view=unban_cog.unban_view)
+            await interaction.response.send_message(
+                f"✅ Unban request bericht verzonden naar {channel.mention}!",
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            self.bot.log.error(f"Error setting up unban message: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het verzenden van het unban request bericht.",
+                ephemeral=True
+            )
 
 
 async def setup(bot):
