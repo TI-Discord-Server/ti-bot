@@ -63,8 +63,15 @@ class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
             embed.add_field(name="Toevoeging", value=self.toevoeg.value, inline=False)
         embed.add_field(name="Recente Straffen", value=infraction_list, inline=False)
 
-        kanaal1 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_1))
-        kanaal2 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_2)) if self.aanvragen_log_kanaal_id_2 else None
+        try:
+            kanaal1 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_1)) if self.aanvragen_log_kanaal_id_1 else None
+        except (ValueError, TypeError):
+            kanaal1 = None
+            
+        try:
+            kanaal2 = self.bot.get_channel(int(self.aanvragen_log_kanaal_id_2)) if self.aanvragen_log_kanaal_id_2 else None
+        except (ValueError, TypeError):
+            kanaal2 = None
 
         if kanaal1:
             # view = UnbanApprovalView(self.bot, self.user, interaction.guild)

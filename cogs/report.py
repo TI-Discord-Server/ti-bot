@@ -40,11 +40,28 @@ class Reports(commands.Cog, name="reports"):
         """Report a user, issue, or specific message."""
 
         reports_channel_id = await self.get_reports_channel_id()
-        reports_channel = await self.bot.fetch_channel(reports_channel_id)
-
-        if not reports_channel:
+        
+        if not reports_channel_id:
             await interaction.response.send_message(
-                "Rapportage kanaal niet gevonden. Neem contact op met een beheerder.", ephemeral=True
+                "❌ Geen rapportage kanaal geconfigureerd. Neem contact op met een beheerder.", ephemeral=True
+            )
+            return
+            
+        try:
+            reports_channel = await self.bot.fetch_channel(reports_channel_id)
+        except discord.NotFound:
+            await interaction.response.send_message(
+                "❌ Het geconfigureerde rapportage kanaal bestaat niet meer. Neem contact op met een beheerder.", ephemeral=True
+            )
+            return
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ Geen toegang tot het rapportage kanaal. Neem contact op met een beheerder.", ephemeral=True
+            )
+            return
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Fout bij toegang tot rapportage kanaal: {str(e)}", ephemeral=True
             )
             return
 
