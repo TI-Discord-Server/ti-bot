@@ -465,6 +465,101 @@ class ModCommands(commands.Cog, name="ModCommands"):
             interaction.guild.id, member.id, interaction.user.id, "warn", reason
         )
 
+    async def _purge_with_backoff(self, channel, limit, check=None, max_retries=5):
+        """
+        Custom purge function with exponential backoff for rate limiting.
+        
+        Args:
+            channel: The channel to purge messages from
+            limit: Maximum number of messages to delete
+            check: Optional function to filter messages
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            List of deleted messages
+        """
+        deleted_messages = []
+        base_delay = 1.0  # Start with 1 second delay
+        max_delay = 60.0  # Maximum delay of 60 seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # Try to purge messages
+                deleted = await channel.purge(limit=limit, check=check)
+                deleted_messages.extend(deleted)
+                return deleted_messages
+                
+            except discord.errors.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    if attempt < max_retries:
+                        # Calculate exponential backoff delay
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        self.bot.log.warning(f"Purge rate limited (attempt {attempt + 1}/{max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        self.bot.log.error(f"Purge max retries ({max_retries}) exceeded. Giving up.")
+                        raise e
+                else:
+                    # Other HTTP error, don't retry
+                    raise e
+                    
+            except Exception as e:
+                # Other error, don't retry
+                raise e
+        
+        return deleted_messages
+
+    async def _delete_messages_with_backoff(self, channel, messages, max_retries=3):
+        """
+        Delete messages with exponential backoff for rate limiting.
+        
+        Args:
+            channel: The channel to delete messages from
+            messages: List of messages to delete
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            Number of messages successfully deleted
+        """
+        if not messages:
+            return 0
+            
+        base_delay = 1.0  # Start with 1 second delay
+        max_delay = 30.0  # Maximum delay of 30 seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                if len(messages) == 1:
+                    # Single message deletion
+                    await messages[0].delete()
+                    return 1
+                else:
+                    # Bulk delete for multiple messages
+                    await channel.delete_messages(messages)
+                    return len(messages)
+                    
+            except discord.errors.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    if attempt < max_retries:
+                        # Calculate exponential backoff delay
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        self.bot.log.warning(f"Message deletion rate limited (attempt {attempt + 1}/{max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        self.bot.log.error(f"Message deletion max retries ({max_retries}) exceeded. Skipping batch of {len(messages)} messages.")
+                        return 0  # Return 0 to indicate failure
+                else:
+                    # Other HTTP error, don't retry
+                    raise e
+                    
+            except Exception as e:
+                # Other error, don't retry
+                raise e
+        
+        return 0
+
     @app_commands.command(
         name="purge", description="Verwijdert messages uit het kanaal."
     )
@@ -497,8 +592,8 @@ class ModCommands(commands.Cog, name="ModCommands"):
             return
 
         try:
-            # Use channel.purge which handles batching automatically
-            deleted = await interaction.channel.purge(limit=count, check=check)
+            # Use custom purge with exponential backoff for rate limiting
+            deleted = await self._purge_with_backoff(interaction.channel, count, check)
             embed = discord.Embed(
                 title="Messages verwijderd",
                 description=f"{len(deleted)} messages verwijderd in dit kanaal.",
@@ -517,9 +612,31 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.errors.HTTPException as e:
+            if e.status == 429:
+                embed = discord.Embed(
+                    title="Rate Limited",
+                    description="Discord rate limiting verhindert het verwijderen van messages. Probeer het later opnieuw.",
+                    color=discord.Color.orange(),
+                )
+            else:
+                embed = discord.Embed(
+                    title="HTTP Fout",
+                    description=f"Verwijderen mislukt: {e}",
+                    color=discord.Color.red(),
+                )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except asyncio.TimeoutError:
             embed = discord.Embed(
-                title="Fout",
-                description=f"Verwijderen mislukt: {e}",
+                title="Timeout",
+                description="Het verwijderen van messages duurde te lang. Sommige messages zijn mogelijk wel verwijderd.",
+                color=discord.Color.orange(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error in purge command: {e}", exc_info=True)
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description=f"Er is een onverwachte fout opgetreden: {str(e)}",
                 color=discord.Color.red(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -804,6 +921,56 @@ class ModCommands(commands.Cog, name="ModCommands"):
         }
         await self.infractions_collection.insert_one(infraction)
 
+async def _delete_batch_with_backoff(channel, messages, max_retries=3):
+    """
+    Standalone function to delete a batch of messages with exponential backoff.
+    
+    Args:
+        channel: The channel to delete messages from
+        messages: List of messages to delete
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        Number of messages successfully deleted
+    """
+    if not messages:
+        return 0
+        
+    base_delay = 1.0  # Start with 1 second delay
+    max_delay = 30.0  # Maximum delay of 30 seconds
+    
+    for attempt in range(max_retries + 1):
+        try:
+            if len(messages) == 1:
+                # Single message deletion
+                await messages[0].delete()
+                return 1
+            else:
+                # Bulk delete for multiple messages
+                await channel.delete_messages(messages)
+                return len(messages)
+                
+        except discord.errors.HTTPException as e:
+            if e.status == 429:  # Rate limited
+                if attempt < max_retries:
+                    # Calculate exponential backoff delay
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    print(f"Message deletion rate limited (attempt {attempt + 1}/{max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    print(f"Message deletion max retries ({max_retries}) exceeded. Skipping batch of {len(messages)} messages.")
+                    return 0  # Return 0 to indicate failure
+            else:
+                # Other HTTP error, don't retry
+                raise e
+                
+        except Exception as e:
+            # Other error, don't retry
+            raise e
+    
+    return 0
+
 @app_commands.context_menu(name="Verwijder Hieronder")
 @has_role("The Council")
 async def purge_below(interaction: discord.Interaction, message: discord.Message):
@@ -819,17 +986,13 @@ async def purge_below(interaction: discord.Interaction, message: discord.Message
 
         total_deleted = 0
         if messages_to_delete:
-            # Batch delete messages in chunks of 100
+            # Batch delete messages in chunks of 100 with exponential backoff
             for i in range(0, len(messages_to_delete), 100):
                 batch = messages_to_delete[i:i + 100]
-                if len(batch) == 1:
-                    # Single message deletion
-                    await batch[0].delete()
-                    total_deleted += 1
-                else:
-                    # Bulk delete for multiple messages
-                    await interaction.channel.delete_messages(batch)
-                    total_deleted += len(batch)
+                
+                # Try to delete this batch with exponential backoff
+                batch_deleted = await _delete_batch_with_backoff(interaction.channel, batch)
+                total_deleted += batch_deleted
                 
                 # Add a small delay between batches to avoid rate limits
                 if i + 100 < len(messages_to_delete):
