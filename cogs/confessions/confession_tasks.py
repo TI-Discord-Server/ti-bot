@@ -1,7 +1,11 @@
 import discord
 from discord.ext import tasks, commands
 import datetime
+import pytz
 from cogs.confessions.confession_view import ConfessionView
+
+# Define Brussels timezone (same as Amsterdam)
+BRUSSELS_TZ = pytz.timezone('Europe/Brussels')
 
 
 class ConfessionTasks(commands.Cog):
@@ -50,12 +54,12 @@ class ConfessionTasks(commands.Cog):
 
         try:
             hour, minute = map(int, review_time_str.split(":"))
-            review_time = datetime.time(hour=hour, minute=minute, tzinfo=datetime.UTC)
+            review_time = datetime.time(hour=hour, minute=minute, tzinfo=BRUSSELS_TZ)
 
             if self.daily_review and self.daily_review.is_running():
                 self.daily_review.cancel()
                 self.bot.log.info(
-                    f"Review-taak gestopt voor update naar {review_time} UTC."
+                    f"Review-taak gestopt voor update naar {review_time} Brussels tijd."
                 )
 
             @tasks.loop(time=[review_time])
@@ -64,7 +68,7 @@ class ConfessionTasks(commands.Cog):
 
             self.daily_review = daily_review_task
             self.daily_review.start()
-            self.bot.log.info(f"Review-taak gestart op tijdstip: {review_time} UTC.")
+            self.bot.log.info(f"Review-taak gestart op tijdstip: {review_time} Brussels tijd.")
 
         except ValueError:
             self.bot.log.error("Ongeldige review-tijd opgegeven in settings.")
@@ -118,14 +122,14 @@ class ConfessionTasks(commands.Cog):
                 datetime.time(
                     hour=int(t.split(":")[0]),
                     minute=int(t.split(":")[1]),
-                    tzinfo=datetime.UTC,
+                    tzinfo=BRUSSELS_TZ,
                 )
                 for t in post_times
             ]
 
             if self.post_approved and self.post_approved.is_running():
                 self.post_approved.cancel()
-                self.bot.log.info(f"Post-taak gestopt voor update naar tijden: {times}")
+                self.bot.log.info(f"Post-taak gestopt voor update naar tijden: {times} (Brussels tijd)")
 
             @tasks.loop(time=times)
             async def post_approved_task():
@@ -133,7 +137,7 @@ class ConfessionTasks(commands.Cog):
 
             self.post_approved = post_approved_task
             self.post_approved.start()
-            self.bot.log.info(f"Post-taak gestart met tijden: {times}")
+            self.bot.log.info(f"Post-taak gestart met tijden: {times} (Brussels tijd)")
 
         except ValueError:
             self.bot.log.error("Ongeldige post-tijden in de settings.")

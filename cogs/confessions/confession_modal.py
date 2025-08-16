@@ -1,6 +1,10 @@
 import discord
 from discord.ui import Modal, TextInput
 import datetime
+import pytz
+
+# Define Brussels timezone
+BRUSSELS_TZ = pytz.timezone('Europe/Brussels')
 
 
 class ConfessionModal(Modal, title="Submit Confession"):
@@ -20,7 +24,7 @@ class ConfessionModal(Modal, title="Submit Confession"):
         """Saves the confession to the database."""
         confession = {
             "content": self.confession_input.value,
-            "submitted_at": datetime.datetime.now(datetime.UTC),
+            "submitted_at": datetime.datetime.now(BRUSSELS_TZ),
             "status": "pending",
         }
         await self.bot.db.confessions.insert_one(confession)

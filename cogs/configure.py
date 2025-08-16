@@ -486,8 +486,8 @@ class ConfessionsConfigView(BaseConfigView):
         embed.add_field(
             name="⏰ Tijdsinstellingen",
             value=(
-                f"**Review tijd:** {review_time} UTC\n"
-                f"**Post tijden:** {', '.join(post_times)} UTC\n"
+                f"**Review tijd:** {review_time} Brussels tijd\n"
+                f"**Post tijden:** {', '.join(post_times)} Brussels tijd\n"
                 f"**Dagelijkse limiet:** {daily_limit}"
             ),
             inline=False
