@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List
 import datetime
 from .developer_management import DeveloperManagementView
 from utils.timezone import now_utc
+from utils.checks import developer
 from main import DEFAULT_GUILD_ID
 
 
@@ -1430,19 +1431,10 @@ class Configure(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    def has_admin_permissions():
-        """Check if user has admin permissions."""
-        async def predicate(interaction: discord.Interaction):
-            return (
-                interaction.user.guild_permissions.manage_guild or
-                interaction.user.guild_permissions.administrator or
-                interaction.user.id in getattr(interaction.client, 'owner_ids', set())
-            )
-        return app_commands.check(predicate)
     
     @app_commands.command(name="configure", description="Open de bot configuratie interface")
     @app_commands.describe(visible="Of de configuratie zichtbaar moet zijn voor anderen (standaard: waar)")
-    @has_admin_permissions()
+    @developer()
     async def configure(self, interaction: discord.Interaction, visible: bool = True):
         """Open the configuration interface."""
         try:
