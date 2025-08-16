@@ -113,7 +113,7 @@ python3 main.py --tls=false
 python3 main.py --tls=no
 ```
 
-Bij gebruik van Docker kan TLS worden ingeschakeld op verschillende manieren:
+Bij gebruik van Docker kan TLS worden in/uitgeschakeld op verschillende manieren:
 
 1. Tijdens het bouwen van de image:
    ```bash
@@ -200,26 +200,3 @@ docker compose up webapp -d
 - Upload emoji’s [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
 - Gebruik ze als volgt: `<:emoji_naam:emoji_id>`
 
----
-
-## ✅ TODO's
-
-**Nyo:**
-- Mod functies (ban, mute, kick, etc…)
-- Unban-verzoek
-- Prune (optioneel)
-
-**Quinten:**
-- Confessions
-- Voorbeeldvariabelen gebruiken adhv collection
-
-**Jaak:**
-- Verify functie (Office365-authenticatie?)
-
-**Kobe:**
-- ~~Modmail~~ (stickers kunnen niet verstuurd worden)
-- Loggen naar bestand + bestand opslaan op server. Bestand moet opvraagbaar zijn via commando: `/transcript [user_id]`
-
-**Warre:**
-- Punten bekendmaken (variabel maken)
-- Report functie
