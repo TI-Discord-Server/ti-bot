@@ -784,7 +784,7 @@ class Thread:
 
         author = message.author
         if anonymous:
-            avatar_url = self.bot.user.avatar.url
+            avatar_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         else:
             avatar_url = author.display_avatar.url if author.display_avatar else None
 
@@ -806,9 +806,10 @@ class Thread:
                 )
         else:
             #Notes
+            bot_avatar_url = self.bot.user.avatar.url if self.bot.user.avatar else None
             embed.set_author(
                 name=f"{'Permanente' if persistent_note else ''} Notitie door {author.name}",
-                icon_url=self.bot.user.avatar.url
+                icon_url=bot_avatar_url
             )
 
         ext = [(a.url, a.filename, False) for a in message.attachments]

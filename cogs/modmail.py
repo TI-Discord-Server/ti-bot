@@ -354,7 +354,8 @@ class Modmail(commands.Cog, name="modmail"):
         )
 
         em.timestamp = discord.utils.utcnow()
-        em.set_footer(icon_url=self.bot.user.avatar.url)
+        bot_avatar_url = self.bot.user.avatar.url if self.bot.user.avatar else None
+        em.set_footer(icon_url=bot_avatar_url)
 
         await user.send(embed=em)
 
