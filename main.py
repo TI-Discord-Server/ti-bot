@@ -148,15 +148,22 @@ class DiscordWebhookHandler(logging.Handler):
         
         # Check if we should skip due to too many recent failures
         current_time = time.time()
+        start_time = current_time
         if self.failed_attempts >= self.max_retries:
             # If it's been more than max_delay since last failure, reset counter
             if current_time - self.last_failure_time > self.max_delay:
                 self.failed_attempts = 0
+                self._file_logger.info(f"WEBHOOK Failure counter reset after {current_time - self.last_failure_time:.2f}s cooldown")
             else:
                 # Skip this log message to prevent infinite loops
+                self._file_logger.debug(f"WEBHOOK Skipping log message due to recent failures (failed_attempts: {self.failed_attempts})")
                 return
         
         await self._ensure_session()
+        
+        # Log start of webhook operation if we expect potential retries
+        if self.failed_attempts > 0:
+            self._file_logger.info(f"WEBHOOK Starting log transmission (previous failures: {self.failed_attempts}, max_retries: {self.max_retries})")
         
         for attempt in range(self.max_retries + 1):
             try:
@@ -188,7 +195,13 @@ class DiscordWebhookHandler(logging.Handler):
                     embed.add_field(name="Logger", value=record.name, inline=True)
                     await webhook.send(embed=embed)
                 
-                # Success! Reset failure counter
+                # Success! Reset failure counter and log success
+                total_time = time.time() - start_time
+                if attempt > 0:
+                    self._file_logger.info(f"WEBHOOK Log transmission successful after {attempt} retries in {total_time:.2f}s total")
+                elif self.failed_attempts > 0:
+                    self._file_logger.info(f"WEBHOOK Log transmission successful on first attempt after previous failures (total time: {total_time:.2f}s)")
+                
                 self.failed_attempts = 0
                 return
                 
@@ -200,12 +213,22 @@ class DiscordWebhookHandler(logging.Handler):
                     if attempt < self.max_retries:
                         # Calculate exponential backoff delay
                         delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+                        retry_after = getattr(e.response, 'headers', {}).get('Retry-After') if hasattr(e, 'response') else None
+                        
                         # Use file-only logger to avoid webhook loops
-                        self._file_logger.warning(f"WEBHOOK Rate limited (attempt {attempt + 1}/{self.max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        self._file_logger.warning(f"WEBHOOK Rate limited (HTTP 429) on attempt {attempt + 1}/{self.max_retries + 1}. "
+                                                f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s")
+                        
                         await asyncio.sleep(delay)
+                        
+                        elapsed_time = time.time() - start_time
+                        self._file_logger.info(f"WEBHOOK Resuming transmission attempt {attempt + 2}/{self.max_retries + 1} "
+                                             f"after {elapsed_time:.2f}s total elapsed")
                         continue
                     else:
-                        self._file_logger.error(f"WEBHOOK Max retries ({self.max_retries}) exceeded for webhook {webhook.id}. Dropping log message.")
+                        total_time = time.time() - start_time
+                        self._file_logger.error(f"WEBHOOK Max retries ({self.max_retries}) exceeded after {total_time:.2f}s. "
+                                              f"Rate limiting prevented completion. Dropping log message. HTTP status: {e.status}")
                         return
                 else:
                     # Other HTTP error, don't retry
@@ -218,7 +241,7 @@ class DiscordWebhookHandler(logging.Handler):
                 # Other error, don't retry
                 self.failed_attempts += 1
                 self.last_failure_time = current_time
-                self._file_logger.error(f"WEBHOOK Unexpected error: {e}")
+                self._file_logger.error(f"WEBHOOK Unexpected error: {type(e).__name__}: {e}")
                 return
 
     def _get_color(self, levelname):

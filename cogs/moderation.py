@@ -481,12 +481,23 @@ class ModCommands(commands.Cog, name="ModCommands"):
         deleted_messages = []
         base_delay = 1.0  # Start with 1 second delay
         max_delay = 60.0  # Maximum delay of 60 seconds
+        start_time = time.time()
+        
+        self.bot.log.info(f"Starting purge operation in channel {channel.id} (limit: {limit}, max_retries: {max_retries})")
         
         for attempt in range(max_retries + 1):
             try:
                 # Try to purge messages
+                attempt_start = time.time()
                 deleted = await channel.purge(limit=limit, check=check)
                 deleted_messages.extend(deleted)
+                
+                total_time = time.time() - start_time
+                if attempt > 0:
+                    self.bot.log.info(f"Purge successful after {attempt} retries. Deleted {len(deleted)} messages in {total_time:.2f}s total")
+                else:
+                    self.bot.log.info(f"Purge successful on first attempt. Deleted {len(deleted)} messages in {total_time:.2f}s")
+                
                 return deleted_messages
                 
             except discord.errors.HTTPException as e:
@@ -494,18 +505,29 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     if attempt < max_retries:
                         # Calculate exponential backoff delay
                         delay = min(base_delay * (2 ** attempt), max_delay)
-                        self.bot.log.warning(f"Purge rate limited (attempt {attempt + 1}/{max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        retry_after = e.response.headers.get('Retry-After')
+                        
+                        self.bot.log.warning(f"Purge rate limited (HTTP 429) on attempt {attempt + 1}/{max_retries + 1}. "
+                                           f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s")
+                        
                         await asyncio.sleep(delay)
+                        
+                        elapsed_time = time.time() - start_time
+                        self.bot.log.info(f"Resuming purge attempt {attempt + 2}/{max_retries + 1} after {elapsed_time:.2f}s total elapsed")
                         continue
                     else:
-                        self.bot.log.error(f"Purge max retries ({max_retries}) exceeded. Giving up.")
+                        total_time = time.time() - start_time
+                        self.bot.log.error(f"Purge max retries ({max_retries}) exceeded after {total_time:.2f}s. "
+                                         f"Rate limiting prevented completion. HTTP status: {e.status}")
                         raise e
                 else:
                     # Other HTTP error, don't retry
+                    self.bot.log.error(f"Purge failed with HTTP error {e.status}: {e.text}")
                     raise e
                     
             except Exception as e:
                 # Other error, don't retry
+                self.bot.log.error(f"Purge failed with unexpected error: {type(e).__name__}: {e}")
                 raise e
         
         return deleted_messages
@@ -527,16 +549,32 @@ class ModCommands(commands.Cog, name="ModCommands"):
             
         base_delay = 1.0  # Start with 1 second delay
         max_delay = 30.0  # Maximum delay of 30 seconds
+        start_time = time.time()
+        message_count = len(messages)
+        deletion_type = "single" if message_count == 1 else "bulk"
+        
+        self.bot.log.info(f"Starting {deletion_type} message deletion in channel {channel.id} "
+                         f"({message_count} messages, max_retries: {max_retries})")
         
         for attempt in range(max_retries + 1):
             try:
                 if len(messages) == 1:
                     # Single message deletion
                     await messages[0].delete()
+                    total_time = time.time() - start_time
+                    if attempt > 0:
+                        self.bot.log.info(f"Single message deletion successful after {attempt} retries in {total_time:.2f}s")
+                    else:
+                        self.bot.log.info(f"Single message deletion successful on first attempt in {total_time:.2f}s")
                     return 1
                 else:
                     # Bulk delete for multiple messages
                     await channel.delete_messages(messages)
+                    total_time = time.time() - start_time
+                    if attempt > 0:
+                        self.bot.log.info(f"Bulk deletion of {message_count} messages successful after {attempt} retries in {total_time:.2f}s")
+                    else:
+                        self.bot.log.info(f"Bulk deletion of {message_count} messages successful on first attempt in {total_time:.2f}s")
                     return len(messages)
                     
             except discord.errors.HTTPException as e:
@@ -544,18 +582,33 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     if attempt < max_retries:
                         # Calculate exponential backoff delay
                         delay = min(base_delay * (2 ** attempt), max_delay)
-                        self.bot.log.warning(f"Message deletion rate limited (attempt {attempt + 1}/{max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        retry_after = e.response.headers.get('Retry-After')
+                        
+                        self.bot.log.warning(f"Message deletion rate limited (HTTP 429) on attempt {attempt + 1}/{max_retries + 1}. "
+                                           f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s "
+                                           f"({deletion_type} deletion of {message_count} messages)")
+                        
                         await asyncio.sleep(delay)
+                        
+                        elapsed_time = time.time() - start_time
+                        self.bot.log.info(f"Resuming message deletion attempt {attempt + 2}/{max_retries + 1} "
+                                        f"after {elapsed_time:.2f}s total elapsed")
                         continue
                     else:
-                        self.bot.log.error(f"Message deletion max retries ({max_retries}) exceeded. Skipping batch of {len(messages)} messages.")
+                        total_time = time.time() - start_time
+                        self.bot.log.error(f"Message deletion max retries ({max_retries}) exceeded after {total_time:.2f}s. "
+                                         f"Skipping {deletion_type} deletion of {message_count} messages. HTTP status: {e.status}")
                         return 0  # Return 0 to indicate failure
                 else:
                     # Other HTTP error, don't retry
+                    self.bot.log.error(f"Message deletion failed with HTTP error {e.status}: {e.text} "
+                                     f"({deletion_type} deletion of {message_count} messages)")
                     raise e
                     
             except Exception as e:
                 # Other error, don't retry
+                self.bot.log.error(f"Message deletion failed with unexpected error: {type(e).__name__}: {e} "
+                                 f"({deletion_type} deletion of {message_count} messages)")
                 raise e
         
         return 0
