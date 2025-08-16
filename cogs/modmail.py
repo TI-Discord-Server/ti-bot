@@ -80,8 +80,26 @@ class Modmail(commands.Cog, name="modmail"):
                     await interaction.followup.send("⚠️ Waarschuwing: Geen toegang tot het modmail log kanaal. Ticket wordt gesloten maar transcript wordt niet gelogd.", ephemeral=True)
             
             await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
+            self.bot.log.info(f"Modmail ticket closed successfully by {interaction.user.name} ({interaction.user.id}) in channel {interaction.channel.id}. Reason: {reason or 'No reason provided'}")
+        except discord.Forbidden as e:
+            error_msg = f"❌ Geen toestemming om ticket te sluiten: {str(e)}"
+            self.bot.log.error(f"Permission denied when closing modmail ticket in channel {interaction.channel.id}: {e}")
+            await interaction.followup.send(error_msg, ephemeral=True)
+            return
+        except discord.NotFound as e:
+            error_msg = f"❌ Ticket kanaal of gebruiker niet gevonden: {str(e)}"
+            self.bot.log.error(f"Channel or user not found when closing modmail ticket in channel {interaction.channel.id}: {e}")
+            await interaction.followup.send(error_msg, ephemeral=True)
+            return
+        except discord.HTTPException as e:
+            error_msg = f"❌ Discord API fout bij sluiten ticket: {str(e)}"
+            self.bot.log.error(f"Discord API error when closing modmail ticket in channel {interaction.channel.id}: {e}")
+            await interaction.followup.send(error_msg, ephemeral=True)
+            return
         except Exception as e:
-            await interaction.followup.send(f"❌ Kan ticket niet sluiten: {str(e)}", ephemeral=True)
+            error_msg = f"❌ Onverwachte fout bij sluiten ticket: {str(e)}"
+            self.bot.log.error(f"Unexpected error when closing modmail ticket in channel {interaction.channel.id}: {e}", exc_info=True)
+            await interaction.followup.send(error_msg, ephemeral=True)
             return
 
     @command(name="generate_transcript", description="Maakt een transcript en stuurt het naar het log kanaal")
