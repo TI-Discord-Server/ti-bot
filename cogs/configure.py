@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from typing import Optional, Dict, Any, List
 import datetime
+from .developer_management import DeveloperManagementView
 
 
 class ConfigurationView(discord.ui.View):
@@ -237,19 +238,18 @@ class ServerConfigView(BaseConfigView):
     @discord.ui.button(label="Ontwikkelaars beheren", style=discord.ButtonStyle.primary, emoji="👨‍💻")
     async def manage_developers(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage developer IDs."""
-        embed = discord.Embed(
-            title="👨‍💻 Ontwikkelaars Beheren",
-            description=(
-                "Gebruik de volgende slash commands om ontwikkelaars te beheren:\n\n"
-                "• `/add_developer <user>` - Voeg een ontwikkelaar toe\n"
-                "• `/remove_developer <user>` - Verwijder een ontwikkelaar\n"
-                "• `/list_developers` - Toon alle ontwikkelaars\n\n"
-                "Deze commands gebruiken Discord's gebruiker autocomplete voor een betere ervaring."
-            ),
-            color=discord.Color.blue()
-        )
-        embed.set_footer(text="Alleen administrators kunnen ontwikkelaars beheren")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            view = DeveloperManagementView(self.bot, self.user_id)
+            embed = await view.create_embed()
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Error opening developer management: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description="Er is een fout opgetreden bij het openen van het ontwikkelaars menu.",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=error_embed, ephemeral=True)
     
     @discord.ui.button(label="Webhook Logging", style=discord.ButtonStyle.secondary, emoji="📝", row=1)
     async def toggle_webhook_format(self, interaction: discord.Interaction, button: discord.ui.Button):
