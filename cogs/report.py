@@ -24,7 +24,7 @@ class Reports(commands.Cog, name="reports"):
             return settings["moderator_role_id"]
         return None
 
-    @command(name="report", description="Report a user or issue to the moderators.")
+    @command(name="report", description="Rapporteer een gebruiker of probleem aan de moderators.")
     @app_commands.describe(
         user="De gebruiker die je wilt rapporteren",
         reason="De reden van je melding",
@@ -96,7 +96,7 @@ class Reports(commands.Cog, name="reports"):
 
     @command(
         name="set_report_channel",
-        description="Set the channel where reports should be sent (Moderators only).",
+        description="Stel het kanaal in waar rapporten naartoe gestuurd moeten worden (Alleen moderators).",
     )
     @has_admin()
     async def set_report_channel(

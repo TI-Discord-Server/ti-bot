@@ -11,7 +11,7 @@ class ping(commands.Cog, name="ping"):
 
     @command(
         name="ping",
-        description="Get the bot's latency.",
+        description="Krijg de latentie van de bot.",
     )
     async def ping(self, interaction: discord.Interaction):
         await interaction.response.send_message(

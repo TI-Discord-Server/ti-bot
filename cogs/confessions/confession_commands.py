@@ -20,7 +20,7 @@ class ConfessionCommands(commands.Cog):
         return any(role.id == moderator_role_id for role in interaction.user.roles)
 
     @app_commands.command(
-        name="force_review", description="Force the review of confessions."
+        name="force_review", description="Forceer de review van confessions."
     )
     async def force_review(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):

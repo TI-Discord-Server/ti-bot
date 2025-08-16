@@ -9,7 +9,7 @@ class Help(commands.Cog, name="help"):
         # Note: remove_command only affects prefix commands, not slash commands
         # self.bot.remove_command("help")  # Removes the built-in help command
 
-    @command(name="help", description="Get a list of all available commands.")
+    @command(name="help", description="Krijg een lijst van alle beschikbare commando's.")
     async def help_command(self, interaction: discord.Interaction):
         """Displays a help menu with all available slash commands."""
         
@@ -86,7 +86,7 @@ class Help(commands.Cog, name="help"):
                 except:
                     pass  # Give up if everything fails
 
-    @command(name="debug_commands", description="Debug command to see registered commands")
+    @command(name="debug_commands", description="Debug commando om geregistreerde commando's te bekijken")
     async def debug_commands(self, interaction: discord.Interaction):
         """Debug command to see what commands are registered."""
         try:
