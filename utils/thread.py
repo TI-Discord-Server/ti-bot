@@ -442,7 +442,20 @@ class Thread:
 
         # Send to log channel
         if log_channel:
-            await log_channel.send(f"{nsfw}Transcript for {channel.name} (closed by {closer.mention}):", file=file)
+            try:
+                await log_channel.send(f"{nsfw}Transcript for {channel.name} (closed by {closer.mention}):", file=file)
+            except discord.NotFound:
+                self.bot.log.error(f"Modmail log channel {log_channel.id} not found when trying to send transcript for ticket {channel.id}")
+                raise Exception(f"Het geconfigureerde modmail log kanaal (ID: {log_channel.id}) bestaat niet meer.")
+            except discord.Forbidden:
+                self.bot.log.error(f"No permission to send to modmail log channel {log_channel.id} when trying to send transcript for ticket {channel.id}")
+                raise Exception(f"Geen toestemming om berichten te sturen naar het modmail log kanaal (ID: {log_channel.id}).")
+            except discord.HTTPException as e:
+                self.bot.log.error(f"HTTP error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}")
+                raise Exception(f"Discord API fout bij versturen transcript naar log kanaal: {str(e)}")
+            except Exception as e:
+                self.bot.log.error(f"Unexpected error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}", exc_info=True)
+                raise Exception(f"Onverwachte fout bij versturen transcript naar log kanaal: {str(e)}")
 
         # Store in MongoDB
         _, recipient_id = parse_channel_topic(channel.topic)
