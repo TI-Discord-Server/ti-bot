@@ -21,18 +21,43 @@ This directory contains the migration script to migrate data from the old TIBot 
    MONGODB_PORT=27017
    MONGODB_USERNAME=your_new_db_username
    OLD_CONNECTION_STRING=mongodb://old_username:old_password@old_host:old_port/old_database
+   
+   # Regular email settings (for normal verification)
+   SMTP_EMAIL=your-custom-domain@example.com
+   SMTP_PASSWORD=your_smtp_password
+   SMTP_SERVER=smtp.example.com
+   SMTP_PORT=587
+   
+   # Migration email settings (for bounce checking - use Gmail for best compatibility)
+   MIGRATION_SMTP_EMAIL=your-gmail@gmail.com
+   MIGRATION_SMTP_PASSWORD=your_gmail_app_password
+   MIGRATION_SMTP_SERVER=smtp.gmail.com
+   MIGRATION_SMTP_PORT=587
+   MIGRATION_IMAP_SERVER=imap.gmail.com
+   MIGRATION_IMAP_PORT=993
    ```
 
-2. **Dependencies**: Install required Python packages:
+2. **Email Configuration**: 
+   - **Regular SMTP**: Used for sending verification codes to students
+   - **Migration SMTP/IMAP**: Used for bounce checking during migration (Gmail recommended for security compatibility)
+   - For Gmail accounts, enable 2FA and create an "App Password" for MIGRATION_SMTP_PASSWORD
+
+3. **Dependencies**: Install required Python packages:
    ```bash
-   pip install motor pymongo python-dotenv
+   pip install motor pymongo python-dotenv cryptography
    ```
 
-3. **Database Access**: Ensure you have:
+4. **Database Access**: Ensure you have:
    - Read access to the old database
    - Write access to the new database
 
 ## Usage
+
+### Test Email Configuration
+```bash
+python test_email_config.py
+```
+This will test both regular and migration email configurations to ensure they're working properly.
 
 ### Test Database Connections
 ```bash
