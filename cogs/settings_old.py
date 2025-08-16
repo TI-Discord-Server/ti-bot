@@ -179,6 +179,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
         app_commands.Choice(name="Role Menu - Role selection menu", value="role_menu"),
         app_commands.Choice(name="Channel Menu - Year/course selection", value="channel_menu"),
         app_commands.Choice(name="Verification - Verification message", value="verification"),
+        app_commands.Choice(name="Unban Request - Unban request button", value="unban_request"),
     ])
     async def setup_command(self, interaction: discord.Interaction,
                            component: str,
@@ -340,6 +341,38 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 await interaction.response.send_message(
                     "❌ Kon verification view niet laden.", ephemeral=True)
                 return
+        
+        elif component == "unban_request":
+            # Setup unban request message
+            unban_cog = self.bot.get_cog("UnbanRequest")
+            if not unban_cog:
+                await interaction.response.send_message(
+                    "❌ Unban request systeem is niet geladen.", ephemeral=True)
+                return
+            
+            # Check if settings are configured
+            if not (unban_cog.unban_request_kanaal_id and unban_cog.aanvragen_log_kanaal_id_1 and unban_cog.aanvragen_log_kanaal_id_2):
+                await interaction.response.send_message(
+                    "❌ De unban aanvraag instellingen zijn nog niet ingesteld. Gebruik `/set_mod_setting` om ze in te stellen.", 
+                    ephemeral=True)
+                return
+            
+            # Create the unban request embed and view
+            embed = discord.Embed(
+                title="Unban Aanvragen", 
+                description="Klik op de knop hieronder om een unban aan te vragen.", 
+                color=discord.Color.blue()
+            )
+            
+            if target_channel == interaction.channel:
+                await target_channel.send(embed=embed, view=unban_cog.unban_view)
+                await interaction.response.send_message("✅ Unban aanvraag bericht verzonden!", ephemeral=True)
+            else:
+                await target_channel.send(embed=embed, view=unban_cog.unban_view)
+                await interaction.response.send_message(
+                    f"✅ Unban aanvraag bericht verzonden naar {target_channel.mention}.", ephemeral=True)
+            
+            self.bot.log.info(f"{interaction.user} heeft unban request setup uitgevoerd in {target_channel.name}.")
 
 
 async def setup(bot):

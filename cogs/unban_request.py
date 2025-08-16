@@ -110,21 +110,7 @@ class UnbanRequest(commands.Cog):
             self.unban_view = UnbanView(self.bot, self.unban_request_kanaal_id, self.aanvragen_log_kanaal_id_1, self.aanvragen_log_kanaal_id_2)
             self.bot.add_view(self.unban_view)
 
-    @app_commands.command(name="unban_bericht", description="Stuurt het unban aanvraag bericht.")
-    @commands.is_owner()
-    async def stuur_unban_bericht(self, interaction: discord.Interaction):
-        if not (self.unban_request_kanaal_id and self.aanvragen_log_kanaal_id_1 and self.aanvragen_log_kanaal_id_2):
-            await interaction.response.send_message("De unban aanvraag instellingen zijn nog niet ingesteld. Gebruik `/set_mod_setting` om ze in te stellen.", ephemeral=True)
-            return
 
-        kanaal = self.bot.get_channel(int(self.unban_request_kanaal_id))
-
-        if kanaal:
-            embed = discord.Embed(title="Unban Aanvragen", description="Klik op de knop hieronder om een unban aan te vragen.", color=discord.Color.blue())
-            await kanaal.send(embed=embed, view=self.unban_view)
-            await interaction.response.send_message(f"Unban aanvraag bericht verzonden naar {kanaal.mention}.", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"Kanaal met ID {self.unban_request_kanaal_id} niet gevonden.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(UnbanRequest(bot))
