@@ -798,19 +798,29 @@ class Verification(commands.Cog):
     async def cleanup_orphaned_records(self):
         """Periodically clean up verification records for users no longer in the server."""
         await self.bot.wait_until_ready()
-        self.bot.log.info("Starting periodic verification records cleanup task")
+        
+        # Wait a bit more to ensure guild configuration is loaded
+        await asyncio.sleep(5)
+        
+        self.bot.log.info(f"Starting periodic verification records cleanup task (configured guild_id: {self.bot.guild_id})")
+        
+        # Verify guild configuration is available
+        if not self.bot.guild_id:
+            self.bot.log.error("No guild_id configured for verification cleanup. Please configure the server in /configure")
+            return
         
         while not self.bot.is_closed():
             try:
                 self.bot.log.debug("Running verification records cleanup check")
                 
-                if not self.bot.guilds:
-                    self.bot.log.warning("No guilds found for verification cleanup, skipping")
+                # Get the configured guild from bot settings
+                guild = self.bot.guild
+                if not guild:
+                    self.bot.log.warning(f"Configured guild not found (guild_id: {self.bot.guild_id}), skipping verification cleanup")
                     await asyncio.sleep(3600)
                     continue
                 
-                guild = self.bot.guilds[0]  # Adjust if you have multiple guilds
-                self.bot.log.debug(f"Checking verification records for guild: {guild.name} ({guild.id})")
+                self.bot.log.debug(f"Checking verification records for configured guild: {guild.name} ({guild.id})")
                 
                 cleanup_count = 0
                 total_records = 0
