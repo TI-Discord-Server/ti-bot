@@ -95,6 +95,12 @@ class DiscordWebhookHandler(logging.Handler):
         self.bot = bot
         # Do not create a ClientSession here—set it to None; it will be lazily created.
         self.session = None
+        # Rate limiting and retry configuration
+        self.max_retries = 3
+        self.base_delay = 2.0  # Base delay in seconds
+        self.max_delay = 60.0  # Maximum delay in seconds
+        self.failed_attempts = 0
+        self.last_failure_time = 0
 
     async def _ensure_session(self):
         # Create the ClientSession only when needed and within an async context.
@@ -119,37 +125,81 @@ class DiscordWebhookHandler(logging.Handler):
         return "embed"
 
     async def _async_emit(self, record):
-        await self._ensure_session()
-        try:
-            webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
-            msg = self.format(record)
-            
-            # Add POD_UID prefix if available (first 5 characters only)
-            if POD_UID:
-                pod_prefix = f"[{POD_UID[:5]}] "
-                msg = pod_prefix + msg
-            
-            # Get the current webhook format setting
-            format_type = await self._get_webhook_format()
-            
-            if format_type == "plaintext":
-                # Plaintext format with square brackets
-                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-                plaintext_msg = f"[{record.levelname}] [{timestamp}] {msg}"
-                await webhook.send(content=f"```\n{plaintext_msg}\n```")
+        import time
+        
+        # Check if we should skip due to too many recent failures
+        current_time = time.time()
+        if self.failed_attempts >= self.max_retries:
+            # If it's been more than max_delay since last failure, reset counter
+            if current_time - self.last_failure_time > self.max_delay:
+                self.failed_attempts = 0
             else:
-                # Default embed format
-                embed = discord.Embed(
-                    title="Log Entry",
-                    description=f"```{msg}```",
-                    color=self._get_color(record.levelname),
-                    timestamp=datetime.datetime.now(datetime.UTC),
-                )
-                embed.add_field(name="Level", value=record.levelname, inline=True)
-                embed.add_field(name="Logger", value=record.name, inline=True)
-                await webhook.send(embed=embed)
-        except Exception:
-            self.handleError(record)
+                # Skip this log message to prevent infinite loops
+                return
+        
+        await self._ensure_session()
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
+                msg = self.format(record)
+                
+                # Add POD_UID prefix if available (first 5 characters only)
+                if POD_UID:
+                    pod_prefix = f"[{POD_UID[:5]}] "
+                    msg = pod_prefix + msg
+                
+                # Get the current webhook format setting
+                format_type = await self._get_webhook_format()
+                
+                if format_type == "plaintext":
+                    # Plaintext format with square brackets
+                    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                    plaintext_msg = f"[{record.levelname}] [{timestamp}] {msg}"
+                    await webhook.send(content=f"```\n{plaintext_msg}\n```")
+                else:
+                    # Default embed format
+                    embed = discord.Embed(
+                        title="Log Entry",
+                        description=f"```{msg}```",
+                        color=self._get_color(record.levelname),
+                        timestamp=datetime.datetime.now(datetime.UTC),
+                    )
+                    embed.add_field(name="Level", value=record.levelname, inline=True)
+                    embed.add_field(name="Logger", value=record.name, inline=True)
+                    await webhook.send(embed=embed)
+                
+                # Success! Reset failure counter
+                self.failed_attempts = 0
+                return
+                
+            except discord.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    self.failed_attempts += 1
+                    self.last_failure_time = current_time
+                    
+                    if attempt < self.max_retries:
+                        # Calculate exponential backoff delay
+                        delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+                        print(f"[WEBHOOK] Rate limited (attempt {attempt + 1}/{self.max_retries + 1}). Waiting {delay:.1f}s before retry...")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        print(f"[WEBHOOK] Max retries ({self.max_retries}) exceeded for webhook {webhook.id}. Dropping log message.")
+                        return
+                else:
+                    # Other HTTP error, don't retry
+                    self.failed_attempts += 1
+                    self.last_failure_time = current_time
+                    print(f"[WEBHOOK] HTTP error {e.status}: {e.text}")
+                    return
+                    
+            except Exception as e:
+                # Other error, don't retry
+                self.failed_attempts += 1
+                self.last_failure_time = current_time
+                print(f"[WEBHOOK] Unexpected error: {e}")
+                return
 
     def _get_color(self, levelname):
         # Map log level names to Discord color objects.
@@ -161,6 +211,12 @@ class DiscordWebhookHandler(logging.Handler):
             "CRITICAL": discord.Color.dark_red(),
         }
         return colors.get(levelname, discord.Color.default())
+
+    async def async_close(self):
+        """Async close method for proper cleanup."""
+        if self.session is not None and not self.session.closed:
+            await self.session.close()
+        super().close()
 
     def close(self):
         # If the session was created, schedule its closure.
@@ -862,7 +918,7 @@ class Bot(commands.Bot):
             for handler in self.log.handlers:
                 if isinstance(handler, DiscordWebhookHandler):
                     try:
-                        await handler.close()
+                        await handler.async_close()
                         self.log.info("Webhook handler session closed")
                     except Exception as e:
                         print(f"Error closing webhook handler: {e}")  # Use print since logging might not work
