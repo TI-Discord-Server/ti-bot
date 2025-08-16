@@ -64,8 +64,25 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.response.send_message(close_msg, ephemeral=True)
         
         # Close the thread
-        modmail_logs_channel = await self.bot.fetch_channel(await self.get_modmail_logs_channel_id())
-        await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
+        try:
+            modmail_logs_channel_id = await self.get_modmail_logs_channel_id()
+            modmail_logs_channel = None
+            
+            if modmail_logs_channel_id is None:
+                # No log channel configured - warn but still allow closing
+                await interaction.followup.send("⚠️ Waarschuwing: Geen modmail log kanaal geconfigureerd. Ticket wordt gesloten maar transcript wordt niet gelogd.", ephemeral=True)
+            else:
+                try:
+                    modmail_logs_channel = await self.bot.fetch_channel(modmail_logs_channel_id)
+                except discord.NotFound:
+                    await interaction.followup.send("⚠️ Waarschuwing: Het geconfigureerde modmail log kanaal bestaat niet meer. Ticket wordt gesloten maar transcript wordt niet gelogd.", ephemeral=True)
+                except discord.Forbidden:
+                    await interaction.followup.send("⚠️ Waarschuwing: Geen toegang tot het modmail log kanaal. Ticket wordt gesloten maar transcript wordt niet gelogd.", ephemeral=True)
+            
+            await thread.close(closer=interaction.user, message=reason, silent=silent, log_channel=modmail_logs_channel)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Kan ticket niet sluiten: {str(e)}", ephemeral=True)
+            return
 
     @command(name="generate_transcript", description="Maakt een transcript en stuurt het naar het log kanaal")
     @has_admin()

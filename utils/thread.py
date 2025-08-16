@@ -462,7 +462,7 @@ class Thread:
         closer: typing.Union[discord.Member, discord.User],
         silent: bool = False,
         message: str = None,
-        log_channel: discord.TextChannel,
+        log_channel: typing.Optional[discord.TextChannel] = None,
     ) -> None:
         """Close a thread now or after a set time in seconds"""
         try:
