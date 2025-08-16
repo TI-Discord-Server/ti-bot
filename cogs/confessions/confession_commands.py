@@ -24,6 +24,7 @@ class ConfessionCommands(commands.Cog):
     )
     async def force_review(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use force_review without moderator role")
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
@@ -42,6 +43,7 @@ class ConfessionCommands(commands.Cog):
     )
     async def force_post(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use force_post without moderator role")
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
@@ -63,6 +65,7 @@ class ConfessionCommands(commands.Cog):
     )
     async def setup_submit_message(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use setup_submit_message without moderator role")
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
@@ -71,6 +74,7 @@ class ConfessionCommands(commands.Cog):
         # Get public channel
         public_channel_id = await self.tasks.get_public_channel_id()
         if not public_channel_id:
+            self.bot.log.warning(f"Public channel not configured when {interaction.user.name} ({interaction.user.id}) tried to setup submit message")
             await interaction.response.send_message(
                 "❌ Publiek kanaal niet geconfigureerd. Gebruik `/configure` om het in te stellen.", 
                 ephemeral=True
@@ -79,6 +83,7 @@ class ConfessionCommands(commands.Cog):
         
         public_channel = self.bot.get_channel(public_channel_id)
         if not public_channel:
+            self.bot.log.error(f"Public channel {public_channel_id} not found when {interaction.user.name} ({interaction.user.id}) tried to setup submit message")
             await interaction.response.send_message(
                 "❌ Publiek kanaal niet gevonden.", ephemeral=True
             )

@@ -449,6 +449,8 @@ class ChannelMenu(commands.Cog):
         
         embed.set_footer(text="Cache wordt automatisch elke 5 minuten vernieuwd")
         await interaction.followup.send(embed=embed, ephemeral=True)
+        
+        self.bot.log.info(f"Channel cache refreshed by {interaction.user.name} ({interaction.user.id}) - {len(mapping)} mappings found")
     
     @app_commands.command(
         name="show_channel_cache",
@@ -517,6 +519,8 @@ class ChannelMenu(commands.Cog):
         
         embed.set_footer(text="Cache wordt automatisch elke 5 minuten vernieuwd")
         await interaction.followup.send(embed=embed, ephemeral=True)
+        
+        self.bot.log.info(f"Channel cache status viewed by {interaction.user.name} ({interaction.user.id}) - {len(mapping)} mappings in cache")
 
 
 async def setup(bot):

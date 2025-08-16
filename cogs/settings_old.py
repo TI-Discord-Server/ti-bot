@@ -48,6 +48,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             # Setup confessions
             confession_cog = self.bot.get_cog("ConfessionCommands")
             if not confession_cog:
+                self.bot.log.error(f"ConfessionCommands cog not loaded when {interaction.user.name} ({interaction.user.id}) tried to setup confessions")
                 await interaction.response.send_message(
                     "❌ Confession systeem is niet geladen.", ephemeral=True)
                 return
@@ -69,7 +70,8 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 
                 self.bot.log.info(f"{interaction.user} heeft confessions setup uitgevoerd in {target_channel.name}.")
                 
-            except ImportError:
+            except ImportError as e:
+                self.bot.log.error(f"Could not import ConfessionView when {interaction.user.name} ({interaction.user.id}) tried to setup confessions: {e}")
                 await interaction.response.send_message(
                     "❌ Kon confession view niet laden.", ephemeral=True)
                 return
@@ -78,6 +80,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             # Setup role menu overview
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if not role_selector_cog:
+                self.bot.log.error(f"RoleSelector cog not loaded when {interaction.user.name} ({interaction.user.id}) tried to setup role menu")
                 await interaction.response.send_message(
                     "❌ Role selector systeem is niet geladen.", ephemeral=True)
                 return
@@ -85,6 +88,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             # Get categories
             categories = await role_selector_cog.get_categories()
             if not categories:
+                self.bot.log.warning(f"No role categories found when {interaction.user.name} ({interaction.user.id}) tried to setup role menu")
                 await interaction.response.send_message(
                     "❌ Geen rolcategorieën gevonden. Voeg eerst categorieën toe met `/add_role_category`.", 
                     ephemeral=True)
@@ -119,11 +123,14 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 await target_channel.send(embed=embed, view=view)
                 await interaction.response.send_message(
                     f"✅ Role menu ingesteld in {target_channel.mention}", ephemeral=True)
+            
+            self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup role menu in {target_channel.name} ({target_channel.id})")
         
         elif component == "channel_menu":
             # Setup channel menu
             channel_menu_cog = self.bot.get_cog("ChannelMenu")
             if not channel_menu_cog:
+                self.bot.log.error(f"ChannelMenu cog not loaded when {interaction.user.name} ({interaction.user.id}) tried to setup channel menu")
                 await interaction.response.send_message(
                     "❌ Channel menu systeem is niet geladen.", ephemeral=True)
                 return
@@ -161,8 +168,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 
                 # Ensure categories exist in the background
                 await channel_menu_cog.ensure_categories_exist(interaction.guild)
+                self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup channel menu in {target_channel.name} ({target_channel.id})")
                 
-            except ImportError:
+            except ImportError as e:
+                self.bot.log.error(f"Could not import ChannelMenuView when {interaction.user.name} ({interaction.user.id}) tried to setup channel menu: {e}")
                 await interaction.response.send_message(
                     "❌ Kon channel menu view niet laden.", ephemeral=True)
                 return
@@ -193,8 +202,11 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                     await target_channel.send(embed=embed, view=view)
                     await interaction.response.send_message(
                         f"✅ Verificatiebericht verzonden naar {target_channel.mention}", ephemeral=True)
+                
+                self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup verification in {target_channel.name} ({target_channel.id})")
                         
-            except ImportError:
+            except ImportError as e:
+                self.bot.log.error(f"Could not import VerificationView when {interaction.user.name} ({interaction.user.id}) tried to setup verification: {e}")
                 await interaction.response.send_message(
                     "❌ Kon verification view niet laden.", ephemeral=True)
                 return
@@ -203,12 +215,14 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             # Setup unban request message
             unban_cog = self.bot.get_cog("UnbanRequest")
             if not unban_cog:
+                self.bot.log.error(f"UnbanRequest cog not loaded when {interaction.user.name} ({interaction.user.id}) tried to setup unban request")
                 await interaction.response.send_message(
                     "❌ Unban request systeem is niet geladen.", ephemeral=True)
                 return
             
             # Check if required settings are configured (archive channel is optional)
             if not (unban_cog.unban_request_kanaal_id and unban_cog.aanvragen_log_kanaal_id_1):
+                self.bot.log.warning(f"Unban request settings not configured when {interaction.user.name} ({interaction.user.id}) tried to setup unban request")
                 await interaction.response.send_message(
                     "❌ De unban aanvraag instellingen zijn nog niet volledig ingesteld. Gebruik `/configure` en selecteer 'Unban Requests' om ze in te stellen.", 
                     ephemeral=True)

@@ -40,6 +40,7 @@ class Reports(commands.Cog, name="reports"):
         reports_channel_id = await self.get_reports_channel_id()
         
         if not reports_channel_id:
+            self.bot.log.warning(f"Report command used but no reports channel configured by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Geen rapportage kanaal geconfigureerd. Neem contact op met een beheerder.", ephemeral=True
             )
@@ -48,16 +49,19 @@ class Reports(commands.Cog, name="reports"):
         try:
             reports_channel = await self.bot.fetch_channel(reports_channel_id)
         except discord.NotFound:
+            self.bot.log.error(f"Reports channel {reports_channel_id} not found for report by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Het geconfigureerde rapportage kanaal bestaat niet meer. Neem contact op met een beheerder.", ephemeral=True
             )
             return
         except discord.Forbidden:
+            self.bot.log.error(f"No access to reports channel {reports_channel_id} for report by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Geen toegang tot het rapportage kanaal. Neem contact op met een beheerder.", ephemeral=True
             )
             return
         except Exception as e:
+            self.bot.log.error(f"Error accessing reports channel {reports_channel_id} for report by {interaction.user.name} ({interaction.user.id}): {e}", exc_info=True)
             await interaction.response.send_message(
                 f"❌ Fout bij toegang tot rapportage kanaal: {str(e)}", ephemeral=True
             )
@@ -95,6 +99,7 @@ class Reports(commands.Cog, name="reports"):
                     inline=False,
                 )
             except Exception as e:
+                self.bot.log.warning(f"Could not fetch message {message_id} for report by {interaction.user.name} ({interaction.user.id}): {e}")
                 embed.add_field(
                     name="Message Error",
                     value=f"Kon bericht niet ophalen. Mogelijk fout ID of geen toegang.\n`{str(e)}`",
@@ -107,6 +112,8 @@ class Reports(commands.Cog, name="reports"):
         if moderator_role_id:
             await reports_channel.send(f"<@&{moderator_role_id}>")
 
+        self.bot.log.info(f"Report submitted by {interaction.user.name} ({interaction.user.id}) against {user.name if user else 'N/A'} ({user.id if user else 'N/A'}) - Reason: {reason[:100]}{'...' if len(reason) > 100 else ''}")
+        
         await interaction.response.send_message(
             "Je rapport is ingediend. Bedankt!", ephemeral=True
         )
@@ -129,6 +136,7 @@ class Reports(commands.Cog, name="reports"):
         reports_channel_id = await self.get_reports_channel_id()
         
         if not reports_channel_id:
+            self.bot.log.warning(f"Anonymous report command used but no reports channel configured by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Geen rapportage kanaal geconfigureerd. Neem contact op met een beheerder.", ephemeral=True
             )
@@ -137,16 +145,19 @@ class Reports(commands.Cog, name="reports"):
         try:
             reports_channel = await self.bot.fetch_channel(reports_channel_id)
         except discord.NotFound:
+            self.bot.log.error(f"Reports channel {reports_channel_id} not found for anonymous report by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Het geconfigureerde rapportage kanaal bestaat niet meer. Neem contact op met een beheerder.", ephemeral=True
             )
             return
         except discord.Forbidden:
+            self.bot.log.error(f"No access to reports channel {reports_channel_id} for anonymous report by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(
                 "❌ Geen toegang tot het rapportage kanaal. Neem contact op met een beheerder.", ephemeral=True
             )
             return
         except Exception as e:
+            self.bot.log.error(f"Error accessing reports channel {reports_channel_id} for anonymous report by {interaction.user.name} ({interaction.user.id}): {e}", exc_info=True)
             await interaction.response.send_message(
                 f"❌ Fout bij toegang tot rapportage kanaal: {str(e)}", ephemeral=True
             )
@@ -184,6 +195,7 @@ class Reports(commands.Cog, name="reports"):
                     inline=False,
                 )
             except Exception as e:
+                self.bot.log.warning(f"Could not fetch message {message_id} for anonymous report by {interaction.user.name} ({interaction.user.id}): {e}")
                 embed.add_field(
                     name="Message Error",
                     value=f"Kon bericht niet ophalen. Mogelijk fout ID of geen toegang.\n`{str(e)}`",
@@ -196,6 +208,8 @@ class Reports(commands.Cog, name="reports"):
         if moderator_role_id:
             await reports_channel.send(f"<@&{moderator_role_id}>")
 
+        self.bot.log.info(f"Anonymous report submitted by {interaction.user.name} ({interaction.user.id}) against {user.name if user else 'N/A'} ({user.id if user else 'N/A'}) - Reason: {reason[:100]}{'...' if len(reason) > 100 else ''}")
+        
         await interaction.response.send_message(
             "Je anonieme rapport is ingediend. Bedankt!", ephemeral=True
         )

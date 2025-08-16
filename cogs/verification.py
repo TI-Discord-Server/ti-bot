@@ -610,11 +610,13 @@ class Verification(commands.Cog):
                     has_permission = True
         
         if not has_permission:
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use get_email without permission")
             await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
             return
 
         record = await self.bot.db.verifications.find_one({"user_id": user.id})
         if not record:
+            self.bot.log.info(f"No email found for user {user.name} ({user.id}) when requested by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message("❌ Geen e-mailadres gevonden voor deze gebruiker.", ephemeral=True)
             return
 
@@ -630,7 +632,9 @@ class Verification(commands.Cog):
                 message = f"📧 E-mailadres: {decrypted_email}\n✅ Nieuw verificatiesysteem"
             
             await interaction.response.send_message(message, ephemeral=True)
+            self.bot.log.info(f"Email retrieved for user {user.name} ({user.id}) by {interaction.user.name} ({interaction.user.id})")
         except Exception as e:
+            self.bot.log.error(f"Error retrieving email for user {user.name} ({user.id}) by {interaction.user.name} ({interaction.user.id}): {e}")
             await interaction.response.send_message("❌ Fout bij het ophalen van het e-mailadres.", ephemeral=True)
 
     @app_commands.command(name="unverify", description="Verwijder een verificatie en kick de gebruiker")
@@ -654,11 +658,13 @@ class Verification(commands.Cog):
                     has_permission = True
         
         if not has_permission:
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use unverify without permission")
             await interaction.response.send_message("❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True)
             return
 
         # Must provide either email or user
         if not email and not user:
+            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) used unverify without providing email or user")
             await interaction.response.send_message("❌ Je moet een e-mailadres of gebruiker opgeven.", ephemeral=True)
             return
 
@@ -682,6 +688,7 @@ class Verification(commands.Cog):
         
         if not record:
             search_term = f"gebruiker {user.mention}" if user else f"e-mailadres {email}"
+            self.bot.log.info(f"No verification record found for {search_term} when unverify requested by {interaction.user.name} ({interaction.user.id})")
             await interaction.response.send_message(f"❌ Geen verificatie gevonden voor {search_term}.", ephemeral=True)
             return
             
