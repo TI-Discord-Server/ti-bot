@@ -6,6 +6,7 @@ import re
 from typing import Optional
 import pymongo
 import time
+import asyncio
 from utils.has_role import has_role
 from utils.has_admin import has_admin
 from utils.timezone import TIMEZONE, now_utc, format_local_time, to_local
@@ -485,7 +486,18 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         await interaction.response.defer(ephemeral=True)
 
+        # Add reasonable limit to prevent abuse
+        if count > 1000:
+            embed = discord.Embed(
+                title="Limiet Overschreden",
+                description="Je kunt maximaal 1000 messages tegelijk verwijderen.",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
         try:
+            # Use channel.purge which handles batching automatically
             deleted = await interaction.channel.purge(limit=count, check=check)
             embed = discord.Embed(
                 title="Messages verwijderd",
@@ -493,6 +505,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            # Log the purge action
+            self.bot.log.info(f"Purge command used by {interaction.user.name} ({interaction.user.id}) in channel {interaction.channel.id}. Deleted {len(deleted)} messages. Filters: bots={bots}, bot_only={bot_only}")
 
         except discord.errors.Forbidden:
             embed = discord.Embed(
@@ -802,15 +817,34 @@ async def purge_below(interaction: discord.Interaction, message: discord.Message
                 break
             messages_to_delete.append(msg)
 
+        total_deleted = 0
         if messages_to_delete:
-            await interaction.channel.delete_messages(messages_to_delete)
+            # Batch delete messages in chunks of 100
+            for i in range(0, len(messages_to_delete), 100):
+                batch = messages_to_delete[i:i + 100]
+                if len(batch) == 1:
+                    # Single message deletion
+                    await batch[0].delete()
+                    total_deleted += 1
+                else:
+                    # Bulk delete for multiple messages
+                    await interaction.channel.delete_messages(batch)
+                    total_deleted += len(batch)
+                
+                # Add a small delay between batches to avoid rate limits
+                if i + 100 < len(messages_to_delete):
+                    await asyncio.sleep(1)
 
         embed = discord.Embed(
             title="Messages verwijderd Hieronder",
-            description=f"{len(messages_to_delete)} messages verwijderd onder de geselecteerde message.",
+            description=f"{total_deleted} messages verwijderd onder de geselecteerde message.",
             color=discord.Color.green(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
+        
+        # Log the action (need to access bot instance through interaction)
+        if hasattr(interaction, 'client') and hasattr(interaction.client, 'log'):
+            interaction.client.log.info(f"Purge below command used by {interaction.user.name} ({interaction.user.id}) in channel {interaction.channel.id}. Deleted {total_deleted} messages below message {message.id}")
 
     except discord.errors.Forbidden:
         embed = discord.Embed(
@@ -820,12 +854,19 @@ async def purge_below(interaction: discord.Interaction, message: discord.Message
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
     except discord.errors.HTTPException as e:
-            embed = discord.Embed(
-                title="Fout",
-                description=f"Verwijderen mislukt: {e}",
-                color=discord.Color.red(),
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+        embed = discord.Embed(
+            title="Fout",
+            description=f"Verwijderen mislukt: {e}",
+            color=discord.Color.red(),
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = discord.Embed(
+            title="Onverwachte Fout",
+            description=f"Er is een onverwachte fout opgetreden: {e}",
+            color=discord.Color.red(),
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot):
