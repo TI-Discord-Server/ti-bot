@@ -1011,6 +1011,81 @@ class ConfessionTimesModal(discord.ui.Modal):
             await interaction.response.send_message("❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True)
 
 
+class UnbanUrlModal(discord.ui.Modal):
+    """Modal for setting unban request URL."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Unban Request URL Instellen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.url_input = discord.ui.TextInput(
+            label="Unban Request URL",
+            placeholder="https://example.com/unban-request",
+            required=False,
+            max_length=500
+        )
+        self.add_item(self.url_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            url_value = self.url_input.value.strip()
+            
+            if url_value:
+                # Basic URL validation
+                if not (url_value.startswith('http://') or url_value.startswith('https://')):
+                    await interaction.response.send_message(
+                        "❌ URL moet beginnen met http:// of https://", 
+                        ephemeral=True
+                    )
+                    return
+                
+                await self.bot.db.settings.update_one(
+                    {"_id": "mod_settings"},
+                    {"$set": {"unban_request_url": url_value}},
+                    upsert=True
+                )
+                
+                success_embed = discord.Embed(
+                    title="✅ URL Ingesteld",
+                    description=f"Unban request URL is ingesteld op:\n`{url_value}`",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=success_embed, ephemeral=True)
+            else:
+                # Remove URL if empty
+                await self.bot.db.settings.update_one(
+                    {"_id": "mod_settings"},
+                    {"$unset": {"unban_request_url": ""}},
+                    upsert=True
+                )
+                
+                success_embed = discord.Embed(
+                    title="✅ URL Verwijderd",
+                    description="Unban request URL is verwijderd.",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=success_embed, ephemeral=True)
+            
+            # Refresh the main configuration view
+            view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in UnbanUrlModal.on_submit: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het instellen van de URL:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
+
+
 class Configure(commands.Cog):
     """Configuration management cog."""
     
@@ -1537,6 +1612,14 @@ class UnbanRequestsConfigView(BaseConfigView):
                     inline=False
                 )
             
+            # Unban request URL
+            unban_request_url = settings.get("unban_request_url", "Niet ingesteld")
+            embed.add_field(
+                name="🔗 Unban Request URL",
+                value=f"`{unban_request_url}`",
+                inline=False
+            )
+            
             # Log channel 1
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
             if aanvragen_log_kanaal_id_1:
@@ -1615,11 +1698,6 @@ class UnbanRequestsConfigView(BaseConfigView):
             )
             
             if required_configured:
-                embed.add_field(
-                    name="ℹ️ Gebruik",
-                    value="Gebruik `/setup unban_request [kanaal]` om het unban request bericht te verzenden.",
-                    inline=False
-                )
                 if not aanvragen_log_kanaal_id_2:
                     embed.add_field(
                         name="💡 Optioneel",
@@ -1658,6 +1736,26 @@ class UnbanRequestsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
+    
+    @discord.ui.button(label="Request URL", style=discord.ButtonStyle.secondary, emoji="🔗")
+    async def set_request_url(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set the unban request URL."""
+        try:
+            self.bot.log.info(f"Unban request URL button clicked by {interaction.user} ({interaction.user.id})")
+            modal = UnbanUrlModal(self.bot, self.user_id, self.visible)
+            await interaction.response.send_modal(modal)
+            self.bot.log.debug("Unban request URL modal sent successfully")
+        except Exception as e:
+            self.bot.log.error(f"Error opening unban request URL modal: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het openen van het URL menu:\n```{str(e)}```",
                 color=discord.Color.red()
             )
             try:
