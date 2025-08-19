@@ -827,7 +827,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @has_role("The Council")
     @app_commands.describe(member="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, member: discord.Member):
-        infractions = await self.bot.db.infractions.find(
+        infractions = await self.infractions_collection.find(
             {"guild_id": interaction.guild.id, "user_id": member.id}
         ).sort("timestamp", pymongo.DESCENDING).limit(
             10
@@ -884,6 +884,15 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed)
+            
+            # Log the lockdown infraction
+            try:
+                await self.log_infraction(
+                    interaction.guild.id, channel.id, interaction.user.id, "lockdown", reason
+                )
+            except Exception as e:
+                self.bot.log.error(f"Failed to log lockdown infraction for channel {channel.name} ({channel.id}): {e}")
+                
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permissie Fout",
