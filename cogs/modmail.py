@@ -2,6 +2,7 @@ import asyncio
 from typing import Optional, Literal
 import io
 
+import discord
 from discord.ext import commands
 from discord.app_commands import (
     command,
