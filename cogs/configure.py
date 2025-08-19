@@ -1282,6 +1282,27 @@ class Configure(commands.Cog):
             except Exception as followup_error:
                 self.bot.log.error(f"Failed to send error message: {followup_error}")
 
+    @configure.error
+    async def configure_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        """Handle configure command errors."""
+        if isinstance(error, app_commands.CheckFailure):
+            await interaction.response.send_message(
+                "❌ Je hebt geen toestemming om de bot configuratie te gebruiken. Alleen developers en administrators kunnen dit commando gebruiken.",
+                ephemeral=True
+            )
+        else:
+            self.bot.log.error(f"Unexpected error in configure command: {error}", exc_info=True)
+            try:
+                await interaction.response.send_message(
+                    "❌ Er is een onverwachte fout opgetreden. Check de logs voor details.",
+                    ephemeral=True
+                )
+            except discord.InteractionResponded:
+                await interaction.followup.send(
+                    "❌ Er is een onverwachte fout opgetreden. Check de logs voor details.",
+                    ephemeral=True
+                )
+
 
 
 
