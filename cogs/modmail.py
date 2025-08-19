@@ -130,17 +130,17 @@ class Modmail(commands.Cog, name="modmail"):
     async def transcripts(
             self,
             interaction: discord.Interaction,
-            recipient_id: str,
+            user: discord.User,
     ):
         await interaction.response.defer()  # Acknowledge command (avoids timeout)
-        recipient_id = int(recipient_id)
+        recipient_id = user.id
 
         # Fetch files from MongoDB
-        cursor = self.db.logs.find({"recipient_id": recipient_id})
+        cursor = self.db.modmail_logs.find({"recipient_id": recipient_id})
         files_list = await cursor.to_list(length=None)  # Convert cursor to a list
 
         if not files_list:
-            await interaction.followup.send(f"Geen transcripts gevonden voor ontvanger {recipient_id}.")
+            await interaction.followup.send(f"Geen transcripts gevonden voor {user.mention} ({user.display_name}).")
             return
 
         amount = len(files_list)
@@ -172,7 +172,7 @@ class Modmail(commands.Cog, name="modmail"):
 
         # Send each batch separately
         for batch in file_batches:
-            await interaction.followup.send(f"{amount} transcripts gevonden voor ontvanger {recipient_id}:", files=batch)
+            await interaction.followup.send(f"{amount} transcripts gevonden voor {user.mention} ({user.display_name}):", files=batch)
 
     @staticmethod
     def parse_user_or_role(ctx, user_or_role):
