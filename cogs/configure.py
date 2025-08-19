@@ -69,6 +69,12 @@ class ConfigurationView(discord.ui.View):
                 value="unban_requests",
                 description="Unban aanvraag systeem instellingen",
                 emoji="🔓"
+            ),
+            discord.SelectOption(
+                label="Examenresultaten",
+                value="exam_results",
+                description="Examenresultaten datum instellingen",
+                emoji="📊"
             )
         ]
     )
@@ -90,6 +96,8 @@ class ConfigurationView(discord.ui.View):
             view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
         elif category == "unban_requests":
             view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
+        elif category == "exam_results":
+            view = ExamResultsConfigView(self.bot, self.user_id, self.visible)
         
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
@@ -112,7 +120,8 @@ class ConfigurationView(discord.ui.View):
                     "🚨 **Reports** - Report systeem instellingen\n"
                     "✅ **Verificatie** - Verificatie systeem instellingen\n"
                     "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen\n"
-                    "🔓 **Unban Requests** - Unban aanvraag systeem instellingen"
+                    "🔓 **Unban Requests** - Unban aanvraag systeem instellingen\n"
+                    "📊 **Examenresultaten** - Examenresultaten datum instellingen"
                 ),
                 inline=False
             )
@@ -1009,6 +1018,159 @@ class ConfessionTimesModal(discord.ui.Modal):
             
         except ValueError:
             await interaction.response.send_message("❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True)
+
+
+class ExamResultsConfigView(BaseConfigView):
+    """Exam results configuration view."""
+    
+    async def create_embed(self):
+        """Create exam results configuration embed."""
+        try:
+            self.bot.log.debug("Creating exam results configuration embed")
+            settings = await self.bot.db.settings.find_one({"_id": "exam_results_settings"}) or {}
+            self.bot.log.debug(f"Retrieved exam_results_settings: {settings}")
+            
+            embed = discord.Embed(
+                title="📊 Examenresultaten Instellingen",
+                description="Configuratie voor de examenresultaten datum",
+                color=discord.Color.green(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            # Exam result date
+            exam_result_date = settings.get("exam_result_date", "Niet ingesteld")
+            embed.add_field(
+                name="📅 Examenresultaten Datum",
+                value=f"`{exam_result_date}`",
+                inline=False
+            )
+            
+            # Status
+            if exam_result_date != "Niet ingesteld":
+                embed.add_field(
+                    name="🔧 Status",
+                    value="✅ Datum is ingesteld",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="🔧 Status",
+                    value="❌ Datum niet ingesteld",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Gebruik de knop hieronder om de datum in te stellen")
+            return embed
+            
+        except Exception as e:
+            self.bot.log.error(f"Error creating exam results embed: {e}", exc_info=True)
+            raise
+    
+    @discord.ui.button(label="Datum Instellen", style=discord.ButtonStyle.primary, emoji="📅")
+    async def set_exam_date(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set the exam results date."""
+        try:
+            self.bot.log.info(f"Exam date button clicked by {interaction.user} ({interaction.user.id})")
+            modal = ExamDateModal(self.bot, self.user_id, self.visible)
+            await interaction.response.send_modal(modal)
+            self.bot.log.debug("Exam date modal sent successfully")
+        except Exception as e:
+            self.bot.log.error(f"Error opening exam date modal: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het openen van het datum menu:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
+    
+    @discord.ui.button(label="← Terug naar Menu", style=discord.ButtonStyle.secondary, emoji="🏠")
+    async def back_to_main(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Go back to main configuration menu."""
+        try:
+            view = ConfigurationView(self.bot, self.user_id, self.visible)
+            embed = await view.create_main_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+        except Exception as e:
+            self.bot.log.error(f"Error going back to main menu: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
+
+
+class ExamDateModal(discord.ui.Modal):
+    """Modal for setting exam results date."""
+    
+    def __init__(self, bot, user_id: int, visible: bool):
+        super().__init__(title="Examenresultaten Datum Instellen")
+        self.bot = bot
+        self.user_id = user_id
+        self.visible = visible
+        
+        self.date_input = discord.ui.TextInput(
+            label="Examenresultaten Datum",
+            placeholder="Bijvoorbeeld: 15 januari 2024 om 14:00",
+            required=False,
+            max_length=200
+        )
+        self.add_item(self.date_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            date_value = self.date_input.value.strip()
+            
+            if date_value:
+                await self.bot.db.settings.update_one(
+                    {"_id": "exam_results_settings"},
+                    {"$set": {"exam_result_date": date_value}},
+                    upsert=True
+                )
+                
+                success_embed = discord.Embed(
+                    title="✅ Datum Ingesteld",
+                    description=f"Examenresultaten datum is ingesteld op:\n`{date_value}`",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=success_embed, ephemeral=True)
+            else:
+                # Remove date if empty
+                await self.bot.db.settings.update_one(
+                    {"_id": "exam_results_settings"},
+                    {"$unset": {"exam_result_date": ""}},
+                    upsert=True
+                )
+                
+                success_embed = discord.Embed(
+                    title="✅ Datum Verwijderd",
+                    description="Examenresultaten datum is verwijderd.",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=success_embed, ephemeral=True)
+            
+            # Refresh the exam results configuration view
+            view = ExamResultsConfigView(self.bot, self.user_id, self.visible)
+            embed = await view.create_embed()
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in ExamDateModal.on_submit: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het instellen van de datum:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
 
 
 class UnbanUrlModal(discord.ui.Modal):

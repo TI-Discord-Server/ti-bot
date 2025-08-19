@@ -3,7 +3,6 @@ from discord.app_commands import (
     command,
 )
 from discord.ext import commands
-from utils.has_admin import has_admin
 
 
 class examresults(commands.Cog, name="when_exam_results"):
@@ -30,32 +29,6 @@ class examresults(commands.Cog, name="when_exam_results"):
         else:
             await interaction.response.send_message(
                 f"De examenresultaten worden gepubliceerd op: {exam_result_date}"
-            )
-
-    @command(
-        name="set_exam_results",
-        description="Set a new exam result date (Moderators only).",
-    )
-    @has_admin()
-    async def setExamResults(self, interaction: discord.Interaction, new_date: str):
-        # Update the exam result date in the settings collection
-        await self.db.settings.update_one(
-            {"_id": self.settings_id},  # Filter by the specific ID
-            {"$set": {"exam_result_date": new_date}},  # Update or set the field
-            upsert=True,  # Create the document if it doesn't exist
-        )
-
-        await interaction.response.send_message(
-            f"Datum voor examenresultaten bijgewerkt naar: {new_date}"
-        )
-
-    @setExamResults.error
-    async def setExamResults_error(
-        self, interaction: discord.Interaction, error: commands.MissingPermissions
-    ):
-        if isinstance(error, commands.CheckFailure):
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
 
 
