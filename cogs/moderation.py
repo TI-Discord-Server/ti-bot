@@ -884,15 +884,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed)
-            
-            # Log the lockdown infraction
-            try:
-                await self.log_infraction(
-                    interaction.guild.id, channel.id, interaction.user.id, "lockdown", reason
-                )
-            except Exception as e:
-                self.bot.log.error(f"Failed to log lockdown infraction for channel {channel.name} ({channel.id}): {e}")
-                
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permissie Fout",
