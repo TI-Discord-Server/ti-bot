@@ -59,12 +59,6 @@ class ConfigurationView(discord.ui.View):
                 emoji="✅"
             ),
             discord.SelectOption(
-                label="Moderatie",
-                value="moderation",
-                description="Moderatie instellingen",
-                emoji="🛡️"
-            ),
-            discord.SelectOption(
                 label="Rollen & Kanalen",
                 value="roles_channels",
                 description="Rol en kanaal menu instellingen",
@@ -92,8 +86,6 @@ class ConfigurationView(discord.ui.View):
             view = ReportsConfigView(self.bot, self.user_id, self.visible)
         elif category == "verification":
             view = VerificationConfigView(self.bot, self.user_id, self.visible)
-        elif category == "moderation":
-            view = ModerationConfigView(self.bot, self.user_id, self.visible)
         elif category == "roles_channels":
             view = RolesChannelsConfigView(self.bot, self.user_id, self.visible)
         elif category == "unban_requests":
@@ -119,7 +111,6 @@ class ConfigurationView(discord.ui.View):
                     "🤫 **Confessions** - Confession systeem instellingen\n"
                     "🚨 **Reports** - Report systeem instellingen\n"
                     "✅ **Verificatie** - Verificatie systeem instellingen\n"
-                    "🛡️ **Moderatie** - Moderatie instellingen\n"
                     "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen\n"
                     "🔓 **Unban Requests** - Unban aanvraag systeem instellingen"
                 ),
@@ -639,179 +630,6 @@ class VerificationConfigView(BaseConfigView):
     
 
 
-
-class ModerationConfigView(BaseConfigView):
-    """Moderation configuration view."""
-    
-    async def create_embed(self):
-        """Create moderation configuration embed."""
-        try:
-            self.bot.log.debug("Creating moderation configuration embed")
-            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
-            self.bot.log.debug(f"Retrieved mod_settings: {settings}")
-
-            embed = discord.Embed(
-                title="🛡️ Moderatie Instellingen",
-                description="Configuratie voor moderatie functies",
-                color=discord.Color.orange(),
-                timestamp=datetime.datetime.now()
-            )
-            
-            # Unban request settings
-            unban_url = settings.get("unban_request_url", "Niet ingesteld")
-            unban_channel_id = settings.get("unban_request_kanaal_id", "Niet ingesteld")
-            
-            if unban_channel_id != "Niet ingesteld":
-                try:
-                    unban_channel = self.bot.get_channel(unban_channel_id)
-                    if unban_channel:
-                        unban_channel_name = unban_channel.mention
-                        self.bot.log.debug(f"Found unban channel: {unban_channel.name} ({unban_channel_id})")
-                    else:
-                        unban_channel_name = f"⚠️ Onbekend kanaal ({unban_channel_id})"
-                        self.bot.log.warning(f"Unban channel {unban_channel_id} not found or not accessible")
-                except Exception as e:
-                    unban_channel_name = f"❌ Fout bij ophalen kanaal ({unban_channel_id})"
-                    self.bot.log.error(f"Error getting unban channel {unban_channel_id}: {e}")
-            else:
-                unban_channel_name = "Niet ingesteld"
-            
-            embed.add_field(
-                name="🔓 Unban Verzoeken",
-                value=(
-                    f"**URL:** {unban_url}\n"
-                    f"**Kanaal:** {unban_channel_name} (`{unban_channel_id}`)"
-                ),
-                inline=False
-            )
-            
-            # Log channels with improved error handling
-            log1_id = settings.get("aanvragen_log_kanaal_id_1", "Niet ingesteld")
-            log2_id = settings.get("aanvragen_log_kanaal_id_2", "Niet ingesteld")
-            
-            log_text = ""
-            log_warnings = []
-            
-            # Process log channel 1
-            if log1_id != "Niet ingesteld":
-                try:
-                    log1_channel = self.bot.get_channel(log1_id)
-                    if log1_channel:
-                        # Check if channel is in correct guild
-                        if hasattr(log1_channel, 'guild') and log1_channel.guild and self.bot.guild_id:
-                            if log1_channel.guild.id != self.bot.guild_id:
-                                log1_name = f"⚠️ {log1_channel.mention} (andere server: {log1_channel.guild.name})"
-                                log_warnings.append(f"Log kanaal 1 is in een andere server ({log1_channel.guild.name})")
-                                self.bot.log.warning(f"Log channel 1 ({log1_id}) is in different guild: {log1_channel.guild.id} vs expected {self.bot.guild_id}")
-                            else:
-                                log1_name = log1_channel.mention
-                                self.bot.log.debug(f"Log channel 1 found: {log1_channel.name} ({log1_id})")
-                        else:
-                            log1_name = log1_channel.mention
-                            self.bot.log.debug(f"Log channel 1 found: {log1_channel.name} ({log1_id})")
-                    else:
-                        log1_name = f"⚠️ Onbekend kanaal ({log1_id})"
-                        log_warnings.append(f"Log kanaal 1 ({log1_id}) niet gevonden of niet toegankelijk")
-                        self.bot.log.warning(f"Log channel 1 {log1_id} not found or not accessible")
-                    
-                    log_text += f"**Log 1:** {log1_name} (`{log1_id}`)\n"
-                except Exception as e:
-                    log1_name = f"❌ Fout bij ophalen kanaal ({log1_id})"
-                    log_text += f"**Log 1:** {log1_name}\n"
-                    log_warnings.append(f"Fout bij ophalen log kanaal 1: {str(e)}")
-                    self.bot.log.error(f"Error getting log channel 1 ({log1_id}): {e}")
-            
-            # Process log channel 2
-            if log2_id != "Niet ingesteld":
-                try:
-                    log2_channel = self.bot.get_channel(log2_id)
-                    if log2_channel:
-                        # Check if channel is in correct guild
-                        if hasattr(log2_channel, 'guild') and log2_channel.guild and self.bot.guild_id:
-                            if log2_channel.guild.id != self.bot.guild_id:
-                                log2_name = f"⚠️ {log2_channel.mention} (andere server: {log2_channel.guild.name})"
-                                log_warnings.append(f"Log kanaal 2 is in een andere server ({log2_channel.guild.name})")
-                                self.bot.log.warning(f"Log channel 2 ({log2_id}) is in different guild: {log2_channel.guild.id} vs expected {self.bot.guild_id}")
-                            else:
-                                log2_name = log2_channel.mention
-                                self.bot.log.debug(f"Log channel 2 found: {log2_channel.name} ({log2_id})")
-                        else:
-                            log2_name = log2_channel.mention
-                            self.bot.log.debug(f"Log channel 2 found: {log2_channel.name} ({log2_id})")
-                    else:
-                        log2_name = f"⚠️ Onbekend kanaal ({log2_id})"
-                        log_warnings.append(f"Log kanaal 2 ({log2_id}) niet gevonden of niet toegankelijk")
-                        self.bot.log.warning(f"Log channel 2 {log2_id} not found or not accessible")
-                    
-                    log_text += f"**Log 2:** {log2_name} (`{log2_id}`)\n"
-                except Exception as e:
-                    log2_name = f"❌ Fout bij ophalen kanaal ({log2_id})"
-                    log_text += f"**Log 2:** {log2_name}\n"
-                    log_warnings.append(f"Fout bij ophalen log kanaal 2: {str(e)}")
-                    self.bot.log.error(f"Error getting log channel 2 ({log2_id}): {e}")
-            
-            if not log_text:
-                log_text = "Geen log kanalen ingesteld"
-            
-            embed.add_field(
-                name="📋 Log Kanalen",
-                value=log_text,
-                inline=False
-            )
-            
-            # Add warnings if any
-            if log_warnings:
-                embed.add_field(
-                    name="⚠️ Waarschuwingen",
-                    value="\n".join([f"• {warning}" for warning in log_warnings]),
-                    inline=False
-                )
-                self.bot.log.info(f"Moderation config warnings: {log_warnings}")
-            
-            embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
-            self.bot.log.debug("Moderation configuration embed created successfully")
-            return embed
-            
-        except Exception as e:
-            self.bot.log.error(f"Error creating moderation configuration embed: {e}", exc_info=True)
-            # Return a basic error embed
-            error_embed = discord.Embed(
-                title="❌ Fout bij laden configuratie",
-                description=f"Er is een fout opgetreden bij het laden van de moderatie instellingen:\n```{str(e)}```",
-                color=discord.Color.red(),
-                timestamp=datetime.datetime.now()
-            )
-            return error_embed
-    
-
-    
-    @discord.ui.button(label="Unban Instellingen", style=discord.ButtonStyle.primary, emoji="🔓")
-    async def set_unban_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set unban request settings."""
-        modal = UnbanSettingsModal(self.bot, self.user_id, self.visible)
-        await interaction.response.send_modal(modal)
-    
-    @discord.ui.button(label="Log Kanalen", style=discord.ButtonStyle.primary, emoji="📋")
-    async def set_log_channels(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set log channels."""
-        try:
-            self.bot.log.info(f"Log channels button clicked by {interaction.user} ({interaction.user.id})")
-            modal = LogChannelsModal(self.bot, self.user_id, self.visible)
-            await interaction.response.send_modal(modal)
-            self.bot.log.debug("Log channels modal sent successfully")
-        except Exception as e:
-            self.bot.log.error(f"Error opening log channels modal: {e}", exc_info=True)
-            error_embed = discord.Embed(
-                title="❌ Fout",
-                description=f"Er is een fout opgetreden bij het openen van het log kanalen menu:\n```{str(e)}```",
-                color=discord.Color.red()
-            )
-            try:
-                await interaction.response.send_message(embed=error_embed, ephemeral=True)
-            except discord.InteractionResponded:
-                await interaction.followup.send(embed=error_embed, ephemeral=True)
-
-
 class RolesChannelsConfigView(BaseConfigView):
     """Roles and channels configuration view."""
     
@@ -955,13 +773,9 @@ class ChannelSelectView(discord.ui.View):
             elif self.settings_id == "reports_settings":
                 config_view = ReportsConfigView(self.bot, self.user_id, True)
             elif self.settings_id == "mod_settings":
-                # For mod_settings, determine the correct view based on field name
-                if self.field_name in ["unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"]:
-                    config_view = UnbanRequestsConfigView(self.bot, self.user_id, True)
-                    self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
-                else:
-                    config_view = ModerationConfigView(self.bot, self.user_id, True)
-                    self.bot.log.debug(f"Returning to ModerationConfigView for field {self.field_name}")
+                # All mod_settings fields now go to UnbanRequestsConfigView
+                config_view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+                self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
             else:
                 config_view = ConfigurationView(self.bot, self.user_id, True)
                 self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
@@ -995,13 +809,9 @@ class ChannelSelectView(discord.ui.View):
             elif self.settings_id == "reports_settings":
                 view = ReportsConfigView(self.bot, self.user_id, True)
             elif self.settings_id == "mod_settings":
-                # For mod_settings, determine the correct view based on field name
-                if self.field_name in ["unban_request_kanaal_id", "aanvragen_log_kanaal_id_1", "aanvragen_log_kanaal_id_2"]:
-                    view = UnbanRequestsConfigView(self.bot, self.user_id, True)
-                    self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
-                else:
-                    view = ModerationConfigView(self.bot, self.user_id, True)
-                    self.bot.log.debug(f"Returning to ModerationConfigView for field {self.field_name}")
+                # All mod_settings fields now go to UnbanRequestsConfigView
+                view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+                self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
             else:
                 view = ConfigurationView(self.bot, self.user_id, True)
                 self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
@@ -1199,218 +1009,6 @@ class ConfessionTimesModal(discord.ui.Modal):
             
         except ValueError:
             await interaction.response.send_message("❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True)
-
-
-
-class UnbanSettingsModal(discord.ui.Modal):
-    """Modal for setting unban request settings."""
-    
-    def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(title="Unban Verzoek Instellingen")
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-        self.url_input = discord.ui.TextInput(
-            label="Unban Verzoek URL",
-            placeholder="https://example.com/unban-request",
-            required=False,
-            max_length=500
-        )
-        self.add_item(self.url_input)
-        
-        self.channel_id_input = discord.ui.TextInput(
-            label="Unban Verzoek Kanaal ID",
-            placeholder="Voer het kanaal ID in...",
-            required=False,
-            max_length=20
-        )
-        self.add_item(self.channel_id_input)
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            update_data = {}
-            
-            if self.url_input.value.strip():
-                update_data["unban_request_url"] = self.url_input.value.strip()
-            
-            if self.channel_id_input.value.strip():
-                channel_id = int(self.channel_id_input.value.strip())
-                update_data["unban_request_kanaal_id"] = channel_id
-            
-            if update_data:
-                await self.bot.db.settings.update_one(
-                    {"_id": "mod_settings"},
-                    {"$set": update_data},
-                    upsert=True
-                )
-            
-            view = ModerationConfigView(self.bot, self.user_id, self.visible)
-            embed = await view.create_embed()
-            await interaction.response.edit_message(embed=embed, view=view)
-            
-        except ValueError:
-            await interaction.response.send_message("❌ Ongeldige kanaal ID. Voer een geldig nummer in.", ephemeral=True)
-
-
-class LogChannelsModal(discord.ui.Modal):
-    """Modal for setting log channels."""
-    
-    def __init__(self, bot, user_id: int, visible: bool):
-        super().__init__(title="Log Kanalen Instellen")
-        self.bot = bot
-        self.user_id = user_id
-        self.visible = visible
-        
-        self.log1_input = discord.ui.TextInput(
-            label="Log Kanaal 1 ID",
-            placeholder="Voer het eerste log kanaal ID in...",
-            required=False,
-            max_length=20
-        )
-        self.add_item(self.log1_input)
-        
-        self.log2_input = discord.ui.TextInput(
-            label="Log Kanaal 2 ID",
-            placeholder="Voer het tweede log kanaal ID in...",
-            required=False,
-            max_length=20
-        )
-        self.add_item(self.log2_input)
-    
-    async def _validate_channel(self, channel_id: int, channel_name: str) -> tuple[bool, str]:
-        """Validate if a channel exists and is accessible."""
-        try:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
-                # Try to fetch the channel if not in cache
-                try:
-                    channel = await self.bot.fetch_channel(channel_id)
-                except discord.NotFound:
-                    self.bot.log.warning(f"Channel validation failed: Channel {channel_id} not found")
-                    return False, f"Kanaal {channel_id} niet gevonden"
-                except discord.Forbidden:
-                    self.bot.log.warning(f"Channel validation failed: No access to channel {channel_id}")
-                    return False, f"Geen toegang tot kanaal {channel_id}"
-                except Exception as e:
-                    self.bot.log.error(f"Channel validation error for {channel_id}: {e}", exc_info=True)
-                    return False, f"Fout bij valideren van kanaal {channel_id}: {str(e)}"
-            
-            # Check if channel is in the correct guild
-            if hasattr(channel, 'guild') and channel.guild and self.bot.guild_id:
-                if channel.guild.id != self.bot.guild_id:
-                    self.bot.log.warning(f"Channel validation failed: Channel {channel_id} is in guild {channel.guild.id}, expected {self.bot.guild_id}")
-                    return False, f"Kanaal {channel_id} is in een andere server ({channel.guild.name})"
-            
-            # Check if it's a text channel
-            if not isinstance(channel, (discord.TextChannel, discord.Thread)):
-                self.bot.log.warning(f"Channel validation failed: Channel {channel_id} is not a text channel (type: {type(channel).__name__})")
-                return False, f"Kanaal {channel_id} is geen tekstkanaal"
-            
-            # Check bot permissions
-            if hasattr(channel, 'permissions_for'):
-                permissions = channel.permissions_for(channel.guild.me)
-                if not permissions.send_messages:
-                    self.bot.log.warning(f"Channel validation failed: No send_messages permission in channel {channel_id}")
-                    return False, f"Geen toestemming om berichten te sturen in kanaal {channel_id}"
-            
-            self.bot.log.info(f"Channel validation successful: {channel_name} channel {channel_id} ({channel.name})")
-            return True, f"✅ {channel.mention} ({channel.name})"
-            
-        except Exception as e:
-            self.bot.log.error(f"Unexpected error validating channel {channel_id}: {e}", exc_info=True)
-            return False, f"Onverwachte fout bij valideren van kanaal {channel_id}"
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            self.bot.log.info(f"Log channels modal submitted by {interaction.user} ({interaction.user.id})")
-            
-            update_data = {}
-            validation_results = []
-            
-            # Validate and process log channel 1
-            if self.log1_input.value.strip():
-                try:
-                    log1_id = int(self.log1_input.value.strip())
-                    is_valid, message = await self._validate_channel(log1_id, "Log 1")
-                    if is_valid:
-                        update_data["aanvragen_log_kanaal_id_1"] = log1_id
-                        validation_results.append(f"**Log Kanaal 1:** {message}")
-                        self.bot.log.info(f"Log channel 1 set to {log1_id}")
-                    else:
-                        validation_results.append(f"**Log Kanaal 1:** ❌ {message}")
-                        self.bot.log.warning(f"Log channel 1 validation failed: {message}")
-                except ValueError:
-                    validation_results.append("**Log Kanaal 1:** ❌ Ongeldige kanaal ID")
-                    self.bot.log.warning(f"Invalid log channel 1 ID: {self.log1_input.value}")
-            
-            # Validate and process log channel 2
-            if self.log2_input.value.strip():
-                try:
-                    log2_id = int(self.log2_input.value.strip())
-                    is_valid, message = await self._validate_channel(log2_id, "Log 2")
-                    if is_valid:
-                        update_data["aanvragen_log_kanaal_id_2"] = log2_id
-                        validation_results.append(f"**Log Kanaal 2:** {message}")
-                        self.bot.log.info(f"Log channel 2 set to {log2_id}")
-                    else:
-                        validation_results.append(f"**Log Kanaal 2:** ❌ {message}")
-                        self.bot.log.warning(f"Log channel 2 validation failed: {message}")
-                except ValueError:
-                    validation_results.append("**Log Kanaal 2:** ❌ Ongeldige kanaal ID")
-                    self.bot.log.warning(f"Invalid log channel 2 ID: {self.log2_input.value}")
-            
-            # Update database only with valid channels
-            if update_data:
-                await self.bot.db.settings.update_one(
-                    {"_id": "mod_settings"},
-                    {"$set": update_data},
-                    upsert=True
-                )
-                self.bot.log.info(f"Updated mod_settings with: {update_data}")
-            
-            # Show validation results
-            if validation_results:
-                result_embed = discord.Embed(
-                    title="📋 Log Kanalen Validatie",
-                    description="\n".join(validation_results),
-                    color=discord.Color.blue() if update_data else discord.Color.orange(),
-                    timestamp=now_utc()
-                )
-                
-                if update_data:
-                    result_embed.add_field(
-                        name="✅ Opgeslagen",
-                        value=f"{len(update_data)} kanaal(en) succesvol opgeslagen",
-                        inline=False
-                    )
-                else:
-                    result_embed.add_field(
-                        name="⚠️ Geen wijzigingen",
-                        value="Geen geldige kanalen om op te slaan",
-                        inline=False
-                    )
-                
-                await interaction.response.send_message(embed=result_embed, ephemeral=True)
-            else:
-                await interaction.response.send_message("ℹ️ Geen kanalen opgegeven.", ephemeral=True)
-            
-            # Refresh the main configuration view
-            view = ModerationConfigView(self.bot, self.user_id, self.visible)
-            embed = await view.create_embed()
-            await interaction.edit_original_response(embed=embed, view=view)
-            
-        except Exception as e:
-            self.bot.log.error(f"Error in LogChannelsModal.on_submit: {e}", exc_info=True)
-            error_embed = discord.Embed(
-                title="❌ Fout",
-                description=f"Er is een fout opgetreden bij het instellen van de log kanalen:\n```{str(e)}```",
-                color=discord.Color.red()
-            )
-            try:
-                await interaction.response.send_message(embed=error_embed, ephemeral=True)
-            except discord.InteractionResponded:
-                await interaction.followup.send(embed=error_embed, ephemeral=True)
 
 
 class Configure(commands.Cog):
