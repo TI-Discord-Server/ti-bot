@@ -12,6 +12,83 @@ from utils.has_admin import has_admin
 from utils.timezone import TIMEZONE, now_utc, format_local_time, to_local
 
 
+class OverwriteConfirmationView(discord.ui.View):
+    """View for confirming overwrite of existing timeout/mute."""
+    
+    def __init__(self, original_user: discord.Member, target_member: discord.Member, 
+                 action_type: str, new_duration: str = None, reason: str = None, 
+                 timeout_callback=None, mute_callback=None):
+        super().__init__(timeout=60.0)
+        self.original_user = original_user
+        self.target_member = target_member
+        self.action_type = action_type
+        self.new_duration = new_duration
+        self.reason = reason
+        self.timeout_callback = timeout_callback
+        self.mute_callback = mute_callback
+        self.responded = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the original command user to interact with the buttons."""
+        if interaction.user.id != self.original_user.id:
+            await interaction.response.send_message(
+                "Only the person who ran the command can interact with these buttons.", 
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Yes, Overwrite", style=discord.ButtonStyle.danger, emoji="✅")
+    async def confirm_overwrite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Confirm overwriting the existing timeout/mute."""
+        if self.responded:
+            return
+        self.responded = True
+        
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+        
+        # Update the message to show it's being processed
+        embed = discord.Embed(
+            title="Processing...",
+            description=f"Overwriting existing {self.action_type} for {self.target_member.mention}...",
+            color=discord.Color.yellow()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+        
+        # Execute the appropriate callback
+        if self.action_type == "timeout" and self.timeout_callback:
+            await self.timeout_callback(interaction, self.target_member, self.new_duration, self.reason, overwrite=True)
+        elif self.action_type == "mute" and self.mute_callback:
+            await self.mute_callback(interaction, self.target_member, self.reason, overwrite=True)
+
+    @discord.ui.button(label="No, Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_overwrite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Cancel the overwrite operation."""
+        if self.responded:
+            return
+        self.responded = True
+        
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+        
+        embed = discord.Embed(
+            title="Cancelled",
+            description=f"The {self.action_type} operation for {self.target_member.mention} has been cancelled.",
+            color=discord.Color.red()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        """Handle view timeout."""
+        if not self.responded:
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+
 
 
 
@@ -309,6 +386,57 @@ class ModCommands(commands.Cog, name="ModCommands"):
         guild = interaction.guild
         muted_role = discord.utils.get(guild.roles, name="Muted")
 
+        # Check if member is already muted
+        if muted_role and muted_role in member.roles:
+            # Get the mute infraction from database to show when they were muted
+            try:
+                mute_infraction = await self.infractions_collection.find_one({
+                    "guild_id": guild.id,
+                    "user_id": member.id,
+                    "type": "mute"
+                }, sort=[("timestamp", -1)])  # Get the most recent mute
+                
+                if mute_infraction:
+                    mute_time = datetime.datetime.fromisoformat(mute_infraction["timestamp"])
+                    mute_time_formatted = discord.utils.format_dt(mute_time, 'F')
+                    mute_time_relative = discord.utils.format_dt(mute_time, 'R')
+                    time_info = f"sinds {mute_time_formatted} ({mute_time_relative})"
+                else:
+                    time_info = "voor een onbekende tijd"
+            except Exception:
+                time_info = "voor een onbekende tijd"
+            
+            # Create confirmation embed
+            embed = discord.Embed(
+                title="⚠️ Member is al gemute",
+                description=(
+                    f"{member.mention} is al gemute {time_info}.\n\n"
+                    f"Wil je de mute overschrijven met een nieuwe reden?"
+                ),
+                color=discord.Color.orange()
+            )
+            
+            # Create view with confirmation buttons
+            view = OverwriteConfirmationView(
+                original_user=interaction.user,
+                target_member=member,
+                action_type="mute",
+                reason=reason,
+                mute_callback=self._execute_mute
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view)
+            return
+        
+        # If not already muted, proceed with normal mute
+        await self._execute_mute(interaction, member, reason)
+
+    async def _execute_mute(self, interaction: discord.Interaction, member: discord.Member, 
+                           reason: str, overwrite: bool = False):
+        """Execute the mute operation."""
+        guild = interaction.guild
+        muted_role = discord.utils.get(guild.roles, name="Muted")
+
         if not muted_role:
             muted_role = await guild.create_role(
                 name="Muted", reason="Muted role aangemaakt voor muting"
@@ -345,7 +473,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description=f"{member.mention} is gemute. Reden: {reason}",
                 color=discord.Color.green(),
             )
-            await interaction.response.send_message(embed=embed)
+            
+            if overwrite:
+                await interaction.followup.send(embed=embed)
+            else:
+                await interaction.response.send_message(embed=embed)
+                
             await self.log_infraction(
                 interaction.guild.id, member.id, interaction.user.id, "mute", reason
             )
@@ -356,14 +489,20 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description="Ik heb geen permissie om rollen te beheren voor deze member.",
                 color=discord.Color.red(),
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            if overwrite:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Fout",
                 description="Muten mislukt.",
                 color=discord.Color.red(),
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            if overwrite:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="unmute", description="Unmute een member in de server."
@@ -710,6 +849,57 @@ class ModCommands(commands.Cog, name="ModCommands"):
         duration: str,
         reason: str = "Geen reden opgegeven",
     ):
+        # Check if member is already timed out
+        if member.timed_out_until and member.timed_out_until > discord.utils.utcnow():
+            # Calculate remaining time
+            remaining_time = member.timed_out_until - discord.utils.utcnow()
+            
+            # Format the remaining time in a human-readable way
+            days = remaining_time.days
+            hours, remainder = divmod(remaining_time.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
+            
+            time_parts = []
+            if days > 0:
+                time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
+            if hours > 0:
+                time_parts.append(f"{hours} uur")
+            if minutes > 0:
+                time_parts.append(f"{minutes} minuten")
+            
+            remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+            
+            # Create confirmation embed
+            embed = discord.Embed(
+                title="⚠️ Member is al getimed out",
+                description=(
+                    f"{member.mention} is al getimed out voor **{remaining_str}** "
+                    f"en blijft getimed out tot {discord.utils.format_dt(member.timed_out_until, 'F')} "
+                    f"({discord.utils.format_dt(member.timed_out_until, 'R')}).\n\n"
+                    f"Wil je dit overschrijven met een nieuwe timeout van **{duration}**?"
+                ),
+                color=discord.Color.orange()
+            )
+            
+            # Create view with confirmation buttons
+            view = OverwriteConfirmationView(
+                original_user=interaction.user,
+                target_member=member,
+                action_type="timeout",
+                new_duration=duration,
+                reason=reason,
+                timeout_callback=self._execute_timeout
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view)
+            return
+        
+        # If not already timed out, proceed with normal timeout
+        await self._execute_timeout(interaction, member, duration, reason)
+
+    async def _execute_timeout(self, interaction: discord.Interaction, member: discord.Member, 
+                              duration: str, reason: str, overwrite: bool = False):
+        """Execute the timeout operation."""
         duration_timedelta = self.parse_duration(duration)
         if not duration_timedelta:
             embed = discord.Embed(
@@ -717,9 +907,11 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description="Invalid duration format. Gebruik voorbeelden zoals 1m, 5h, 1d.",
                 color=discord.Color.red(),
             )
-            return await interaction.response.send_message(
-                embed=embed, ephemeral=True
-            )
+            if overwrite:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
 
         timeout_until = discord.utils.utcnow() + duration_timedelta
 
@@ -729,9 +921,11 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description="Maximale timeout duration is 28 dagen.",
                 color=discord.Color.red(),
             )
-            return await interaction.response.send_message(
-                embed=embed, ephemeral=True
-            )
+            if overwrite:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         timestamp = now_utc()
@@ -745,6 +939,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         if bot_icon_url:
             dm_embed.set_thumbnail(url=bot_icon_url)
         dm_sent = await self.send_dm_embed(member, dm_embed)
+        
         try:
             await member.timeout(timeout_until, reason=reason)
             embed = discord.Embed(
@@ -752,7 +947,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description=f"{member.mention} is getimed out voor {duration}. Reden: {reason}",
                 color=discord.Color.green(),
             )
-            await interaction.response.send_message(embed=embed)
+            
+            if overwrite:
+                await interaction.followup.send(embed=embed)
+            else:
+                await interaction.response.send_message(embed=embed)
+                
             await self.log_infraction(
                 interaction.guild.id, member.id, interaction.user.id, "timeout", reason
             )
@@ -762,7 +962,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 description="Ik heb geen permissie om deze member te timeouten.",
                 color=discord.Color.red(),
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            if overwrite:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
 
     def parse_duration(self, duration_str: str) -> Optional[datetime.timedelta]:
         units = {"m": "minutes", "h": "hours", "d": "days"}
