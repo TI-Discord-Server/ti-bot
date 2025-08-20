@@ -383,21 +383,55 @@ class ModCommands(commands.Cog, name="ModCommands"):
             {"guild_id": interaction.guild.id, "user_id": member.id}
         ).sort("timestamp", pymongo.DESCENDING).limit(10).to_list(length=None)
         
+        # Dutch translations for infraction types
+        infraction_translations = {
+            "kick": "Kick",
+            "ban": "Ban",
+            "unban": "Unban", 
+            "warn": "Waarschuwing",
+            "mute": "Mute",
+            "unmute": "Unmute",
+            "timeout": "Timeout",
+            "untimeout": "Untimeout",
+            "auto_unmute": "Automatische Unmute"
+        }
+        
         infraction_list = ""
         for infraction in infractions:
-            localized_timestamp = to_local(infraction['timestamp'])
-            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction['type'].capitalize()}**: {infraction['reason']}\n"
+            # Parse timestamp - handle both datetime objects and ISO strings
+            timestamp = infraction['timestamp']
+            if isinstance(timestamp, str):
+                # Parse ISO string to datetime
+                timestamp = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            
+            localized_timestamp = to_local(timestamp)
+            infraction_type = infraction_translations.get(infraction['type'], infraction['type'].capitalize())
+            reason = infraction.get('reason', 'Geen reden opgegeven')
+            
+            # Get moderator info if available
+            moderator_info = ""
+            if 'moderator_id' in infraction:
+                try:
+                    moderator = interaction.guild.get_member(infraction['moderator_id'])
+                    if moderator:
+                        moderator_info = f" door {moderator.mention}"
+                    else:
+                        moderator_info = f" door <@{infraction['moderator_id']}>"
+                except:
+                    moderator_info = ""
+            
+            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction_type}**{moderator_info}\n**Reden:** {reason}\n\n"
 
         if not infraction_list:
             infraction_list = "Geen voorgaande straffen gevonden voor deze gebruiker."
 
         embed = discord.Embed(
-            title=f"History voor {member.name}",
+            title=f"Strafgeschiedenis voor {member.name}",
             color=discord.Color.blue(),
             description=infraction_list,
         )
         embed.add_field(
-            name="Join Date",
+            name="Lid Sinds",
             value=f"<t:{int(time.mktime(to_local(member.joined_at).timetuple()))}:D>",
             inline=False,
         )
