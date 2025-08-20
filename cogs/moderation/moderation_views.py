@@ -25,7 +25,7 @@ class TimeoutFallbackView(discord.ui.View):
             return False
         return True
 
-    @discord.ui.button(label="Yes, Use Muted Role", style=discord.ButtonStyle.success, emoji="✅")
+    @discord.ui.button(label="Ja, Gebruik Muted Role", style=discord.ButtonStyle.success, emoji="✅")
     async def confirm_mute_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Confirm using muted role as fallback."""
         if self.responded:
@@ -38,8 +38,8 @@ class TimeoutFallbackView(discord.ui.View):
         
         # Update the message to show it's being processed
         embed = discord.Embed(
-            title="Processing...",
-            description=f"Using muted role for {self.target_member.mention} for {self.duration}...",
+            title="Verwerken...",
+            description=f"Muted role gebruiken voor {self.target_member.mention} voor {self.duration}...",
             color=discord.Color.yellow()
         )
         await interaction.response.edit_message(embed=embed, view=self)
@@ -48,7 +48,7 @@ class TimeoutFallbackView(discord.ui.View):
         if self.mute_callback:
             await self.mute_callback(interaction, self.target_member, self.reason, self.duration, scheduled=True)
 
-    @discord.ui.button(label="No, Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    @discord.ui.button(label="Nee, Annuleren", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Cancel the fallback operation."""
         if self.responded:
@@ -60,8 +60,8 @@ class TimeoutFallbackView(discord.ui.View):
             item.disabled = True
         
         embed = discord.Embed(
-            title="Cancelled",
-            description=f"The timeout operation for {self.target_member.mention} has been cancelled.",
+            title="Geannuleerd",
+            description=f"De timeout operatie voor {self.target_member.mention} is geannuleerd.",
             color=discord.Color.red()
         )
         await interaction.response.edit_message(embed=embed, view=self)
@@ -100,7 +100,7 @@ class OverwriteConfirmationView(discord.ui.View):
             return False
         return True
 
-    @discord.ui.button(label="Yes, Overwrite", style=discord.ButtonStyle.danger, emoji="✅")
+    @discord.ui.button(label="Ja, Overschrijven", style=discord.ButtonStyle.danger, emoji="✅")
     async def confirm_overwrite(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Confirm overwriting the existing timeout/mute."""
         if self.responded:
@@ -113,8 +113,8 @@ class OverwriteConfirmationView(discord.ui.View):
         
         # Update the message to show it's being processed
         embed = discord.Embed(
-            title="Processing...",
-            description=f"Overwriting existing {self.action_type} for {self.target_member.mention}...",
+            title="Verwerken...",
+            description=f"Bestaande {self.action_type} overschrijven voor {self.target_member.mention}...",
             color=discord.Color.yellow()
         )
         await interaction.response.edit_message(embed=embed, view=self)
@@ -125,7 +125,7 @@ class OverwriteConfirmationView(discord.ui.View):
         elif self.action_type == "mute" and self.mute_callback:
             await self.mute_callback(interaction, self.target_member, self.reason, overwrite=True)
 
-    @discord.ui.button(label="No, Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    @discord.ui.button(label="Nee, Annuleren", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_overwrite(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Cancel the overwrite operation."""
         if self.responded:
@@ -137,8 +137,8 @@ class OverwriteConfirmationView(discord.ui.View):
             item.disabled = True
         
         embed = discord.Embed(
-            title="Cancelled",
-            description=f"The {self.action_type} operation for {self.target_member.mention} has been cancelled.",
+            title="Geannuleerd",
+            description=f"De {self.action_type} operatie voor {self.target_member.mention} is geannuleerd.",
             color=discord.Color.red()
         )
         await interaction.response.edit_message(embed=embed, view=self)

@@ -130,7 +130,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 settings = await self.settings_collection.find_one({"_id": "mod_settings"})
                 unban_request_url = settings.get("unban_request_url", "https://example.com/unban_request") if settings else "https://example.com/unban_request"
                 button = discord.ui.Button(
-                    label="Request Unban", style=discord.ButtonStyle.link, url=unban_request_url
+                    label="Unban Aanvragen", style=discord.ButtonStyle.link, url=unban_request_url
                 )
                 view.add_item(button)
 

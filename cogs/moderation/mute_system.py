@@ -134,7 +134,7 @@ class MuteSystem:
                 await self.tasks.schedule_unmute(guild.id, member.id, unmute_at, duration, reason)
             
             embed = discord.Embed(
-                title="Member gemute" + (" (Scheduled)" if scheduled else ""),
+                title="Member gemute" + (" (Gepland)" if scheduled else ""),
                 description=f"{member.mention} is gemute" + (f" voor {duration}" if scheduled else "") + f". Reden: {reason}",
                 color=discord.Color.green(),
             )
@@ -274,7 +274,7 @@ class MuteSystem:
         try:
             cancelled = await self.tasks.cancel_scheduled_unmute(guild.id, member.id)
             if cancelled:
-                cleanup_actions.append("Cancelled scheduled unmute")
+                cleanup_actions.append("Geplande unmute geannuleerd")
         except Exception as e:
             self.bot.log.error(f"Failed to cancel scheduled unmute for {member.name} ({member.id}): {e}")
         
@@ -320,9 +320,9 @@ class MuteSystem:
             # Cancel any scheduled unmute for this user
             cancelled = await self.tasks.cancel_scheduled_unmute(guild.id, member.id)
             if cancelled:
-                removed_punishments.append("scheduled unmute")
+                removed_punishments.append("geplande unmute")
             
-            punishment_text = " and ".join(removed_punishments)
+            punishment_text = " en ".join(removed_punishments)
             
             # Send DM only after successful removal
             bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
@@ -344,7 +344,7 @@ class MuteSystem:
             await log_infraction(
                 self.infractions_collection,
                 interaction.guild.id, member.id, interaction.user.id, "unmute", 
-                f"{reason} (removed: {punishment_text})"
+                f"{reason} (verwijderd: {punishment_text})"
             )
         except discord.errors.Forbidden:
             embed = discord.Embed(

@@ -38,11 +38,11 @@ class TimeoutSystem:
         if duration_timedelta > datetime.timedelta(days=28):
             # Offer fallback to muted role
             embed = discord.Embed(
-                title="⚠️ Timeout Duration Too Long",
+                title="⚠️ Timeout Duur Te Lang",
                 description=(
-                    f"The requested timeout duration of **{duration}** exceeds Discord's maximum limit of 28 days.\n\n"
-                    f"Would you like to use the **Muted role** instead? This will mute {member.mention} "
-                    f"for the full duration of **{duration}** and automatically unmute them when the time expires."
+                    f"De gevraagde timeout duur van **{duration}** overschrijdt Discord's maximum limiet van 28 dagen.\n\n"
+                    f"Wil je in plaats daarvan de **Muted role** gebruiken? Dit zal {member.mention} "
+                    f"muten voor de volledige duur van **{duration}** en automatisch unmuten wanneer de tijd verloopt."
                 ),
                 color=discord.Color.orange()
             )
@@ -230,7 +230,7 @@ class TimeoutSystem:
         try:
             cancelled = await self.mute_system.tasks.cancel_scheduled_unmute(guild.id, member.id)
             if cancelled:
-                cleanup_actions.append("Cancelled scheduled unmute")
+                cleanup_actions.append("Geplande unmute geannuleerd")
         except Exception as e:
             self.bot.log.error(f"Failed to cancel scheduled unmute for {member.name} ({member.id}): {e}")
         
@@ -284,9 +284,9 @@ class TimeoutSystem:
             # Cancel any scheduled unmute
             cancelled = await self.mute_system.tasks.cancel_scheduled_unmute(guild.id, member.id)
             if cancelled:
-                removed_punishments.append("scheduled unmute")
+                removed_punishments.append("geplande unmute")
             
-            punishment_text = " and ".join(removed_punishments)
+            punishment_text = " en ".join(removed_punishments)
             
             # Send DM only after successful removal
             bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
@@ -309,7 +309,7 @@ class TimeoutSystem:
             await log_infraction(
                 self.infractions_collection,
                 interaction.guild.id, member.id, interaction.user.id, "untimeout", 
-                f"{reason} (removed: {punishment_text})"
+                f"{reason} (verwijderd: {punishment_text})"
             )
             
         except discord.errors.Forbidden:

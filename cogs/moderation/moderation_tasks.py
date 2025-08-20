@@ -52,7 +52,7 @@ class ModerationTasks:
                         muted_role = discord.utils.get(guild.roles, name="Muted")
                         if muted_role and muted_role in member.roles:
                             # Remove muted role
-                            await member.remove_roles(muted_role, reason="Scheduled unmute expired")
+                            await member.remove_roles(muted_role, reason="Geplande unmute verlopen")
                             
                             # Send DM to user
                             try:
@@ -70,7 +70,7 @@ class ModerationTasks:
                                 await log_infraction(
                                     self.infractions_collection,
                                     guild.id, member.id, self.bot.user.id, "auto_unmute", 
-                                    f"Scheduled unmute after {unmute_data.get('original_duration', 'unknown duration')}"
+                                    f"Geplande unmute na {unmute_data.get('original_duration', 'onbekende duur')}"
                                 )
                             except Exception as e:
                                 self.bot.log.error(f"Failed to log auto unmute infraction: {e}")
