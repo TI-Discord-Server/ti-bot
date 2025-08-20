@@ -12,6 +12,78 @@ from utils.has_admin import has_admin
 from utils.timezone import TIMEZONE, now_utc, format_local_time, to_local
 
 
+class TimeoutFallbackView(discord.ui.View):
+    """View for confirming fallback to muted role when timeout exceeds 28 days."""
+    
+    def __init__(self, original_user: discord.Member, target_member: discord.Member, 
+                 duration: str, reason: str, mute_callback=None):
+        super().__init__(timeout=60.0)
+        self.original_user = original_user
+        self.target_member = target_member
+        self.duration = duration
+        self.reason = reason
+        self.mute_callback = mute_callback
+        self.responded = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the original command user to interact with the buttons."""
+        if interaction.user.id != self.original_user.id:
+            await interaction.response.send_message(
+                "Only the person who ran the command can interact with these buttons.", 
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Yes, Use Muted Role", style=discord.ButtonStyle.success, emoji="✅")
+    async def confirm_mute_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Confirm using muted role as fallback."""
+        if self.responded:
+            return
+        self.responded = True
+        
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+        
+        # Update the message to show it's being processed
+        embed = discord.Embed(
+            title="Processing...",
+            description=f"Using muted role for {self.target_member.mention} for {self.duration}...",
+            color=discord.Color.yellow()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+        
+        # Execute the mute callback with scheduled unmute
+        if self.mute_callback:
+            await self.mute_callback(interaction, self.target_member, self.reason, self.duration, scheduled=True)
+
+    @discord.ui.button(label="No, Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Cancel the fallback operation."""
+        if self.responded:
+            return
+        self.responded = True
+        
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+        
+        embed = discord.Embed(
+            title="Cancelled",
+            description=f"The timeout operation for {self.target_member.mention} has been cancelled.",
+            color=discord.Color.red()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        """Handle view timeout."""
+        if not self.responded:
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+
 class OverwriteConfirmationView(discord.ui.View):
     """View for confirming overwrite of existing timeout/mute."""
     
@@ -102,6 +174,204 @@ class ModCommands(commands.Cog, name="ModCommands"):
         self.bot = bot
         self.infractions_collection = self.bot.db["infractions"]
         self.settings_collection = self.bot.db["settings"]
+        self.scheduled_unmutes_collection = self.bot.db["scheduled_unmutes"]
+        
+        # Start the unmute checker task
+        self.unmute_task = None
+        self.start_unmute_checker()
+
+    def cog_unload(self):
+        """Clean up when the cog is unloaded."""
+        if self.unmute_task and not self.unmute_task.done():
+            self.unmute_task.cancel()
+
+    def start_unmute_checker(self):
+        """Start the background task to check for scheduled unmutes."""
+        if self.unmute_task is None or self.unmute_task.done():
+            self.unmute_task = asyncio.create_task(self.check_scheduled_unmutes())
+
+    async def check_scheduled_unmutes(self):
+        """Background task to check and process scheduled unmutes."""
+        while True:
+            try:
+                current_time = datetime.datetime.utcnow()
+                
+                # Find all unmutes that should be processed
+                expired_unmutes = await self.scheduled_unmutes_collection.find({
+                    "unmute_at": {"$lte": current_time}
+                }).to_list(length=None)
+                
+                for unmute_data in expired_unmutes:
+                    try:
+                        guild = self.bot.get_guild(unmute_data["guild_id"])
+                        if not guild:
+                            # Guild not found, remove the scheduled unmute
+                            await self.scheduled_unmutes_collection.delete_one({"_id": unmute_data["_id"]})
+                            continue
+                        
+                        member = guild.get_member(unmute_data["user_id"])
+                        if not member:
+                            # Member not found, remove the scheduled unmute
+                            await self.scheduled_unmutes_collection.delete_one({"_id": unmute_data["_id"]})
+                            continue
+                        
+                        # Get muted role
+                        muted_role = discord.utils.get(guild.roles, name="Muted")
+                        if muted_role and muted_role in member.roles:
+                            # Remove muted role
+                            await member.remove_roles(muted_role, reason="Scheduled unmute expired")
+                            
+                            # Send DM to user
+                            try:
+                                dm_embed = discord.Embed(
+                                    title="🔓 | Je bent automatisch geunmute.",
+                                    description=f"Je scheduled mute in {guild.name} is verlopen.",
+                                    color=discord.Color.green(),
+                                )
+                                await member.send(embed=dm_embed)
+                            except (discord.errors.Forbidden, discord.errors.HTTPException):
+                                pass  # Couldn't send DM, but that's okay
+                            
+                            # Log the automatic unmute
+                            try:
+                                await self.log_infraction(
+                                    guild.id, member.id, self.bot.user.id, "auto_unmute", 
+                                    f"Scheduled unmute after {unmute_data.get('original_duration', 'unknown duration')}"
+                                )
+                            except Exception as e:
+                                self.bot.log.error(f"Failed to log auto unmute infraction: {e}")
+                        
+                        # Remove the scheduled unmute from database
+                        await self.scheduled_unmutes_collection.delete_one({"_id": unmute_data["_id"]})
+                        
+                    except Exception as e:
+                        self.bot.log.error(f"Error processing scheduled unmute for user {unmute_data.get('user_id')}: {e}")
+                        # Don't remove from database if there was an error, try again later
+                
+                # Wait 60 seconds before checking again
+                await asyncio.sleep(60)
+                
+            except Exception as e:
+                self.bot.log.error(f"Error in scheduled unmute checker: {e}")
+                await asyncio.sleep(60)  # Wait before retrying
+
+    async def schedule_unmute(self, guild_id: int, user_id: int, unmute_at: datetime.datetime, 
+                             original_duration: str, reason: str):
+        """Schedule an unmute for a specific time."""
+        unmute_data = {
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "unmute_at": unmute_at,
+            "original_duration": original_duration,
+            "reason": reason,
+            "created_at": datetime.datetime.utcnow()
+        }
+        
+        # Remove any existing scheduled unmute for this user in this guild
+        await self.scheduled_unmutes_collection.delete_many({
+            "guild_id": guild_id,
+            "user_id": user_id
+        })
+        
+        # Insert the new scheduled unmute
+        await self.scheduled_unmutes_collection.insert_one(unmute_data)
+
+    async def cancel_scheduled_unmute(self, guild_id: int, user_id: int):
+        """Cancel a scheduled unmute for a user."""
+        result = await self.scheduled_unmutes_collection.delete_many({
+            "guild_id": guild_id,
+            "user_id": user_id
+        })
+        return result.deleted_count > 0
+
+    async def _execute_scheduled_mute(self, interaction: discord.Interaction, member: discord.Member,
+                                     reason: str, duration: str, scheduled: bool = True):
+        """Execute a mute operation with optional scheduled unmute."""
+        guild = interaction.guild
+        muted_role = discord.utils.get(guild.roles, name="Muted")
+
+        if not muted_role:
+            muted_role = await guild.create_role(
+                name="Muted", reason="Muted role aangemaakt voor muting"
+            )
+            # Set up permissions for the muted role
+            for channel in guild.channels:
+                await channel.set_permissions(
+                    muted_role,
+                    send_messages=False,
+                    speak=False,
+                    add_reactions=False,
+                    send_messages_in_threads=False,
+                    create_public_threads=False,
+                    create_private_threads=False,
+                )
+
+        bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
+        timestamp = now_utc()
+        
+        # Calculate unmute time if scheduled
+        unmute_at = None
+        if scheduled:
+            duration_timedelta = self.parse_duration(duration)
+            if duration_timedelta:
+                unmute_at = datetime.datetime.utcnow() + duration_timedelta
+
+        dm_embed = discord.Embed(
+            title=f"⚠️| Je bent gemute.",
+            description=f"Reden: {reason}" + (f"\nDuration: {duration}" if scheduled else ""),
+            color=discord.Color.dark_orange(),
+        )
+        dm_embed.set_footer(text=f"Tijd: {format_local_time(timestamp)}")
+        if bot_icon_url:
+            dm_embed.set_thumbnail(url=bot_icon_url)
+        dm_sent = await self.send_dm_embed(member, dm_embed)
+
+        try:
+            await member.add_roles(muted_role, reason=reason)
+            
+            # Schedule unmute if requested
+            if scheduled and unmute_at:
+                await self.schedule_unmute(guild.id, member.id, unmute_at, duration, reason)
+            
+            embed = discord.Embed(
+                title="Member gemute" + (" (Scheduled)" if scheduled else ""),
+                description=f"{member.mention} is gemute" + (f" voor {duration}" if scheduled else "") + f". Reden: {reason}",
+                color=discord.Color.green(),
+            )
+            
+            if scheduled and unmute_at:
+                embed.add_field(
+                    name="Automatische Unmute",
+                    value=f"{discord.utils.format_dt(unmute_at, 'F')} ({discord.utils.format_dt(unmute_at, 'R')})",
+                    inline=False
+                )
+            
+            await interaction.followup.send(embed=embed)
+            
+            try:
+                await self.log_infraction(
+                    interaction.guild.id, member.id, interaction.user.id, 
+                    "scheduled_mute" if scheduled else "mute", reason
+                )
+            except Exception as e:
+                self.bot.log.error(f"Failed to log mute infraction for {member.name} ({member.id}): {e}")
+
+        except discord.errors.Forbidden as e:
+            self.bot.log.error(f"Permission denied when trying to mute {member.name} ({member.id}): {e}")
+            embed = discord.Embed(
+                title="Permissie Fout",
+                description="Ik heb geen permissie om deze member te muten.",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error when trying to mute {member.name} ({member.id}): {e}", exc_info=True)
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description="Muten mislukt.",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def send_dm_embed(self, member: discord.Member, embed: discord.Embed):
         """
@@ -541,11 +811,23 @@ class ModCommands(commands.Cog, name="ModCommands"):
         dm_sent = await self.send_dm_embed(member, dm_embed)
         try:
             await member.remove_roles(muted_role, reason=reason)
+            
+            # Cancel any scheduled unmute for this user
+            cancelled = await self.cancel_scheduled_unmute(guild.id, member.id)
+            
             embed = discord.Embed(
                 title="Member geunmute",
                 description=f"{member.mention} is geunmute. Reden: {reason}",
                 color=discord.Color.green(),
             )
+            
+            if cancelled:
+                embed.add_field(
+                    name="Scheduled Unmute Cancelled",
+                    value="Any scheduled automatic unmute has been cancelled.",
+                    inline=False
+                )
+            
             await interaction.response.send_message(embed=embed)
             await self.log_infraction(
                 interaction.guild.id, member.id, interaction.user.id, "unmute", reason
@@ -839,7 +1121,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @has_role("The Council")
     @app_commands.describe(
         member="De member om te timeouten",
-        duration="De duration van de timeout (bijv. 1m, 5h, 1d). Max 28 dagen.",
+        duration="De duration van de timeout (bijv. 1m, 5h, 1d, 1w, 1mo, 1y). Max 28 dagen voor timeout, longer durations use muted role.",
         reason="De reden voor de timeout",
     )
     async def timeout(
@@ -904,7 +1186,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         if not duration_timedelta:
             embed = discord.Embed(
                 title="Fout",
-                description="Invalid duration format. Gebruik voorbeelden zoals 1m, 5h, 1d.",
+                description="Invalid duration format. Gebruik voorbeelden zoals 1m, 5h, 1d, 1w, 1mo, 1y.",
                 color=discord.Color.red(),
             )
             if overwrite:
@@ -915,16 +1197,32 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
         timeout_until = discord.utils.utcnow() + duration_timedelta
 
+        # Check if duration exceeds Discord's 28-day limit
         if duration_timedelta > datetime.timedelta(days=28):
+            # Offer fallback to muted role
             embed = discord.Embed(
-                title="Fout",
-                description="Maximale timeout duration is 28 dagen.",
-                color=discord.Color.red(),
+                title="⚠️ Timeout Duration Too Long",
+                description=(
+                    f"The requested timeout duration of **{duration}** exceeds Discord's maximum limit of 28 days.\n\n"
+                    f"Would you like to use the **Muted role** instead? This will mute {member.mention} "
+                    f"for the full duration of **{duration}** and automatically unmute them when the time expires."
+                ),
+                color=discord.Color.orange()
             )
+            
+            # Create view with fallback confirmation buttons
+            view = TimeoutFallbackView(
+                original_user=interaction.user,
+                target_member=member,
+                duration=duration,
+                reason=reason,
+                mute_callback=self._execute_scheduled_mute
+            )
+            
             if overwrite:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, view=view)
             else:
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, view=view)
             return
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
@@ -968,15 +1266,34 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 await interaction.response.send_message(embed=embed, ephemeral=True)
 
     def parse_duration(self, duration_str: str) -> Optional[datetime.timedelta]:
-        units = {"m": "minutes", "h": "hours", "d": "days"}
-        match = re.match(r"(\d+)([mhd])", duration_str)
+        """Parse duration string and return timedelta. Supports m, h, d, w, mo, y units."""
+        units = {
+            "m": "minutes", 
+            "h": "hours", 
+            "d": "days",
+            "w": "weeks",
+            "mo": "months",
+            "y": "years"
+        }
+        
+        # Match pattern like 1m, 5h, 1d, 2w, 1mo, 1y
+        match = re.match(r"(\d+)(m|h|d|w|mo|y)$", duration_str.lower())
         if not match:
             return None
 
         amount, unit = match.groups()
         amount = int(amount)
-        unit = units[unit]
-        return datetime.timedelta(**{unit: amount})
+        
+        # Handle months and years separately since timedelta doesn't support them directly
+        if unit == "mo":
+            # Approximate 1 month = 30 days
+            return datetime.timedelta(days=amount * 30)
+        elif unit == "y":
+            # Approximate 1 year = 365 days
+            return datetime.timedelta(days=amount * 365)
+        else:
+            unit_name = units[unit]
+            return datetime.timedelta(**{unit_name: amount})
 
     @app_commands.command(
         name="untimeout", description="Verwijdert timeout van een member"
