@@ -267,16 +267,6 @@ class TimeoutSystem:
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
-        bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        dm_embed = create_dm_embed(
-            f"Je straffen zijn verwijderd in {interaction.guild.name}",
-            f"Reden: {reason}",
-            discord.Color.green(),
-            bot_icon_url
-        )
-
-        dm_sent = await send_dm_embed(member, dm_embed)
-        
         # Track what we're removing
         removed_punishments = []
         
@@ -297,6 +287,17 @@ class TimeoutSystem:
                 removed_punishments.append("scheduled unmute")
             
             punishment_text = " and ".join(removed_punishments)
+            
+            # Send DM only after successful removal
+            bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
+            dm_embed = create_dm_embed(
+                f"Je straffen zijn verwijderd in {interaction.guild.name}",
+                f"Reden: {reason}",
+                discord.Color.green(),
+                bot_icon_url
+            )
+            dm_sent = await send_dm_embed(member, dm_embed)
+            
             embed = discord.Embed(
                 title="Straffen Verwijderd",
                 description=f"{member.mention} - {punishment_text} verwijderd. Reden: {reason}",

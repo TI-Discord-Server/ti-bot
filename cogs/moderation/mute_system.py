@@ -117,16 +117,17 @@ class MuteSystem:
             if duration_timedelta:
                 unmute_at = datetime.datetime.utcnow() + duration_timedelta
 
-        dm_embed = create_dm_embed(
-            "⚠️| Je bent gemute.",
-            f"Reden: {reason}" + (f"\nDuration: {duration}" if scheduled else ""),
-            discord.Color.dark_orange(),
-            bot_icon_url
-        )
-        dm_sent = await send_dm_embed(member, dm_embed)
-
         try:
             await member.add_roles(muted_role, reason=reason)
+            
+            # Send DM only after successful mute
+            dm_embed = create_dm_embed(
+                "⚠️| Je bent gemute.",
+                f"Reden: {reason}" + (f"\nDuration: {duration}" if scheduled else ""),
+                discord.Color.dark_orange(),
+                bot_icon_url
+            )
+            dm_sent = await send_dm_embed(member, dm_embed)
             
             # Schedule unmute if requested
             if scheduled and unmute_at:
@@ -302,16 +303,6 @@ class MuteSystem:
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        dm_embed = create_dm_embed(
-            "⚠️ | Je straffen zijn verwijderd.",
-            f"Reden: {reason}",
-            discord.Color.green(),
-            bot_icon_url
-        )
-
-        dm_sent = await send_dm_embed(member, dm_embed)
-        
         # Track what we're removing
         removed_punishments = []
         
@@ -332,6 +323,17 @@ class MuteSystem:
                 removed_punishments.append("scheduled unmute")
             
             punishment_text = " and ".join(removed_punishments)
+            
+            # Send DM only after successful removal
+            bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
+            dm_embed = create_dm_embed(
+                "⚠️ | Je straffen zijn verwijderd.",
+                f"Reden: {reason}",
+                discord.Color.green(),
+                bot_icon_url
+            )
+            dm_sent = await send_dm_embed(member, dm_embed)
+            
             embed = discord.Embed(
                 title="Straffen Verwijderd",
                 description=f"{member.mention} - {punishment_text} verwijderd. Reden: {reason}",
