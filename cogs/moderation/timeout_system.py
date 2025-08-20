@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 from utils.has_role import has_role
 from utils.timezone import now_utc, format_local_time
-from .moderation_utils import send_dm_embed, parse_duration, log_infraction, create_dm_embed
+from .moderation_utils import send_dm_embed, parse_duration, log_infraction, create_dm_embed, format_duration
 from .moderation_views import OverwriteConfirmationView, TimeoutFallbackView
 
 
@@ -62,21 +62,38 @@ class TimeoutSystem:
                 await interaction.response.send_message(embed=embed, view=view)
             return
 
-        bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        dm_embed = create_dm_embed(
-            "⚠️ | Je bent getimed out.",
-            f"Reden: {reason}\nDuration: {duration}",
-            discord.Color.dark_orange(),
-            bot_icon_url
-        )
-        dm_sent = await send_dm_embed(member, dm_embed)
-        
         try:
             await member.timeout(timeout_until, reason=reason)
+            
+            # Calculate the actual timeout duration from Discord's API
+            actual_timeout_until = member.timed_out_until or timeout_until
+            current_time = discord.utils.utcnow()
+            actual_duration = actual_timeout_until - current_time
+            
+            # Format the actual duration in a human-readable way
+            duration_str = format_duration(actual_duration)
+            
+            # Send DM with actual timeout information
+            bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
+            dm_embed = create_dm_embed(
+                "⚠️ | Je bent getimed out.",
+                f"Reden: {reason}\nDuration: {duration_str}\nEindigt: {discord.utils.format_dt(actual_timeout_until, 'F')} ({discord.utils.format_dt(actual_timeout_until, 'R')})",
+                discord.Color.dark_orange(),
+                bot_icon_url
+            )
+            dm_sent = await send_dm_embed(member, dm_embed)
+            
             embed = discord.Embed(
                 title="Member Timeout",
-                description=f"{member.mention} is getimed out voor {duration}. Reden: {reason}",
+                description=f"{member.mention} is getimed out voor **{duration_str}**. Reden: {reason}",
                 color=discord.Color.green(),
+            )
+            
+            # Add precise timeout end time
+            embed.add_field(
+                name="Timeout Eindigt",
+                value=f"{discord.utils.format_dt(actual_timeout_until, 'F')} ({discord.utils.format_dt(actual_timeout_until, 'R')})",
+                inline=False
             )
             
             if overwrite:
@@ -143,19 +160,7 @@ class TimeoutSystem:
             if has_timeout:
                 # Calculate remaining timeout time
                 remaining_time = member.timed_out_until - discord.utils.utcnow()
-                days = remaining_time.days
-                hours, remainder = divmod(remaining_time.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
-                
-                time_parts = []
-                if days > 0:
-                    time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
-                if hours > 0:
-                    time_parts.append(f"{hours} uur")
-                if minutes > 0:
-                    time_parts.append(f"{minutes} minuten")
-                
-                remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+                remaining_str = format_duration(remaining_time)
                 current_punishment_info.append(f"**Discord Timeout** voor {remaining_str} (tot {discord.utils.format_dt(member.timed_out_until, 'F')})")
             
             if has_muted_role:

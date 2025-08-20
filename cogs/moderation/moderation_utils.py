@@ -75,3 +75,20 @@ def create_dm_embed(title: str, description: str, color: discord.Color,
     if bot_icon_url:
         embed.set_thumbnail(url=bot_icon_url)
     return embed
+
+
+def format_duration(duration: datetime.timedelta) -> str:
+    """Format a timedelta into a human-readable Dutch string."""
+    days = duration.days
+    hours, remainder = divmod(duration.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+    
+    time_parts = []
+    if days > 0:
+        time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
+    if hours > 0:
+        time_parts.append(f"{hours} uur")
+    if minutes > 0:
+        time_parts.append(f"{minutes} minuten")
+    
+    return ", ".join(time_parts) if time_parts else "minder dan een minuut"

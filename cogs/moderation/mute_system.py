@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 from utils.has_role import has_role
 from utils.timezone import now_utc, format_local_time
-from .moderation_utils import send_dm_embed, parse_duration, log_infraction, create_dm_embed
+from .moderation_utils import send_dm_embed, parse_duration, log_infraction, create_dm_embed, format_duration
 from .moderation_views import OverwriteConfirmationView
 
 
@@ -189,19 +189,7 @@ class MuteSystem:
             if has_timeout:
                 # Calculate remaining timeout time
                 remaining_time = member.timed_out_until - discord.utils.utcnow()
-                days = remaining_time.days
-                hours, remainder = divmod(remaining_time.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
-                
-                time_parts = []
-                if days > 0:
-                    time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
-                if hours > 0:
-                    time_parts.append(f"{hours} uur")
-                if minutes > 0:
-                    time_parts.append(f"{minutes} minuten")
-                
-                remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+                remaining_str = format_duration(remaining_time)
                 current_punishment_info.append(f"**Discord Timeout** voor {remaining_str} (tot {discord.utils.format_dt(member.timed_out_until, 'F')})")
             
             if has_muted_role:
