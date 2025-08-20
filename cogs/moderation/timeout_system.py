@@ -129,34 +129,61 @@ class TimeoutSystem:
     async def handle_timeout_command(self, interaction: discord.Interaction, member: discord.Member, 
                                    duration: str, reason: str):
         """Handle the timeout command with overwrite confirmation."""
-        # Check if member is already timed out
-        if member.timed_out_until and member.timed_out_until > discord.utils.utcnow():
-            # Calculate remaining time
-            remaining_time = member.timed_out_until - discord.utils.utcnow()
+        guild = interaction.guild
+        muted_role = discord.utils.get(guild.roles, name="Muted")
+        
+        # Check if member has any existing punishment (timeout or muted role)
+        has_timeout = member.timed_out_until and member.timed_out_until > discord.utils.utcnow()
+        has_muted_role = muted_role and muted_role in member.roles
+        
+        if has_timeout or has_muted_role:
+            # Determine what type of punishment they currently have
+            current_punishment_info = []
             
-            # Format the remaining time in a human-readable way
-            days = remaining_time.days
-            hours, remainder = divmod(remaining_time.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
+            if has_timeout:
+                # Calculate remaining timeout time
+                remaining_time = member.timed_out_until - discord.utils.utcnow()
+                days = remaining_time.days
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                time_parts = []
+                if days > 0:
+                    time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
+                if hours > 0:
+                    time_parts.append(f"{hours} uur")
+                if minutes > 0:
+                    time_parts.append(f"{minutes} minuten")
+                
+                remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+                current_punishment_info.append(f"**Discord Timeout** voor {remaining_str} (tot {discord.utils.format_dt(member.timed_out_until, 'F')})")
             
-            time_parts = []
-            if days > 0:
-                time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
-            if hours > 0:
-                time_parts.append(f"{hours} uur")
-            if minutes > 0:
-                time_parts.append(f"{minutes} minuten")
+            if has_muted_role:
+                # Check if there's a scheduled unmute
+                try:
+                    scheduled_unmute = await self.mute_system.tasks.scheduled_unmutes_collection.find_one({
+                        "guild_id": guild.id,
+                        "user_id": member.id
+                    })
+                    
+                    if scheduled_unmute:
+                        unmute_time = scheduled_unmute["unmute_at"]
+                        current_punishment_info.append(f"**Muted Role** (scheduled unmute: {discord.utils.format_dt(unmute_time, 'F')} - {discord.utils.format_dt(unmute_time, 'R')})")
+                    else:
+                        current_punishment_info.append("**Muted Role** (permanent/manual unmute required)")
+                except Exception as e:
+                    self.bot.log.error(f"Error checking scheduled unmute: {e}")
+                    current_punishment_info.append("**Muted Role** (status unknown)")
             
-            remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+            punishment_description = "\n".join(current_punishment_info)
             
             # Create confirmation embed
             embed = discord.Embed(
-                title="⚠️ Member is al getimed out",
+                title="⚠️ Member heeft al een straf",
                 description=(
-                    f"{member.mention} is al getimed out voor **{remaining_str}** "
-                    f"en blijft getimed out tot {discord.utils.format_dt(member.timed_out_until, 'F')} "
-                    f"({discord.utils.format_dt(member.timed_out_until, 'R')}).\n\n"
-                    f"Wil je dit overschrijven met een nieuwe timeout van **{duration}**?"
+                    f"{member.mention} heeft momenteel:\n{punishment_description}\n\n"
+                    f"Wil je dit overschrijven met een nieuwe timeout van **{duration}**?\n\n"
+                    f"**Note:** Dit zal alle huidige straffen verwijderen en vervangen door de nieuwe timeout."
                 ),
                 color=discord.Color.orange()
             )
@@ -168,42 +195,129 @@ class TimeoutSystem:
                 action_type="timeout",
                 new_duration=duration,
                 reason=reason,
-                timeout_callback=self.execute_timeout
+                timeout_callback=self.execute_timeout_with_cleanup
             )
             
             await interaction.response.send_message(embed=embed, view=view)
             return
         
-        # If not already timed out, proceed with normal timeout
+        # If no existing punishment, proceed with normal timeout
         await self.execute_timeout(interaction, member, duration, reason)
 
+    async def execute_timeout_with_cleanup(self, interaction: discord.Interaction, member: discord.Member, 
+                                         duration: str, reason: str, overwrite: bool = False):
+        """Execute timeout after cleaning up any existing punishments."""
+        guild = interaction.guild
+        muted_role = discord.utils.get(guild.roles, name="Muted")
+        
+        # Clean up existing punishments
+        cleanup_actions = []
+        
+        # Remove muted role if present
+        if muted_role and muted_role in member.roles:
+            try:
+                await member.remove_roles(muted_role, reason=f"Replacing with timeout: {reason}")
+                cleanup_actions.append("Removed muted role")
+            except Exception as e:
+                self.bot.log.error(f"Failed to remove muted role from {member.name} ({member.id}): {e}")
+        
+        # Cancel any scheduled unmute
+        try:
+            cancelled = await self.mute_system.tasks.cancel_scheduled_unmute(guild.id, member.id)
+            if cancelled:
+                cleanup_actions.append("Cancelled scheduled unmute")
+        except Exception as e:
+            self.bot.log.error(f"Failed to cancel scheduled unmute for {member.name} ({member.id}): {e}")
+        
+        # Remove existing timeout (this will be replaced by the new one)
+        if member.timed_out_until and member.timed_out_until > discord.utils.utcnow():
+            try:
+                await member.timeout(None, reason=f"Clearing for new timeout: {reason}")
+                cleanup_actions.append("Cleared existing timeout")
+            except Exception as e:
+                self.bot.log.error(f"Failed to clear existing timeout for {member.name} ({member.id}): {e}")
+        
+        # Log cleanup actions
+        if cleanup_actions:
+            self.bot.log.info(f"Cleaned up existing punishments for {member.name} ({member.id}): {', '.join(cleanup_actions)}")
+        
+        # Now apply the new timeout
+        await self.execute_timeout(interaction, member, duration, reason, overwrite=True)
+
     async def handle_untimeout_command(self, interaction: discord.Interaction, member: discord.Member, reason: str):
-        """Handle the untimeout command."""
+        """Handle the untimeout command - removes both timeout and muted role if present."""
+        guild = interaction.guild
+        muted_role = discord.utils.get(guild.roles, name="Muted")
+        
+        # Check what punishments the member currently has
+        has_timeout = member.timed_out_until and member.timed_out_until > discord.utils.utcnow()
+        has_muted_role = muted_role and muted_role in member.roles
+        
+        if not has_timeout and not has_muted_role:
+            embed = discord.Embed(
+                title="Geen Straf Actief",
+                description=f"{member.mention} heeft geen actieve timeout of mute.",
+                color=discord.Color.orange(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         dm_embed = create_dm_embed(
-            f"Je timeout is verwijderd in {interaction.guild.name}",
+            f"Je straffen zijn verwijderd in {interaction.guild.name}",
             f"Reden: {reason}",
             discord.Color.green(),
             bot_icon_url
         )
 
         dm_sent = await send_dm_embed(member, dm_embed)
+        
+        # Track what we're removing
+        removed_punishments = []
+        
         try:
-            await member.timeout(None, reason=reason)
+            # Remove timeout if present
+            if has_timeout:
+                await member.timeout(None, reason=reason)
+                removed_punishments.append("timeout")
+            
+            # Remove muted role if present
+            if has_muted_role:
+                await member.remove_roles(muted_role, reason=reason)
+                removed_punishments.append("muted role")
+            
+            # Cancel any scheduled unmute
+            cancelled = await self.mute_system.tasks.cancel_scheduled_unmute(guild.id, member.id)
+            if cancelled:
+                removed_punishments.append("scheduled unmute")
+            
+            punishment_text = " and ".join(removed_punishments)
             embed = discord.Embed(
-                title="Member untimeout",
-                description=f"{member.mention} is geuntimeout. Reden: {reason}",
+                title="Straffen Verwijderd",
+                description=f"{member.mention} - {punishment_text} verwijderd. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
+            
+            # Log the action
             await log_infraction(
                 self.infractions_collection,
-                interaction.guild.id, member.id, interaction.user.id, "untimeout", reason
+                interaction.guild.id, member.id, interaction.user.id, "untimeout", 
+                f"{reason} (removed: {punishment_text})"
             )
+            
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permissie Fout",
-                description="Ik heb geen permissie om deze member te untimeouten.",
+                description="Ik heb geen permissie om straffen van deze member te verwijderen.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Error removing punishments from {member.name} ({member.id}): {e}")
+            embed = discord.Embed(
+                title="Fout",
+                description="Er is een fout opgetreden bij het verwijderen van de straffen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)

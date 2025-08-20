@@ -177,33 +177,75 @@ class MuteSystem:
         """Handle the mute command with overwrite confirmation."""
         guild = interaction.guild
         muted_role = discord.utils.get(guild.roles, name="Muted")
+        
+        # Check if member has any existing punishment (timeout or muted role)
+        has_timeout = member.timed_out_until and member.timed_out_until > discord.utils.utcnow()
+        has_muted_role = muted_role and muted_role in member.roles
 
-        # Check if member is already muted
-        if muted_role and muted_role in member.roles:
-            # Get the mute infraction from database to show when they were muted
-            try:
-                mute_infraction = await self.infractions_collection.find_one({
-                    "guild_id": guild.id,
-                    "user_id": member.id,
-                    "type": "mute"
-                }, sort=[("timestamp", -1)])  # Get the most recent mute
+        if has_timeout or has_muted_role:
+            # Determine what type of punishment they currently have
+            current_punishment_info = []
+            
+            if has_timeout:
+                # Calculate remaining timeout time
+                remaining_time = member.timed_out_until - discord.utils.utcnow()
+                days = remaining_time.days
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                time_parts = []
+                if days > 0:
+                    time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
+                if hours > 0:
+                    time_parts.append(f"{hours} uur")
+                if minutes > 0:
+                    time_parts.append(f"{minutes} minuten")
+                
+                remaining_str = ", ".join(time_parts) if time_parts else "minder dan een minuut"
+                current_punishment_info.append(f"**Discord Timeout** voor {remaining_str} (tot {discord.utils.format_dt(member.timed_out_until, 'F')})")
+            
+            if has_muted_role:
+                # Get the mute infraction from database to show when they were muted
+                try:
+                    mute_infraction = await self.infractions_collection.find_one({
+                        "guild_id": guild.id,
+                        "user_id": member.id,
+                        "type": {"$in": ["mute", "scheduled_mute"]}
+                    }, sort=[("timestamp", -1)])  # Get the most recent mute
 
-                time_info = "for an unknown duration"
-                if mute_infraction:
-                    mute_time = datetime.datetime.fromisoformat(mute_infraction["timestamp"])
-                    mute_time_formatted = discord.utils.format_dt(mute_time, 'F')
-                    mute_time_relative = discord.utils.format_dt(mute_time, 'R')
-                    time_info = f"sinds {mute_time_formatted} ({mute_time_relative})"
-            except Exception as e:
-                self.bot.log.error(f"Error fetching mute infraction: {e}")
-                time_info = "for an unknown duration"
+                    if mute_infraction:
+                        mute_time = datetime.datetime.fromisoformat(mute_infraction["timestamp"])
+                        mute_time_formatted = discord.utils.format_dt(mute_time, 'F')
+                        mute_time_relative = discord.utils.format_dt(mute_time, 'R')
+                        time_info = f"sinds {mute_time_formatted} ({mute_time_relative})"
+                    else:
+                        time_info = "for an unknown duration"
+                        
+                    # Check if there's a scheduled unmute
+                    scheduled_unmute = await self.tasks.scheduled_unmutes_collection.find_one({
+                        "guild_id": guild.id,
+                        "user_id": member.id
+                    })
+                    
+                    if scheduled_unmute:
+                        unmute_time = scheduled_unmute["unmute_at"]
+                        current_punishment_info.append(f"**Muted Role** {time_info} (scheduled unmute: {discord.utils.format_dt(unmute_time, 'F')} - {discord.utils.format_dt(unmute_time, 'R')})")
+                    else:
+                        current_punishment_info.append(f"**Muted Role** {time_info} (permanent/manual unmute required)")
+                        
+                except Exception as e:
+                    self.bot.log.error(f"Error fetching mute infraction: {e}")
+                    current_punishment_info.append("**Muted Role** (status unknown)")
+            
+            punishment_description = "\n".join(current_punishment_info)
 
             # Create confirmation embed
             embed = discord.Embed(
-                title="⚠️ Member is al gemute",
+                title="⚠️ Member heeft al een straf",
                 description=(
-                    f"{member.mention} is al gemute {time_info}.\n\n"
-                    f"Wil je de mute overschrijven met een nieuwe reden?"
+                    f"{member.mention} heeft momenteel:\n{punishment_description}\n\n"
+                    f"Wil je dit overschrijven met een nieuwe mute?\n\n"
+                    f"**Note:** Dit zal alle huidige straffen verwijderen en vervangen door de nieuwe mute."
                 ),
                 color=discord.Color.orange()
             )
@@ -214,73 +256,125 @@ class MuteSystem:
                 target_member=member,
                 action_type="mute",
                 reason=reason,
-                mute_callback=self.execute_mute
+                mute_callback=self.execute_mute_with_cleanup
             )
             
             await interaction.response.send_message(embed=embed, view=view)
             return
         
-        # If not already muted, proceed with normal mute
+        # If no existing punishment, proceed with normal mute
         await self.execute_mute(interaction, member, reason)
 
+    async def execute_mute_with_cleanup(self, interaction: discord.Interaction, member: discord.Member,
+                                      reason: str, overwrite: bool = False):
+        """Execute mute after cleaning up any existing punishments."""
+        guild = interaction.guild
+        
+        # Clean up existing punishments
+        cleanup_actions = []
+        
+        # Remove existing timeout if present
+        if member.timed_out_until and member.timed_out_until > discord.utils.utcnow():
+            try:
+                await member.timeout(None, reason=f"Replacing with mute: {reason}")
+                cleanup_actions.append("Removed existing timeout")
+            except Exception as e:
+                self.bot.log.error(f"Failed to remove timeout from {member.name} ({member.id}): {e}")
+        
+        # Cancel any scheduled unmute (will be replaced if this is a scheduled mute)
+        try:
+            cancelled = await self.tasks.cancel_scheduled_unmute(guild.id, member.id)
+            if cancelled:
+                cleanup_actions.append("Cancelled scheduled unmute")
+        except Exception as e:
+            self.bot.log.error(f"Failed to cancel scheduled unmute for {member.name} ({member.id}): {e}")
+        
+        # Log cleanup actions
+        if cleanup_actions:
+            self.bot.log.info(f"Cleaned up existing punishments for {member.name} ({member.id}): {', '.join(cleanup_actions)}")
+        
+        # Now apply the new mute
+        await self.execute_mute(interaction, member, reason, overwrite=True)
+
     async def handle_unmute_command(self, interaction: discord.Interaction, member: discord.Member, reason: str):
-        """Handle the unmute command."""
+        """Handle the unmute command - removes both muted role and timeout if present."""
         guild = interaction.guild
         muted_role = discord.utils.get(guild.roles, name="Muted")
-
-        if not muted_role:
+        
+        # Check what punishments the member currently has
+        has_timeout = member.timed_out_until and member.timed_out_until > discord.utils.utcnow()
+        has_muted_role = muted_role and muted_role in member.roles
+        
+        if not has_timeout and not has_muted_role:
             embed = discord.Embed(
-                title="Fout",
-                description="Geen 'Muted' role gevonden. Kan niet unmuten.",
-                color=discord.Color.red(),
+                title="Geen Straf Actief",
+                description=f"{member.mention} heeft geen actieve timeout of mute.",
+                color=discord.Color.orange(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         dm_embed = create_dm_embed(
-            "⚠️ | Je bent geunmute.",
+            "⚠️ | Je straffen zijn verwijderd.",
             f"Reden: {reason}",
             discord.Color.green(),
             bot_icon_url
         )
 
         dm_sent = await send_dm_embed(member, dm_embed)
+        
+        # Track what we're removing
+        removed_punishments = []
+        
         try:
-            await member.remove_roles(muted_role, reason=reason)
+            # Remove muted role if present
+            if has_muted_role:
+                await member.remove_roles(muted_role, reason=reason)
+                removed_punishments.append("muted role")
+            
+            # Remove timeout if present
+            if has_timeout:
+                await member.timeout(None, reason=reason)
+                removed_punishments.append("timeout")
             
             # Cancel any scheduled unmute for this user
             cancelled = await self.tasks.cancel_scheduled_unmute(guild.id, member.id)
+            if cancelled:
+                removed_punishments.append("scheduled unmute")
             
+            punishment_text = " and ".join(removed_punishments)
             embed = discord.Embed(
-                title="Member geunmute",
-                description=f"{member.mention} is geunmute. Reden: {reason}",
+                title="Straffen Verwijderd",
+                description=f"{member.mention} - {punishment_text} verwijderd. Reden: {reason}",
                 color=discord.Color.green(),
             )
-            
-            if cancelled:
-                embed.add_field(
-                    name="Scheduled Unmute Cancelled",
-                    value="Any scheduled automatic unmute has been cancelled.",
-                    inline=False
-                )
             
             await interaction.response.send_message(embed=embed)
             await log_infraction(
                 self.infractions_collection,
-                interaction.guild.id, member.id, interaction.user.id, "unmute", reason
+                interaction.guild.id, member.id, interaction.user.id, "unmute", 
+                f"{reason} (removed: {punishment_text})"
             )
         except discord.errors.Forbidden:
             embed = discord.Embed(
                 title="Permissie Fout",
-                description="Ik heb geen permissie om rollen te beheren voor deze member.",
+                description="Ik heb geen permissie om straffen van deze member te verwijderen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.HTTPException:
             embed = discord.Embed(
                 title="Fout",
-                description="Unmuten mislukt.",
+                description="Straffen verwijderen mislukt.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            self.bot.log.error(f"Error removing punishments from {member.name} ({member.id}): {e}")
+            embed = discord.Embed(
+                title="Onverwachte Fout",
+                description="Er is een onverwachte fout opgetreden bij het verwijderen van de straffen.",
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
