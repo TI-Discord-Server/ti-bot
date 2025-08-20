@@ -104,7 +104,8 @@ class TimeoutSystem:
             try:
                 await log_infraction(
                     self.infractions_collection,
-                    interaction.guild.id, member.id, interaction.user.id, "timeout", reason
+                    interaction.guild.id, member.id, interaction.user.id, "timeout", 
+                    f"{reason} (duur: {duration_str})"
                 )
             except Exception as e:
                 self.bot.log.error(f"Failed to log timeout infraction for {member.name} ({member.id}): {e}")

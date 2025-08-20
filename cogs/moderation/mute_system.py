@@ -152,7 +152,8 @@ class MuteSystem:
                 await log_infraction(
                     self.infractions_collection,
                     interaction.guild.id, member.id, interaction.user.id, 
-                    "scheduled_mute" if scheduled else "mute", reason
+                    "scheduled_mute" if scheduled else "mute", 
+                    f"{reason}" + (f" (duur: {duration})" if scheduled else "")
                 )
             except Exception as e:
                 self.bot.log.error(f"Failed to log mute infraction for {member.name} ({member.id}): {e}")

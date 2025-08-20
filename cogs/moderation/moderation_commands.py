@@ -5,6 +5,7 @@ import datetime
 import pymongo
 import time
 import asyncio
+import re
 from typing import Optional
 from utils.has_role import has_role
 from utils.has_admin import has_admin
@@ -408,6 +409,16 @@ class ModCommands(commands.Cog, name="ModCommands"):
             infraction_type = infraction_translations.get(infraction['type'], infraction['type'].capitalize())
             reason = infraction.get('reason', 'Geen reden opgegeven')
             
+            # Extract duration information if present in reason
+            duration_info = ""
+            if "(duur:" in reason:
+                # Extract duration from reason like "reason (duur: 1h)"
+                duration_match = re.search(r'\(duur: ([^)]+)\)', reason)
+                if duration_match:
+                    duration_info = f" **({duration_match.group(1)})**"
+                    # Remove duration from reason for cleaner display
+                    reason = re.sub(r'\s*\(duur: [^)]+\)', '', reason)
+            
             # Get moderator info if available
             moderator_info = ""
             if 'moderator_id' in infraction:
@@ -420,7 +431,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 except:
                     moderator_info = ""
             
-            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction_type}**{moderator_info}\n**Reden:** {reason}\n\n"
+            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction_type}**{duration_info}{moderator_info}\n**Reden:** {reason}\n\n"
 
         if not infraction_list:
             infraction_list = "Geen voorgaande straffen gevonden voor deze gebruiker."
