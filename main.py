@@ -437,6 +437,7 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self.load_extension("cogs.confessions.confession_commands")
+        await self.load_extension("cogs.moderation.moderation_commands")
         await self.__load_cogs()
         await self.check_db_connection()
         await self.load_developer_ids()
