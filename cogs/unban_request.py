@@ -115,7 +115,7 @@ class UnbanRequest(commands.Cog):
                 self.bot.remove_view(self.unban_view)
 
             self.unban_view = UnbanView(self.bot, self.unban_request_kanaal_id, self.aanvragen_log_kanaal_id_1, self.aanvragen_log_kanaal_id_2)
-            self.bot.add_view(self.unban_view)
+            # Persistent views are now handled centrally by PersistentViewManager
 
 
 

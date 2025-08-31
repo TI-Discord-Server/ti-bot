@@ -211,8 +211,7 @@ class RoleSelector(commands.Cog):
                 "categories": [category.to_dict() for category in self.default_categories]
             })
         
-        # Setup persistent view
-        self.bot.add_view(RoleSelectorView(self))
+        # Persistent views are now handled centrally by PersistentViewManager
     
     # Using the has_role decorator instead of a separate method
     

@@ -249,8 +249,14 @@ class ConfessionTasks(commands.Cog):
                 submit_message = await public_channel.fetch_message(submit_message_id)
                 await submit_message.delete()
                 self.bot.log.debug(f"Deleted previous submit message {submit_message_id}")
+                
+                # Remove from persistent views database
+                await self.bot.persistent_views.remove_view_message(public_channel.id, submit_message_id)
+                
             except discord.NotFound:
                 self.bot.log.debug(f"Previous submit message {submit_message_id} not found (already deleted)")
+                # Still try to remove from persistent views database in case it's there
+                await self.bot.persistent_views.remove_view_message(public_channel.id, submit_message_id)
             except discord.Forbidden:
                 self.bot.log.warning(f"No permission to delete submit message {submit_message_id}")
             except Exception as e:
@@ -286,6 +292,11 @@ class ConfessionTasks(commands.Cog):
                 {"_id": "confession_settings"},
                 {"$set": {"submit_message_id": submit_message.id}},
                 upsert=True
+            )
+            
+            # Store the persistent view message
+            await self.bot.persistent_views.store_view_message(
+                "confession", public_channel.id, submit_message.id, public_channel.guild.id
             )
             
             self.bot.log.debug(f"Posted new submit message {submit_message.id}")

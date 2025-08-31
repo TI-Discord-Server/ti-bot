@@ -59,14 +59,19 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 view = ConfessionView(self.bot)
                 
                 if target_channel == interaction.channel:
-                    await target_channel.send(
+                    message = await target_channel.send(
                         "Klik op de knop hieronder om een bekentenis in te dienen:", view=view)
                     await interaction.response.send_message("✅ Confession button is aangemaakt!", ephemeral=True)
                 else:
-                    await target_channel.send(
+                    message = await target_channel.send(
                         "Klik op de knop hieronder om een bekentenis in te dienen:", view=view)
                     await interaction.response.send_message(
                         f"✅ Confession button ingesteld in {target_channel.mention}", ephemeral=True)
+                
+                # Store the persistent view message
+                await self.bot.persistent_views.store_view_message(
+                    "confession", target_channel.id, message.id, interaction.guild.id
+                )
                 
                 self.bot.log.info(f"{interaction.user} heeft confessions setup uitgevoerd in {target_channel.name}.")
                 
@@ -119,10 +124,17 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             
             if target_channel == interaction.channel:
                 await interaction.response.send_message(embed=embed, view=view)
+                # Get the message from the interaction response
+                message = await interaction.original_response()
             else:
-                await target_channel.send(embed=embed, view=view)
+                message = await target_channel.send(embed=embed, view=view)
                 await interaction.response.send_message(
                     f"✅ Role menu ingesteld in {target_channel.mention}", ephemeral=True)
+            
+            # Store the persistent view message
+            await self.bot.persistent_views.store_view_message(
+                "role_selector", target_channel.id, message.id, interaction.guild.id
+            )
             
             self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup role menu in {target_channel.name} ({target_channel.id})")
         
@@ -158,13 +170,18 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 
                 if target_channel == interaction.channel:
                     await interaction.response.defer(ephemeral=True)
-                    await target_channel.send(embed=embed, view=view)
+                    message = await target_channel.send(embed=embed, view=view)
                     await interaction.followup.send("✅ Channel menu is aangemaakt!", ephemeral=True)
                 else:
                     await interaction.response.defer(ephemeral=True)
-                    await target_channel.send(embed=embed, view=view)
+                    message = await target_channel.send(embed=embed, view=view)
                     await interaction.followup.send(
                         f"✅ Channel menu ingesteld in {target_channel.mention}", ephemeral=True)
+                
+                # Store the persistent view message
+                await self.bot.persistent_views.store_view_message(
+                    "channel_menu", target_channel.id, message.id, interaction.guild.id
+                )
                 
                 # Ensure categories exist in the background
                 await channel_menu_cog.ensure_categories_exist(interaction.guild)
@@ -196,12 +213,17 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                 view = VerificationView(self.bot)
                 
                 if target_channel == interaction.channel:
-                    await target_channel.send(embed=embed, view=view)
+                    message = await target_channel.send(embed=embed, view=view)
                     await interaction.response.send_message("✅ Verificatiebericht is verzonden", ephemeral=True)
                 else:
-                    await target_channel.send(embed=embed, view=view)
+                    message = await target_channel.send(embed=embed, view=view)
                     await interaction.response.send_message(
                         f"✅ Verificatiebericht verzonden naar {target_channel.mention}", ephemeral=True)
+                
+                # Store the persistent view message
+                await self.bot.persistent_views.store_view_message(
+                    "verification", target_channel.id, message.id, interaction.guild.id
+                )
                 
                 self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup verification in {target_channel.name} ({target_channel.id})")
                         
@@ -236,12 +258,17 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             )
             
             if target_channel == interaction.channel:
-                await target_channel.send(embed=embed, view=unban_cog.unban_view)
+                message = await target_channel.send(embed=embed, view=unban_cog.unban_view)
                 await interaction.response.send_message("✅ Unban aanvraag bericht verzonden!", ephemeral=True)
             else:
-                await target_channel.send(embed=embed, view=unban_cog.unban_view)
+                message = await target_channel.send(embed=embed, view=unban_cog.unban_view)
                 await interaction.response.send_message(
                     f"✅ Unban aanvraag bericht verzonden naar {target_channel.mention}.", ephemeral=True)
+            
+            # Store the persistent view message
+            await self.bot.persistent_views.store_view_message(
+                "unban_request", target_channel.id, message.id, interaction.guild.id
+            )
             
             self.bot.log.info(f"{interaction.user} heeft unban request setup uitgevoerd in {target_channel.name}.")
 

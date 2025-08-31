@@ -875,6 +875,6 @@ class Verification(commands.Cog):
 
 async def setup(bot):
     cog = Verification(bot)
-    bot.add_view(VerificationView(bot))
+    # Persistent views are now handled centrally by PersistentViewManager
     bot.loop.create_task(cog.cleanup_orphaned_records())
     await bot.add_cog(cog)

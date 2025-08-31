@@ -63,8 +63,8 @@ parser.add_argument('--tls', type=str_to_bool, nargs='?', const=True, default=Fa
                    help='Enable TLS for MongoDB connection. Use --tls, --tls=true, or --tls=false')
 args = parser.parse_args()
 
-MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD)
-MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME)
+MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD) if MONGODB_PASSWORD else ""
+MONGODB_USERNAME = urllib.parse.quote_plus(MONGODB_USERNAME) if MONGODB_USERNAME else ""
 load_dotenv()
 
 # Developer IDs are now managed through the /configure command
@@ -335,6 +335,10 @@ class Bot(commands.Bot):
         self.status = discord.Status.online
 
         self.threads = ThreadManager(self)
+        
+        # Initialize persistent view manager
+        from utils.persistent_views import PersistentViewManager
+        self.persistent_views = PersistentViewManager(self)
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
@@ -465,6 +469,13 @@ class Bot(commands.Bot):
                 self.log.info("Thread cache populated successfully")
             except Exception as e:
                 self.log.error(f"Failed to populate thread cache: {e}")
+            
+            # Restore persistent views
+            try:
+                await self.persistent_views.restore_views()
+                self.log.info("Persistent views restored successfully")
+            except Exception as e:
+                self.log.error(f"Failed to restore persistent views: {e}")
 
     @property
     def guild(self) -> typing.Optional[discord.Guild]:
