@@ -278,7 +278,14 @@ class DiscordWebhookHandler(logging.Handler):
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
         # Connect to the MongoDB database with the async version of pymongo
-        connection_string = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_IP_ADDRESS}:{MONGODB_PORT}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256"
+        mongodb_host = MONGODB_IP_ADDRESS or "localhost"
+        mongodb_port = MONGODB_PORT or "27017"
+        
+        if MONGODB_USERNAME and MONGODB_PASSWORD:
+            connection_string = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{mongodb_host}:{mongodb_port}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256"
+        else:
+            # No authentication
+            connection_string = f"mongodb://{mongodb_host}:{mongodb_port}/"
         
         # Add TLS parameters if TLS is enabled
         if args.tls:
@@ -337,8 +344,12 @@ class Bot(commands.Bot):
         self.threads = ThreadManager(self)
         
         # Initialize persistent view manager
-        from utils.persistent_views import PersistentViewManager
-        self.persistent_views = PersistentViewManager(self)
+        try:
+            from utils.persistent_views import PersistentViewManager
+            self.persistent_view_manager = PersistentViewManager(self)
+        except Exception as e:
+            print(f"Warning: Failed to initialize PersistentViewManager: {e}")
+            self.persistent_view_manager = None
 
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
@@ -471,11 +482,15 @@ class Bot(commands.Bot):
                 self.log.error(f"Failed to populate thread cache: {e}")
             
             # Restore persistent views
-            try:
-                await self.persistent_views.restore_views()
-                self.log.info("Persistent views restored successfully")
-            except Exception as e:
-                self.log.error(f"Failed to restore persistent views: {e}")
+            if self.persistent_view_manager:
+                try:
+                    await self.persistent_view_manager.restore_views()
+                    self.log.info("Persistent views restoration completed")
+                except Exception as e:
+                    self.log.error(f"Failed to restore persistent views: {e}")
+                    # Don't crash the bot if persistent views fail to restore
+            else:
+                self.log.warning("PersistentViewManager not available, skipping view restoration")
 
     @property
     def guild(self) -> typing.Optional[discord.Guild]:

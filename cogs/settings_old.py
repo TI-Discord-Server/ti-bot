@@ -69,9 +69,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                         f"✅ Confession button ingesteld in {target_channel.mention}", ephemeral=True)
                 
                 # Store the persistent view message
-                await self.bot.persistent_views.store_view_message(
-                    "confession", target_channel.id, message.id, interaction.guild.id
-                )
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "confession", target_channel.id, message.id, interaction.guild.id
+                    )
                 
                 self.bot.log.info(f"{interaction.user} heeft confessions setup uitgevoerd in {target_channel.name}.")
                 
@@ -132,9 +133,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                     f"✅ Role menu ingesteld in {target_channel.mention}", ephemeral=True)
             
             # Store the persistent view message
-            await self.bot.persistent_views.store_view_message(
-                "role_selector", target_channel.id, message.id, interaction.guild.id
-            )
+            if self.bot.persistent_view_manager:
+                await self.bot.persistent_view_manager.store_view_message(
+                    "role_selector", target_channel.id, message.id, interaction.guild.id
+                )
             
             self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup role menu in {target_channel.name} ({target_channel.id})")
         
@@ -179,9 +181,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                         f"✅ Channel menu ingesteld in {target_channel.mention}", ephemeral=True)
                 
                 # Store the persistent view message
-                await self.bot.persistent_views.store_view_message(
-                    "channel_menu", target_channel.id, message.id, interaction.guild.id
-                )
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "channel_menu", target_channel.id, message.id, interaction.guild.id
+                    )
                 
                 # Ensure categories exist in the background
                 await channel_menu_cog.ensure_categories_exist(interaction.guild)
@@ -221,9 +224,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                         f"✅ Verificatiebericht verzonden naar {target_channel.mention}", ephemeral=True)
                 
                 # Store the persistent view message
-                await self.bot.persistent_views.store_view_message(
-                    "verification", target_channel.id, message.id, interaction.guild.id
-                )
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "verification", target_channel.id, message.id, interaction.guild.id
+                    )
                 
                 self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup verification in {target_channel.name} ({target_channel.id})")
                         
@@ -266,9 +270,10 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                     f"✅ Unban aanvraag bericht verzonden naar {target_channel.mention}.", ephemeral=True)
             
             # Store the persistent view message
-            await self.bot.persistent_views.store_view_message(
-                "unban_request", target_channel.id, message.id, interaction.guild.id
-            )
+            if self.bot.persistent_view_manager:
+                await self.bot.persistent_view_manager.store_view_message(
+                    "unban_request", target_channel.id, message.id, interaction.guild.id
+                )
             
             self.bot.log.info(f"{interaction.user} heeft unban request setup uitgevoerd in {target_channel.name}.")
 

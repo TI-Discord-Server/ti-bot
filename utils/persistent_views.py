@@ -91,7 +91,21 @@ class PersistentViewManager:
         logger.info("Starting persistent view restoration...")
         
         try:
+            # Check if collection exists and has documents
+            try:
+                count = await self.collection.count_documents({})
+                if count == 0:
+                    logger.info("No persistent views found to restore (first run or empty collection)")
+                    return
+            except Exception as e:
+                logger.info(f"Persistent views collection doesn't exist yet or is inaccessible: {e}")
+                return
+            
             view_messages = await self.get_view_messages()
+            if not view_messages:
+                logger.info("No persistent views found to restore")
+                return
+                
             restored_count = 0
             failed_count = 0
             
@@ -103,13 +117,14 @@ class PersistentViewManager:
                     else:
                         failed_count += 1
                 except Exception as e:
-                    logger.error(f"Failed to restore view {view_data['_id']}: {e}")
+                    logger.error(f"Failed to restore view {view_data.get('_id', 'unknown')}: {e}")
                     failed_count += 1
             
             logger.info(f"Persistent view restoration complete: {restored_count} restored, {failed_count} failed")
             
         except Exception as e:
             logger.error(f"Failed to restore persistent views: {e}")
+            # Don't re-raise the exception to prevent bot startup failure
     
     async def _restore_single_view(self, view_data: Dict[str, Any]) -> bool:
         """Restore a single persistent view."""
