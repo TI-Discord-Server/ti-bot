@@ -70,17 +70,43 @@ class YearSelect(discord.ui.Select):
         else:
             user_channel_roles = []
         
-        # Create a multi-select menu for the channels
+        # Create a paginated multi-select menu for the channels
         view = discord.ui.View(timeout=None)
         view.bot = self.bot  # Pass the bot reference to the view
-        view.add_item(CourseSelect(channels, year, self.bot, user_channel_roles))
+        
+        # Filter out general channels first
+        filtered_channels = [
+            channel for channel in channels 
+            if not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])
+        ]
+        
+        # Calculate pagination
+        channels_per_page = 25
+        total_pages = (len(filtered_channels) + channels_per_page - 1) // channels_per_page
+        
+        if total_pages <= 1:
+            # No pagination needed
+            view.add_item(CourseSelect(filtered_channels, year, self.bot, user_channel_roles, 0, 1))
+        else:
+            # Add pagination - start with first page
+            page_channels = filtered_channels[:channels_per_page]
+            view.add_item(CourseSelect(page_channels, year, self.bot, user_channel_roles, 0, total_pages))
+            
+            # Add navigation buttons
+            view.add_item(PaginationButton("◀️", "prev", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=True))
+            view.add_item(PaginationButton("▶️", "next", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=(total_pages <= 1)))
         
         # Create embed for course selection
         year_colors = {"1": discord.Color.green(), "2": discord.Color.gold(), "3": discord.Color.red()}
         year_emojis = {"1": "🟩", "2": "🟨", "3": "🟥"}
         
+        # Update title to show pagination info if needed
+        title = f"{year_emojis[year]} Jaar {year} - Vakselectie"
+        if total_pages > 1:
+            title += f" (Pagina 1/{total_pages})"
+        
         embed = discord.Embed(
-            title=f"{year_emojis[year]} Jaar {year} - Vakselectie",
+            title=title,
             description="Selecteer de vakken die je wilt volgen uit het dropdown menu hieronder.",
             color=year_colors[year]
         )
@@ -98,6 +124,15 @@ class YearSelect(discord.ui.Select):
                 inline=False
             )
         
+        # Add pagination info if multiple pages
+        if total_pages > 1:
+            page_channels = filtered_channels[:channels_per_page]
+            embed.add_field(
+                name="📄 Paginatie",
+                value=f"Pagina 1 van {total_pages} ({len(page_channels)} vakken op deze pagina)\nGebruik de ◀️ ▶️ knoppen om tussen pagina's te navigeren.",
+                inline=False
+            )
+        
         embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
         await interaction.response.send_message(
@@ -108,11 +143,13 @@ class YearSelect(discord.ui.Select):
 
 
 class CourseSelect(discord.ui.Select):
-    def __init__(self, channels, year, bot, user_channel_roles: List[str] = None):
+    def __init__(self, channels, year, bot, user_channel_roles: List[str] = None, page: int = 0, total_pages: int = 1):
         self.year = year
         self.bot = bot
         self.channels = channels
         self.user_channel_roles = user_channel_roles or []
+        self.page = page
+        self.total_pages = total_pages
         
         # Create options from channels
         options = []
@@ -137,12 +174,17 @@ class CourseSelect(discord.ui.Select):
                 )
             )
         
+        # Update placeholder to show page info if multiple pages
+        placeholder = "Selecteer/deselecteer je vakken..."
+        if total_pages > 1:
+            placeholder = f"Pagina {page + 1}/{total_pages} - Selecteer/deselecteer je vakken..."
+        
         super().__init__(
-            placeholder="Selecteer/deselecteer je vakken...",
+            placeholder=placeholder,
             min_values=0,
-            max_values=min(len(options), 25),  # Discord has a max of 25 options that can be selected
+            max_values=len(options),  # Allow selecting all options on this page
             options=options,
-            custom_id=f"course_select_{year}"
+            custom_id=f"course_select_{year}_page_{page}"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -252,6 +294,93 @@ class CourseSelect(discord.ui.Select):
             )
 
 
+class PaginationButton(discord.ui.Button):
+    def __init__(self, emoji: str, action: str, year: str, all_channels: List, user_channel_roles: List[str], current_page: int, total_pages: int, disabled: bool = False):
+        self.action = action
+        self.year = year
+        self.all_channels = all_channels
+        self.user_channel_roles = user_channel_roles
+        self.current_page = current_page
+        self.total_pages = total_pages
+        
+        super().__init__(
+            emoji=emoji,
+            style=discord.ButtonStyle.secondary,
+            disabled=disabled,
+            custom_id=f"pagination_{action}_{year}_{current_page}"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Calculate new page
+        if self.action == "prev":
+            new_page = max(0, self.current_page - 1)
+        else:  # next
+            new_page = min(self.total_pages - 1, self.current_page + 1)
+        
+        # Get channels for the new page
+        channels_per_page = 25
+        start_idx = new_page * channels_per_page
+        end_idx = start_idx + channels_per_page
+        page_channels = self.all_channels[start_idx:end_idx]
+        
+        # Get the user's current roles for all channels (not just this page)
+        channel_menu_cog = self.view.bot.get_cog('ChannelMenu')
+        if channel_menu_cog:
+            # We need to get all channels to check user roles properly
+            year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
+            category_name = f"━━━ {year_emoji_map[self.year]} {self.year}E JAAR ━━━"
+            category = discord.utils.get(interaction.guild.categories, name=category_name)
+            if category:
+                all_channels_in_category = [channel for channel in category.channels if isinstance(channel, discord.TextChannel)]
+                user_channel_roles = await channel_menu_cog.get_user_channel_roles(interaction.guild, interaction.user, all_channels_in_category)
+            else:
+                user_channel_roles = self.user_channel_roles
+        else:
+            user_channel_roles = self.user_channel_roles
+        
+        # Create new view with updated page
+        view = discord.ui.View(timeout=None)
+        view.bot = self.view.bot
+        view.add_item(CourseSelect(page_channels, self.year, self.view.bot, user_channel_roles, new_page, self.total_pages))
+        
+        # Add navigation buttons
+        view.add_item(PaginationButton("◀️", "prev", self.year, self.all_channels, user_channel_roles, new_page, self.total_pages, disabled=(new_page == 0)))
+        view.add_item(PaginationButton("▶️", "next", self.year, self.all_channels, user_channel_roles, new_page, self.total_pages, disabled=(new_page == self.total_pages - 1)))
+        
+        # Update embed
+        year_colors = {"1": discord.Color.green(), "2": discord.Color.gold(), "3": discord.Color.red()}
+        year_emojis = {"1": "🟩", "2": "🟨", "3": "🟥"}
+        
+        embed = discord.Embed(
+            title=f"{year_emojis[self.year]} Jaar {self.year} - Vakselectie (Pagina {new_page + 1}/{self.total_pages})",
+            description="Selecteer de vakken die je wilt volgen uit het dropdown menu hieronder.",
+            color=year_colors[self.year]
+        )
+        
+        if user_channel_roles:
+            embed.add_field(
+                name="✅ Je huidige selecties",
+                value=", ".join(user_channel_roles),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="ℹ️ Info",
+                value="Je hebt nog geen vakken geselecteerd.",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="📄 Paginatie",
+            value=f"Pagina {new_page + 1} van {self.total_pages} ({len(page_channels)} vakken op deze pagina)",
+            inline=False
+        )
+        
+        embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
 class YearSelectView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=None)
@@ -313,47 +442,21 @@ class ChannelMenu(commands.Cog):
             return self.channel_role_cache.get(guild_id, {})
     
     async def _find_channel_role(self, guild: discord.Guild, channel: discord.TextChannel) -> Optional[str]:
-        """Find the role name associated with a channel using comprehensive detection"""
+        """Find the role name associated with a channel using standard name resolver (simplified)"""
         # Format the channel name with spaces and proper capitalization
+        # Convert "programmeren-1" to "Programmeren 1"
         formatted_name = ' '.join(word.capitalize() for word in channel.name.replace('-', ' ').split())
         
-        # First priority: Check if there's a role named after the channel (with proper capitalization)
-        channel_specific_role = discord.utils.get(guild.roles, name=formatted_name)
-        if channel_specific_role:
+        # TEMPORARILY DISABLED: Complex role detection logic
+        # Just use the standard formatted name for role generation
+        # This ensures consistent role naming and avoids conflicts
+        
+        # Check if there's already a role with the formatted name
+        existing_role = discord.utils.get(guild.roles, name=formatted_name)
+        if existing_role:
             # Ensure this role has proper permissions for the channel
-            await channel.set_permissions(channel_specific_role, read_messages=True)
-            return channel_specific_role.name
-        
-        # Second priority: Check for exact match with channel name
-        channel_role_name = channel.name  # Exact match with channel name
-        channel_role = discord.utils.get(guild.roles, name=channel_role_name)
-        if channel_role:
-            await channel.set_permissions(channel_role, read_messages=True)
-            return channel_role.name
-        
-        # Third priority: Check for any role that contains the channel name (for custom roles)
-        for role in guild.roles:
-            # Skip default roles and roles with common names
-            if role == guild.default_role or role.name in ["Admin", "Moderator", "Bot", "everyone", "@everyone"]:
-                continue
-            
-            # Check if the role name contains the channel name (case insensitive)
-            if channel.name.lower() in role.name.lower():
-                # Ensure this role has proper permissions for the channel
-                await channel.set_permissions(role, read_messages=True)
-                return role.name
-        
-        # Fourth priority: Look for roles that have explicit read_messages=True for this channel
-        overwrites = channel.overwrites
-        for role_or_member, permissions in overwrites.items():
-            # Skip @everyone role and members
-            if role_or_member == guild.default_role or not isinstance(role_or_member, discord.Role):
-                continue
-            
-            # Check if this role has read_messages permission
-            if permissions.read_messages:
-                # Use this role - it already has the right permissions
-                return role_or_member.name
+            await channel.set_permissions(existing_role, read_messages=True)
+            return existing_role.name
         
         # If no existing role found, return the formatted name (will be created later)
         return formatted_name
