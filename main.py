@@ -454,6 +454,9 @@ class Bot(commands.Bot):
         await self.check_db_connection()
         await self.load_developer_ids()
         await self.setup_health_check()
+        
+        # Add global check to restrict all prefix commands to developers only
+        self.add_check(self.global_developer_check)
 
         # We have auto sync commands enabled, so we don't need to manually sync them.
         # with contextlib.suppress(Exception):
@@ -549,6 +552,31 @@ class Bot(commands.Bot):
             guild = self.get_guild(guild_id)
             if guild:
                 member = guild.get_member(user.id)
+                if member and member.guild_permissions.administrator:
+                    return True
+        
+        return False
+
+    async def global_developer_check(self, ctx: commands.Context) -> bool:
+        """Global check that restricts all prefix commands to developers only."""
+        # Only apply this check to prefix commands, not slash commands
+        if not ctx.prefix or ctx.prefix == "/":
+            return True
+        
+        # Use the same logic as the developer() decorator
+        settings = await self.db.settings.find_one({"_id": "server_settings"})
+        developer_ids = settings.get("developer_ids", []) if settings else []
+        
+        # If developers are configured, check if user is in the list
+        if developer_ids:
+            return ctx.author.id in developer_ids
+        
+        # If no developers are configured, fallback to server admins
+        guild_id = await self.get_guild_id()
+        if guild_id:
+            guild = self.get_guild(guild_id)
+            if guild:
+                member = guild.get_member(ctx.author.id)
                 if member and member.guild_permissions.administrator:
                     return True
         
