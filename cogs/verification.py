@@ -207,7 +207,8 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
                 "user_id": user_id,
                 "encrypted_email": encrypted_email
             })
-            self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
+            # Verification success logging disabled per user request
+            # self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
         except Exception as e:
             self.bot.log.error(f"Failed to store verification record for user {interaction.user} ({user_id}) with email {email}: {e}", exc_info=True)
             await interaction.response.send_message(
@@ -224,7 +225,8 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
         if role:
             try:
                 await interaction.user.add_roles(role)
-                self.bot.log.info(f"Assigned Verified role to user {interaction.user} ({user_id})")
+                # Role assignment success logging disabled per user request
+                # self.bot.log.info(f"Assigned Verified role to user {interaction.user} ({user_id})")
             except Exception as e:
                 self.bot.log.error(f"Failed to assign Verified role to user {interaction.user} ({user_id}): {e}", exc_info=True)
         else:
@@ -315,7 +317,8 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                         "encrypted_email": encrypted_email,
                         "migrated": True
                     })
-                    self.bot.log.info(f"Successfully migrated verification for user {interaction.user} ({user_id}) with email {old_email} (email bounced)")
+                    # Migration success logging disabled per user request
+                    # self.bot.log.info(f"Successfully migrated verification for user {interaction.user} ({user_id}) with email {old_email} (email bounced)")
                 except Exception as e:
                     self.bot.log.error(f"Failed to store migrated verification record for user {interaction.user} ({user_id}) with email {old_email}: {e}", exc_info=True)
                     await interaction.followup.send("❌ Er is een fout opgetreden bij het opslaan van je migratie. Probeer het opnieuw.", ephemeral=True)
@@ -327,7 +330,8 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 if role:
                     try:
                         await interaction.user.add_roles(role)
-                        self.bot.log.info(f"Assigned Verified role to migrated user {interaction.user} ({user_id})")
+                        # Migration role assignment success logging disabled per user request
+                        # self.bot.log.info(f"Assigned Verified role to migrated user {interaction.user} ({user_id})")
                     except Exception as e:
                         self.bot.log.error(f"Failed to assign Verified role to migrated user {interaction.user} ({user_id}): {e}", exc_info=True)
                 else:
