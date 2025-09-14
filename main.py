@@ -42,10 +42,6 @@ from utils.errors import (
     UnknownRole,
     UnknownUser,
 )
-
-# Constants
-DEFAULT_GUILD_ID = 1334456602324897792  # Default guild ID fallback
-
 # Parse command line arguments
 def str_to_bool(v):
     """Convert string to boolean for argument parsing."""
