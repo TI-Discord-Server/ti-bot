@@ -307,75 +307,99 @@ class RoleSelector(commands.Cog):
     
     async def show_role_select(self, interaction: discord.Interaction, category_name: str, message: str = None):
         """Show the role select menu for a category."""
-        # Get the categories
-        categories = await self.get_categories()
+        # Send immediate thinking response to avoid timeout
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         
-        # Find the selected category
-        category = next((c for c in categories if c.name == category_name), None)
-        if not category:
-            await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
-            return
+        # Build role selector in background
+        async def build_role_selector():
+            try:
+                # Get the categories
+                categories = await self.get_categories()
+                
+                # Find the selected category
+                category = next((c for c in categories if c.name == category_name), None)
+                if not category:
+                    if interaction.response.is_done():
+                        await interaction.followup.send("Deze categorie bestaat niet.", ephemeral=True)
+                    else:
+                        await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
+                    return
+                
+                # Create a new view
+                view = discord.ui.View(timeout=180)
+                
+                # Add a back button to return to category selection
+                back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+                
+                async def back_button_callback(back_interaction: discord.Interaction):
+                    # Create a new view with the category select
+                    category_view = discord.ui.View(timeout=180)
+                    category_view.add_item(CategorySelect(self, categories))
+                    
+                    # Create embed for category selection
+                    embed = discord.Embed(
+                        title="🎭 Rolselectie",
+                        description="Kies een categorie om rollen te beheren.",
+                        color=discord.Color.blue()
+                    )
+                    embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
+                    
+                    await back_interaction.response.edit_message(
+                        embed=embed,
+                        view=category_view
+                    )
+                
+                back_button.callback = back_button_callback
+                view.add_item(back_button)
+                
+                # Add the role select menu
+                view.add_item(RoleSelect(self, category_name, category.roles, interaction.user.roles))
+                
+                # Create embed for role selection
+                embed = discord.Embed(
+                    title=f"🎭 Rolselectie - {category_name}",
+                    description="Selecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen.",
+                    color=discord.Color.green()
+                )
+                
+                if message:
+                    embed.add_field(name="Status", value=message, inline=False)
+                
+                # Add available roles to the embed
+                role_list = []
+                for role in category.roles:
+                    user_has_role = any(user_role.name == role["role_name"] for user_role in interaction.user.roles)
+                    status = "✅" if user_has_role else "❌"
+                    role_list.append(f"{status} {role['emoji']} {role['name']}")
+                
+                if role_list:
+                    embed.add_field(
+                        name="Beschikbare Rollen",
+                        value="\n".join(role_list),
+                        inline=False
+                    )
+                
+                embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
+                
+                # Edit the deferred response with the role selector
+                if interaction.response.is_done():
+                    await interaction.edit_original_response(embed=embed, view=view)
+                else:
+                    await interaction.followup.edit_message(embed=embed, view=view)
+                    
+            except Exception as e:
+                self.bot.log.error(f"Error building role selector: {e}")
+                try:
+                    if interaction.response.is_done():
+                        await interaction.followup.send("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
+                    else:
+                        await interaction.response.send_message("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
+                except Exception:
+                    pass  # If we can't even send an error message, just log it
         
-        # Create a new view
-        view = discord.ui.View(timeout=180)
-        
-        # Add a back button to return to category selection
-        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
-        
-        async def back_button_callback(back_interaction: discord.Interaction):
-            # Create a new view with the category select
-            category_view = discord.ui.View(timeout=180)
-            category_view.add_item(CategorySelect(self, categories))
-            
-            # Create embed for category selection
-            embed = discord.Embed(
-                title="🎭 Rolselectie",
-                description="Kies een categorie om rollen te beheren.",
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
-            
-            await back_interaction.response.edit_message(
-                embed=embed,
-                view=category_view
-            )
-        
-        back_button.callback = back_button_callback
-        view.add_item(back_button)
-        
-        # Add the role select menu
-        view.add_item(RoleSelect(self, category_name, category.roles, interaction.user.roles))
-        
-        # Create embed for role selection
-        embed = discord.Embed(
-            title=f"🎭 Rolselectie - {category_name}",
-            description="Selecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen.",
-            color=discord.Color.green()
-        )
-        
-        if message:
-            embed.add_field(name="Status", value=message, inline=False)
-        
-        # Add available roles to the embed
-        role_list = []
-        for role in category.roles:
-            user_has_role = any(user_role.name == role["role_name"] for user_role in interaction.user.roles)
-            status = "✅" if user_has_role else "❌"
-            role_list.append(f"{status} {role['emoji']} {role['name']}")
-        
-        if role_list:
-            embed.add_field(
-                name="Beschikbare Rollen",
-                value="\n".join(role_list),
-                inline=False
-            )
-        
-        embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
-        
-        if interaction.response.is_done():
-            await interaction.edit_original_response(embed=embed, view=view)
-        else:
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        # Create background task to build role selector
+        asyncio.create_task(build_role_selector())
     
     async def update_role_select_message(self, interaction: discord.Interaction, category_name: str, message: str = None, user_roles = None):
         """Update the existing role select message instead of creating a new one."""
