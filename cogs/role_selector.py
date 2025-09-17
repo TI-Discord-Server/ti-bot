@@ -37,7 +37,7 @@ class CategorySelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="category_select"
+            custom_id="role_selector_category_select"
         )
         self.role_selector = role_selector
     
@@ -341,7 +341,7 @@ class RoleSelector(commands.Cog):
         for category in categories:
             role_list = []
             for role in category.roles:
-                role_list.append(f"{role['emoji']} → @{role['role_name']}")
+                role_list.append(f"{role['emoji']} → {role['role_name']}")
             
             embed.add_field(
                 name=f"**{category.name}**",

@@ -110,7 +110,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             for category in categories:
                 role_list = []
                 for role in category.roles:
-                    role_list.append(f"{role['emoji']} → @{role['role_name']}")
+                    role_list.append(f"{role['emoji']} → {role['role_name']}")
                 
                 embed.add_field(
                     name=f"**{category.name}**",
