@@ -38,6 +38,9 @@ class YearSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # Defer the interaction immediately to prevent timeout
+        await interaction.response.defer(ephemeral=True)
+        
         # Get the selected year
         year = self.values[0]
         
@@ -47,7 +50,7 @@ class YearSelect(discord.ui.Select):
         
         category = discord.utils.get(interaction.guild.categories, name=category_name)
         if not category:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Categorie {category_name} niet gevonden. Neem contact op met een beheerder.",
                 ephemeral=True
             )
@@ -57,7 +60,7 @@ class YearSelect(discord.ui.Select):
         channels = [channel for channel in category.channels if isinstance(channel, discord.TextChannel)]
         
         if not channels:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Geen kanalen gevonden in {category_name}. Neem contact op met een beheerder.",
                 ephemeral=True
             )
@@ -135,7 +138,7 @@ class YearSelect(discord.ui.Select):
         
         embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed,
             view=view,
             ephemeral=True
@@ -311,6 +314,9 @@ class PaginationButton(discord.ui.Button):
         )
     
     async def callback(self, interaction: discord.Interaction):
+        # Defer the interaction immediately to prevent timeout
+        await interaction.response.defer()
+        
         # Calculate new page
         if self.action == "prev":
             new_page = max(0, self.current_page - 1)
@@ -378,7 +384,7 @@ class PaginationButton(discord.ui.Button):
         
         embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
-        await interaction.response.edit_message(embed=embed, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
 
 
 class YearSelectView(discord.ui.View):
