@@ -324,11 +324,21 @@ class RoleSelector(commands.Cog):
         """Clear all cached role selector data."""
         self.role_selector_cache.clear()
     
-    async def update_role_menu_message(self, channel_id: int, message_id: int = None):
+    async def update_role_menu_message(self, channel_id: int, message_id: int = None, force_update: bool = False):
         """Update or create the role menu message."""
         channel = self.bot.get_channel(channel_id)
         if not channel:
             return None
+        
+        # Check if there are active interactions with this message to avoid interference
+        # Only skip update if not forced and there are active views
+        if not force_update and message_id and message_id in self.views:
+            # Check if the view is still active (has timeout or persistent components)
+            view = self.views.get(message_id)
+            if view and hasattr(view, 'timeout') and view.timeout is not None:
+                # Log that we're skipping update to avoid interference
+                self.bot.log.debug(f"Skipping role menu update to avoid interference with active interaction on message {message_id}")
+                return None
         
         # Create the embed
         embed = discord.Embed(
@@ -338,10 +348,20 @@ class RoleSelector(commands.Cog):
         )
         
         categories = await self.get_categories()
+        guild = channel.guild
+        
         for category in categories:
             role_list = []
             for role in category.roles:
-                role_list.append(f"{role['emoji']} → @{role['role_name']}")
+                # Try to get the actual Discord role for proper mention
+                discord_role = discord.utils.get(guild.roles, name=role['role_name']) if guild else None
+                if discord_role:
+                    role_display = discord_role.mention
+                else:
+                    # Fallback to plain text if role doesn't exist
+                    role_display = f"@{role['role_name']}"
+                
+                role_list.append(f"{role['emoji']} → {role_display}")
             
             embed.add_field(
                 name=f"**{category.name}**",

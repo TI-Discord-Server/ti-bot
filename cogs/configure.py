@@ -709,7 +709,7 @@ class RolesChannelsConfigView(BaseConfigView):
     async def manage_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage roles in categories."""
         view = RoleManagementView(self.bot, self.user_id, self.visible)
-        embed = await view.create_embed()
+        embed = await view.create_embed(interaction)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -1367,7 +1367,7 @@ class RoleCategoryManagementView(BaseConfigView):
 class RoleManagementView(BaseConfigView):
     """View for managing roles in categories."""
     
-    async def create_embed(self):
+    async def create_embed(self, interaction: discord.Interaction = None):
         """Create role management embed."""
         embed = discord.Embed(
             title="🎭 Rol Beheer",
@@ -1375,6 +1375,9 @@ class RoleManagementView(BaseConfigView):
             color=discord.Color.purple(),
             timestamp=datetime.datetime.now()
         )
+        
+        # Get guild for role mentions (if interaction is provided)
+        guild = interaction.guild if interaction else None
         
         # Get categories and their roles
         categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
@@ -1389,7 +1392,20 @@ class RoleManagementView(BaseConfigView):
                             emoji = role.get("emoji", "")
                             name = role.get("name", "")
                             role_name = role.get("role_name", "")
-                            role_list.append(f"{emoji} {name} → @{role_name}")
+                            
+                            # Try to get the actual Discord role for proper mention
+                            if guild:
+                                discord_role = discord.utils.get(guild.roles, name=role_name)
+                                if discord_role:
+                                    role_display = discord_role.mention
+                                else:
+                                    # Fallback to plain text if role doesn't exist
+                                    role_display = f"@{role_name}"
+                            else:
+                                # No guild context, use plain text
+                                role_display = f"@{role_name}"
+                            
+                            role_list.append(f"{emoji} {name} → {role_display}")
                         
                         embed.add_field(
                             name=f"📁 {category['name']}",
@@ -1473,12 +1489,13 @@ class AddCategoryModal(discord.ui.Modal):
                 upsert=True
             )
             
-            # Update role menu if it exists
+            # Update role menu if it exists (but don't force to avoid interference)
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
                 await role_selector_cog.update_role_menu_message(
                     role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_message_id,
+                    force_update=False
                 )
             
             # Return to category management
@@ -1535,12 +1552,13 @@ class RemoveCategoryModal(discord.ui.Modal):
                 upsert=True
             )
             
-            # Update role menu if it exists
+            # Update role menu if it exists (but don't force to avoid interference)
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
                 await role_selector_cog.update_role_menu_message(
                     role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_message_id,
+                    force_update=False
                 )
             
             # Return to category management
@@ -1649,12 +1667,13 @@ class AddRoleModal(discord.ui.Modal):
                 upsert=True
             )
             
-            # Update role menu if it exists
+            # Update role menu if it exists (but don't force to avoid interference)
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
                 await role_selector_cog.update_role_menu_message(
                     role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_message_id,
+                    force_update=False
                 )
             
             # Return to role management
@@ -1727,12 +1746,13 @@ class RemoveRoleModal(discord.ui.Modal):
                 upsert=True
             )
             
-            # Update role menu if it exists
+            # Update role menu if it exists (but don't force to avoid interference)
             role_selector_cog = self.bot.get_cog("RoleSelector")
             if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
                 await role_selector_cog.update_role_menu_message(
                     role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_message_id,
+                    force_update=False
                 )
             
             # Return to role management
