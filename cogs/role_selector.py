@@ -572,8 +572,7 @@ class RoleSelector(commands.Cog):
                 
                 await back_interaction.edit_original_response(
                     embed=embed,
-                    view=category_view,
-                    ephemeral=True
+                    view=category_view
                 )
             except Exception as e:
                 self.bot.log.error(f"Error in back button callback (update_role_select_message): {e}")
