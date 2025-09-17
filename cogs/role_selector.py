@@ -244,12 +244,13 @@ class RoleSelector(commands.Cog):
         # Invalidate cache when categories change
         self._invalidate_cache()
     
-    def _get_cache_key(self, category_name: str, user_roles: List[discord.Role]) -> str:
+    async def _get_cache_key(self, category_name: str, user_roles: List[discord.Role]) -> str:
         """Generate a cache key based on category and user roles."""
         try:
-            # Get roles for this category only from default categories (sync access)
+            # Get roles for this category from the current categories in the database
             category_role_names = set()
-            for cat in self.default_categories:  
+            categories = await self.get_categories()
+            for cat in categories:
                 if hasattr(cat, 'name') and cat.name == category_name:
                     # Handle RoleCategory object
                     category_role_names = {role["role_name"] for role in cat.roles}
