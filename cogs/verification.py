@@ -166,8 +166,16 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
                 self.bot.log.error(f"Discord interaction followup failed: {discord_error}")
                 # If email was sent but Discord followup failed, the user can still use the code
         
-        # Create background task to send email
-        asyncio.create_task(send_email_background())
+        # Create background task to send email and track exceptions
+        task = asyncio.create_task(send_email_background())
+        def _log_task_exception(task):
+            try:
+                exc = task.exception()
+                if exc:
+                    self.bot.log.error(f"Unhandled exception in send_email_background: {exc}")
+            except Exception as callback_exc:
+                self.bot.log.error(f"Exception in task done callback: {callback_exc}")
+        task.add_done_callback(_log_task_exception)
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
     code = ui.TextInput(label="Code", placeholder="6-cijferige code", required=True)
