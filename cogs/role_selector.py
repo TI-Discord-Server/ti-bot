@@ -269,9 +269,12 @@ class RoleSelector(commands.Cog):
                 
                 # Store the persistent view message in case it wasn't stored before
                 if self.bot.persistent_view_manager:
-                    await self.bot.persistent_view_manager.store_view_message(
-                        "role_selector", channel.id, message.id, channel.guild.id
-                    )
+                    try:
+                        await self.bot.persistent_view_manager.store_view_message(
+                            "role_selector", channel.id, message.id, channel.guild.id
+                        )
+                    except Exception as e:
+                        self.bot.log.warning(f"Failed to store persistent view for role selector: {e}")
                 
                 return message
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
@@ -293,9 +296,12 @@ class RoleSelector(commands.Cog):
         
         # Store the persistent view message
         if self.bot.persistent_view_manager:
-            await self.bot.persistent_view_manager.store_view_message(
-                "role_selector", channel.id, message.id, channel.guild.id
-            )
+            try:
+                await self.bot.persistent_view_manager.store_view_message(
+                    "role_selector", channel.id, message.id, channel.guild.id
+                )
+            except Exception as e:
+                self.bot.log.warning(f"Failed to store persistent view for role selector: {e}")
         
         return message
     
