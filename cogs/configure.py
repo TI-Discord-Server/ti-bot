@@ -1389,7 +1389,7 @@ class RoleManagementView(BaseConfigView):
                             emoji = role.get("emoji", "")
                             name = role.get("name", "")
                             role_name = role.get("role_name", "")
-                            role_list.append(f"{emoji} {name} → @{role_name}")
+                            role_list.append(f"{emoji} {name} → {role_name}")
                         
                         embed.add_field(
                             name=f"📁 {category['name']}",
