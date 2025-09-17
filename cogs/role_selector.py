@@ -43,6 +43,9 @@ class CategorySelect(discord.ui.Select):
     
     async def callback(self, interaction: discord.Interaction):
         try:
+            # Defer the interaction immediately to prevent timeout
+            await interaction.response.defer()
+            
             # Get the selected category
             selected_category = self.values[0]
             
@@ -51,11 +54,10 @@ class CategorySelect(discord.ui.Select):
         except Exception as e:
             self.role_selector.bot.log.error(f"Error in CategorySelect callback: {e}")
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                else:
-                    await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-            except Exception:
+                # Since we deferred the interaction, we can only use followup
+                await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+            except Exception as followup_error:
+                self.role_selector.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                 pass  # If we can't send an error message, just log it
 
 class RoleSelect(discord.ui.Select):
@@ -88,6 +90,9 @@ class RoleSelect(discord.ui.Select):
     
     async def callback(self, interaction: discord.Interaction):
         try:
+            # Defer the interaction immediately to prevent timeout
+            await interaction.response.defer()
+            
             # Get the guild and member
             guild = interaction.guild
             member = interaction.user
@@ -96,7 +101,7 @@ class RoleSelect(discord.ui.Select):
             categories = await self.role_selector.get_categories()
             category = next((c for c in categories if c.name == self.category_name), None)
             if not category:
-                await interaction.response.send_message("Deze categorie bestaat niet meer.", ephemeral=True)
+                await interaction.followup.send("Deze categorie bestaat niet meer.", ephemeral=True)
                 return
             
             # Get all role names in this category
@@ -128,11 +133,11 @@ class RoleSelect(discord.ui.Select):
                     await member.add_roles(*roles_to_add, reason="Role selector")
                     added_roles = [role.name for role in roles_to_add]
                 except discord.Forbidden:
-                    await interaction.response.send_message("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
+                    await interaction.followup.send("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error adding roles: {e}")
-                    await interaction.response.send_message("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
+                    await interaction.followup.send("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
                     return
             
             if roles_to_remove:
@@ -140,11 +145,11 @@ class RoleSelect(discord.ui.Select):
                     await member.remove_roles(*roles_to_remove, reason="Role selector")
                     removed_roles = [role.name for role in roles_to_remove]
                 except discord.Forbidden:
-                    await interaction.response.send_message("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
+                    await interaction.followup.send("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error removing roles: {e}")
-                    await interaction.response.send_message("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
+                    await interaction.followup.send("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
                     return
             
             # Send a confirmation message
@@ -169,12 +174,11 @@ class RoleSelect(discord.ui.Select):
             await self.role_selector.update_role_select_message(interaction, self.category_name, message, updated_member.roles)
         except Exception as e:
             self.role_selector.bot.log.error(f"Error in RoleSelect callback: {e}")
+            # Since we deferred the interaction, we can only use followup
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                else:
-                    await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-            except Exception:
+                await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+            except Exception as followup_error:
+                self.role_selector.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                 pass  # If we can't send an error message, just log it
 
 class RoleSelectorView(discord.ui.View):
@@ -396,7 +400,8 @@ class RoleSelector(commands.Cog):
     
     async def show_role_select(self, interaction: discord.Interaction, category_name: str, message: str = None):
         """Show the role select menu for a category."""
-        # Send immediate thinking response to avoid timeout
+        # The interaction should already be deferred by the calling component
+        # If not, defer it now to avoid timeout
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
         
@@ -412,11 +417,8 @@ class RoleSelector(commands.Cog):
                 # Create a fresh view based on cached data
                 view = await self._create_role_select_view(category_name, interaction.user.roles)
                 
-                # Send cached response immediately
-                if interaction.response.is_done():
-                    await interaction.edit_original_response(embed=cached_embed, view=view)
-                else:
-                    await interaction.response.send_message(embed=cached_embed, view=view)
+                # Since interaction is deferred, always use edit_original_response
+                await interaction.edit_original_response(embed=cached_embed, view=view)
                 
                 # Optionally refresh cache in background (non-blocking)
                 asyncio.create_task(self._refresh_cache_in_background(cache_key, category_name, interaction.user.roles))
@@ -433,10 +435,7 @@ class RoleSelector(commands.Cog):
                 # Find the selected category
                 category = next((c for c in categories if c.name == category_name), None)
                 if not category:
-                    if interaction.response.is_done():
-                        await interaction.followup.send("Deze categorie bestaat niet.", ephemeral=True)
-                    else:
-                        await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
+                    await interaction.followup.send("Deze categorie bestaat niet.", ephemeral=True)
                     return
                 
                 # Create a new view
@@ -447,6 +446,8 @@ class RoleSelector(commands.Cog):
                 
                 async def back_button_callback(back_interaction: discord.Interaction):
                     try:
+                        await back_interaction.response.defer()
+                        
                         # Create a new view with the category select
                         category_view = discord.ui.View(timeout=180)
                         category_view.add_item(CategorySelect(self, categories))
@@ -459,18 +460,16 @@ class RoleSelector(commands.Cog):
                         )
                         embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                         
-                        await back_interaction.response.edit_message(
+                        await back_interaction.edit_original_response(
                             embed=embed,
                             view=category_view
                         )
                     except Exception as e:
                         self.bot.log.error(f"Error in back button callback: {e}")
                         try:
-                            if not back_interaction.response.is_done():
-                                await back_interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                            else:
-                                await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                        except Exception:
+                            await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+                        except Exception as followup_error:
+                            self.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                             pass  # If we can't send an error message, just log it
                 
                 back_button.callback = back_button_callback
@@ -511,19 +510,14 @@ class RoleSelector(commands.Cog):
                     self._cache_result(cache_key, embed, view)
                 
                 # Edit the deferred response with the role selector
-                if interaction.response.is_done():
-                    await interaction.edit_original_response(embed=embed, view=view)
-                else:
-                    await interaction.response.send_message(embed=embed, view=view)
+                await interaction.edit_original_response(embed=embed, view=view)
                     
             except Exception as e:
                 self.bot.log.error(f"Error building role selector: {e}")
                 try:
-                    if interaction.response.is_done():
-                        await interaction.followup.send("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
-                    else:
-                        await interaction.response.send_message("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
-                except Exception:
+                    await interaction.followup.send("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
+                except Exception as edit_error:
+                    self.bot.log.error(f"Failed to edit interaction response: {edit_error}")
                     pass  # If we can't even send an error message, just log it
         
         # Create background task to build role selector
@@ -562,6 +556,8 @@ class RoleSelector(commands.Cog):
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
+                await back_interaction.response.defer()
+                
                 # Create a new view with the category select
                 category_view = discord.ui.View(timeout=180)
                 category_view.add_item(CategorySelect(self, categories))
@@ -574,18 +570,16 @@ class RoleSelector(commands.Cog):
                 )
                 embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                 
-                await back_interaction.response.edit_message(
+                await back_interaction.edit_original_response(
                     embed=embed,
                     view=category_view
                 )
             except Exception as e:
                 self.bot.log.error(f"Error in back button callback (update_role_select_message): {e}")
                 try:
-                    if not back_interaction.response.is_done():
-                        await back_interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                    else:
-                        await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                except Exception:
+                    await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+                except Exception as followup_error:
+                    self.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                     pass  # If we can't send an error message, just log it
         
         back_button.callback = back_button_callback
@@ -622,10 +616,8 @@ class RoleSelector(commands.Cog):
         
         # Check if interaction has already been responded to and use appropriate method
         try:
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed, view=view)
-            else:
-                await interaction.response.edit_message(embed=embed, view=view)
+            # Since the interaction was deferred in the callback, we should always edit the original response
+            await interaction.edit_original_response(embed=embed, view=view)
         except discord.HTTPException as e:
             # If editing fails, try to send a followup message instead
             if e.code == 10062:  # Unknown interaction
@@ -654,6 +646,8 @@ class RoleSelector(commands.Cog):
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
+                await back_interaction.response.defer()
+                
                 # Create a new view with the category select
                 category_view = discord.ui.View(timeout=180)
                 category_view.add_item(CategorySelect(self, categories))
@@ -666,18 +660,16 @@ class RoleSelector(commands.Cog):
                 )
                 embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                 
-                await back_interaction.response.edit_message(
+                await back_interaction.edit_original_response(
                     embed=embed,
                     view=category_view
                 )
             except Exception as e:
                 self.bot.log.error(f"Error in back button callback (_create_role_select_view): {e}")
                 try:
-                    if not back_interaction.response.is_done():
-                        await back_interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                    else:
-                        await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-                except Exception:
+                    await back_interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+                except Exception as followup_error:
+                    self.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                     pass  # If we can't send an error message, just log it
         
         back_button.callback = back_button_callback
