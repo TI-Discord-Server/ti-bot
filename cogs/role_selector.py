@@ -3,6 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 from typing import List, Dict, Optional, Union, Any
 import asyncio
+import hashlib
+import time
 
 from utils.has_role import has_role
 
@@ -139,6 +141,12 @@ class RoleSelect(discord.ui.Select):
         # Update the view with the new role selections (edit the existing message)
         # Refresh the member object to get updated roles
         updated_member = await interaction.guild.fetch_member(interaction.user.id)
+        
+        # Invalidate cache for this user since roles changed
+        cache_key = self.role_selector._get_cache_key(self.category_name, updated_member.roles)
+        if cache_key in self.role_selector.role_selector_cache:
+            del self.role_selector.role_selector_cache[cache_key]
+        
         await self.role_selector.update_role_select_message(interaction, self.category_name, message, updated_member.roles)
 
 class RoleSelectorView(discord.ui.View):
@@ -161,6 +169,9 @@ class RoleSelector(commands.Cog):
         self.role_menu_message_id = None
         self.role_menu_channel_id = None
         self.views = {}  # Store views by message ID
+        # Cache for role selector embeds and views by category and user role state
+        self.role_selector_cache = {}  # key: cache_key, value: {"embed": embed, "view": view, "timestamp": timestamp}
+        self.cache_duration = 300  # 5 minutes cache duration
         self.default_categories = [
             RoleCategory("Campussen", [
                 {"name": "Gent", "emoji": "🏙️", "role_name": "Gent"},
@@ -230,6 +241,56 @@ class RoleSelector(commands.Cog):
             {"$set": {"categories": [category.to_dict() for category in categories]}},
             upsert=True
         )
+        # Invalidate cache when categories change
+        self._invalidate_cache()
+    
+    async def _get_cache_key(self, category_name: str, user_roles: List[discord.Role]) -> str:
+        """Generate a cache key based on category and user roles."""
+        try:
+            # Get roles for this category from the current categories in the database
+            category_role_names = set()
+            categories = await self.get_categories()
+            for cat in categories:
+                if hasattr(cat, 'name') and cat.name == category_name:
+                    # Handle RoleCategory object
+                    category_role_names = {role["role_name"] for role in cat.roles}
+                    break
+                elif isinstance(cat, dict) and cat.get("name") == category_name:
+                    # Handle dict format
+                    category_role_names = {role["role_name"] for role in cat.get("roles", [])}
+                    break
+            
+            # Get user's relevant roles for this category
+            user_category_roles = sorted([role.name for role in user_roles if role.name in category_role_names])
+            roles_hash = hashlib.sha256(str(user_category_roles).encode()).hexdigest()
+            return f"{category_name}:{roles_hash}"
+        except Exception as e:
+            self.bot.log.warning(f"Error generating cache key: {e}")
+            # Fallback to simple key if there's any issue
+            return f"{category_name}:default"
+    
+    def _get_cached_result(self, cache_key: str) -> Optional[Dict]:
+        """Get cached embed and view if still valid."""
+        if cache_key in self.role_selector_cache:
+            cached = self.role_selector_cache[cache_key]
+            if time.time() - cached["timestamp"] < self.cache_duration:
+                return cached
+            else:
+                # Remove expired cache entry
+                del self.role_selector_cache[cache_key]
+        return None
+    
+    def _cache_result(self, cache_key: str, embed: discord.Embed, view: discord.ui.View):
+        """Cache the embed and view for future use."""
+        self.role_selector_cache[cache_key] = {
+            "embed": embed,
+            "view": view,
+            "timestamp": time.time()
+        }
+    
+    def _invalidate_cache(self):
+        """Clear all cached role selector data."""
+        self.role_selector_cache.clear()
     
     async def update_role_menu_message(self, channel_id: int, message_id: int = None):
         """Update or create the role menu message."""
@@ -311,6 +372,30 @@ class RoleSelector(commands.Cog):
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
         
+        # Check cache first for quick response
+        cache_key = self._get_cache_key(category_name, interaction.user.roles)
+        cached_result = self._get_cached_result(cache_key)
+        
+        if cached_result and not message:  # Only use cache if no status message is needed
+            try:
+                # Use cached embed and create new view (views can't be reused)
+                cached_embed = cached_result["embed"]
+                
+                # Create a fresh view based on cached data
+                view = await self._create_role_select_view(category_name, interaction.user.roles)
+                
+                # Send cached response immediately
+                if interaction.response.is_done():
+                    await interaction.edit_original_response(embed=cached_embed, view=view)
+                else:
+                    await interaction.response.send_message(embed=cached_embed, view=view)
+                
+                # Optionally refresh cache in background (non-blocking)
+                asyncio.create_task(self._refresh_cache_in_background(cache_key, category_name, interaction.user.roles))
+                return
+            except Exception as e:
+                self.bot.log.warning(f"Failed to use cached role selector, falling back to full build: {e}")
+        
         # Build role selector in background
         async def build_role_selector():
             try:
@@ -381,6 +466,11 @@ class RoleSelector(commands.Cog):
                     )
                 
                 embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
+                
+                # Cache the result if no status message (for future quick access)
+                if not message:
+                    cache_key = self._get_cache_key(category_name, interaction.user.roles)
+                    self._cache_result(cache_key, embed, view)
                 
                 # Edit the deferred response with the role selector
                 if interaction.response.is_done():
@@ -502,6 +592,83 @@ class RoleSelector(commands.Cog):
                 except Exception:
                     pass  # If followup also fails, just give up
     
+    async def _create_role_select_view(self, category_name: str, user_roles: List[discord.Role]) -> discord.ui.View:
+        """Create a fresh role select view for the given category and user roles."""
+        categories = await self.get_categories()
+        category = next((c for c in categories if c.name == category_name), None)
+        if not category:
+            return discord.ui.View(timeout=180)
+        
+        view = discord.ui.View(timeout=180)
+        
+        # Add a back button to return to category selection
+        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+        
+        async def back_button_callback(back_interaction: discord.Interaction):
+            # Create a new view with the category select
+            category_view = discord.ui.View(timeout=180)
+            category_view.add_item(CategorySelect(self, categories))
+            
+            # Create embed for category selection
+            embed = discord.Embed(
+                title="🎭 Rolselectie",
+                description="Kies een categorie om rollen te beheren.",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
+            
+            await back_interaction.response.edit_message(
+                embed=embed,
+                view=category_view
+            )
+        
+        back_button.callback = back_button_callback
+        view.add_item(back_button)
+        
+        # Add the role select menu
+        view.add_item(RoleSelect(self, category_name, category.roles, user_roles))
+        
+        return view
+    
+    async def _refresh_cache_in_background(self, cache_key: str, category_name: str, user_roles: List[discord.Role]):
+        """Refresh cache entry in background to keep it up to date."""
+        try:
+            categories = await self.get_categories()
+            category = next((c for c in categories if c.name == category_name), None)
+            if not category:
+                return
+            
+            # Create fresh embed
+            embed = discord.Embed(
+                title=f"🎭 Rolselectie - {category_name}",
+                description="Selecteer de rollen die je wilt hebben. Deselecteer rollen die je wilt verwijderen.",
+                color=discord.Color.green()
+            )
+            
+            # Add available roles to the embed
+            role_list = []
+            for role in category.roles:
+                user_has_role = any(user_role.name == role["role_name"] for user_role in user_roles)
+                status = "✅" if user_has_role else "❌"
+                role_list.append(f"{status} {role['emoji']} {role['name']}")
+            
+            if role_list:
+                embed.add_field(
+                    name="Beschikbare Rollen",
+                    value="\n".join(role_list),
+                    inline=False
+                )
+            
+            embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
+            
+            # Create fresh view
+            view = await self._create_role_select_view(category_name, user_roles)
+            
+            # Update cache
+            self._cache_result(cache_key, embed, view)
+            
+        except Exception as e:
+            self.bot.log.warning(f"Failed to refresh cache in background: {e}")
 
 
 async def setup(bot):
