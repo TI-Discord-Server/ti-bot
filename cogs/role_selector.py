@@ -386,7 +386,7 @@ class RoleSelector(commands.Cog):
                 if interaction.response.is_done():
                     await interaction.edit_original_response(embed=embed, view=view)
                 else:
-                    await interaction.followup.edit_message(embed=embed, view=view)
+                    await interaction.response.send_message(embed=embed, view=view)
                     
             except Exception as e:
                 self.bot.log.error(f"Error building role selector: {e}")
