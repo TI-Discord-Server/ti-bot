@@ -442,7 +442,7 @@ class RoleSelector(commands.Cog):
                 view = discord.ui.View(timeout=180)
                 
                 # Add a back button to return to category selection
-                back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+                back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button_show_role_select")
                 
                 async def back_button_callback(back_interaction: discord.Interaction):
                     try:
@@ -552,7 +552,7 @@ class RoleSelector(commands.Cog):
         view = discord.ui.View(timeout=180)
         
         # Add a back button to return to category selection
-        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button_update_role_select")
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
@@ -642,7 +642,7 @@ class RoleSelector(commands.Cog):
         view = discord.ui.View(timeout=180)
         
         # Add a back button to return to category selection
-        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button")
+        back_button = discord.ui.Button(label="Terug naar categorieën", style=discord.ButtonStyle.secondary, custom_id="back_button_create_role_select_view")
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
