@@ -38,36 +38,57 @@ class YearSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Defer the interaction immediately to prevent timeout
-        await interaction.response.defer(ephemeral=True)
+        try:
+            # Defer the interaction immediately to prevent timeout
+            await interaction.response.defer(ephemeral=True)
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in YearSelect, cannot respond")
+                return
+            else:
+                self.bot.log.error(f"Failed to defer interaction in YearSelect: {e}")
+                return
         
-        # Get the selected year
-        year = self.values[0]
-        
-        # Get all channels in the selected year category
-        year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
-        category_name = f"━━━ {year_emoji_map[year]} {year}E JAAR ━━━"
-        
-        category = discord.utils.get(interaction.guild.categories, name=category_name)
-        if not category:
-            await interaction.followup.send(
-                f"Categorie {category_name} niet gevonden. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
-            return
-        
-        # Get all text channels in this category
-        channels = [channel for channel in category.channels if isinstance(channel, discord.TextChannel)]
-        
-        if not channels:
-            await interaction.followup.send(
-                f"Geen kanalen gevonden in {category_name}. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
-            return
-        
-        # Get the user's current roles for this year's channels using the cache
-        channel_menu_cog = self.bot.get_cog('ChannelMenu')
+        try:
+            # Get the selected year
+            year = self.values[0]
+            
+            # Get all channels in the selected year category
+            year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
+            category_name = f"━━━ {year_emoji_map[year]} {year}E JAAR ━━━"
+            
+            category = discord.utils.get(interaction.guild.categories, name=category_name)
+            if not category:
+                try:
+                    await interaction.followup.send(
+                        f"Categorie {category_name} niet gevonden. Neem contact op met een beheerder.",
+                        ephemeral=True
+                    )
+                except discord.HTTPException as e:
+                    if e.code == 10062:  # Unknown interaction
+                        self.bot.log.warning(f"Interaction expired (10062) in YearSelect, cannot send error message")
+                    else:
+                        self.bot.log.error(f"Failed to send error message in YearSelect: {e}")
+                return
+            
+            # Get all text channels in this category
+            channels = [channel for channel in category.channels if isinstance(channel, discord.TextChannel)]
+            
+            if not channels:
+                try:
+                    await interaction.followup.send(
+                        f"Geen kanalen gevonden in {category_name}. Neem contact op met een beheerder.",
+                        ephemeral=True
+                    )
+                except discord.HTTPException as e:
+                    if e.code == 10062:  # Unknown interaction
+                        self.bot.log.warning(f"Interaction expired (10062) in YearSelect, cannot send error message")
+                    else:
+                        self.bot.log.error(f"Failed to send error message in YearSelect: {e}")
+                return
+            
+            # Get the user's current roles for this year's channels using the cache
+            channel_menu_cog = self.bot.get_cog('ChannelMenu')
         if channel_menu_cog:
             user_channel_roles = await channel_menu_cog.get_user_channel_roles(interaction.guild, interaction.user, channels)
         else:
@@ -138,11 +159,33 @@ class YearSelect(discord.ui.Select):
         
         embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
-        await interaction.followup.send(
-            embed=embed,
-            view=view,
-            ephemeral=True
-        )
+        try:
+            await interaction.followup.send(
+                embed=embed,
+                view=view,
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in YearSelect, cannot send final response")
+                # Interaction expired, try to send as regular message to user via DM
+                try:
+                    await interaction.user.send(
+                        content="Je jaar selectie kon niet worden verwerkt omdat de interactie verlopen is. Probeer het opnieuw.",
+                        embed=embed,
+                        view=view
+                    )
+                except Exception as dm_error:
+                    self.bot.log.error(f"Failed to send DM fallback message: {dm_error}")
+            else:
+                self.bot.log.error(f"Failed to send response in YearSelect: {e}")
+        
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error in YearSelect callback: {e}")
+            try:
+                await interaction.followup.send("Er is een onverwachte fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+            except Exception:
+                pass  # If we can't send error message, just log it
 
 
 class CourseSelect(discord.ui.Select):
@@ -191,13 +234,27 @@ class CourseSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in CourseSelect, cannot respond")
+                return
+            else:
+                self.bot.log.error(f"Failed to defer interaction in CourseSelect: {e}")
+                return
         
         try:
             # Get the channel menu cog for cache access
             channel_menu_cog = self.bot.get_cog('ChannelMenu')
             if not channel_menu_cog:
-                await interaction.followup.send("Kanaal menu systeem niet beschikbaar.", ephemeral=True)
+                try:
+                    await interaction.followup.send("Kanaal menu systeem niet beschikbaar.", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:  # Unknown interaction
+                        self.bot.log.warning(f"Interaction expired (10062) in CourseSelect, cannot send error message")
+                    else:
+                        self.bot.log.error(f"Failed to send error message in CourseSelect: {e}")
                 return
             
             # Get the channel-role mapping from cache
@@ -282,19 +339,45 @@ class CourseSelect(discord.ui.Select):
             )
             embed.set_footer(text="Gebruik het menu opnieuw om je selecties te wijzigen")
             
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except discord.HTTPException as e:
+                if e.code == 10062:  # Unknown interaction
+                    self.bot.log.warning(f"Interaction expired (10062) in CourseSelect, cannot send final response")
+                    # Interaction expired, try to send as regular message to user via DM
+                    try:
+                        await interaction.user.send(
+                            content="Je vakselectie is bijgewerkt maar de bevestiging kon niet worden getoond omdat de interactie verlopen is.",
+                            embed=embed
+                        )
+                    except Exception as dm_error:
+                        self.bot.log.error(f"Failed to send DM fallback message: {dm_error}")
+                else:
+                    self.bot.log.error(f"Failed to send response in CourseSelect: {e}")
                 
         except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ Ik heb geen toestemming om rollen te beheren. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Ik heb geen toestemming om rollen te beheren. Neem contact op met een beheerder.",
+                    ephemeral=True
+                )
+            except discord.HTTPException as e:
+                if e.code == 10062:  # Unknown interaction
+                    self.bot.log.warning(f"Interaction expired (10062) in CourseSelect, cannot send forbidden error")
+                else:
+                    self.bot.log.error(f"Failed to send forbidden error in CourseSelect: {e}")
         except Exception as e:
             self.bot.log.error(f"Error in CourseSelect callback: {e}", exc_info=True)
-            await interaction.followup.send(
-                f"❌ Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"❌ Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
+                    ephemeral=True
+                )
+            except discord.HTTPException as e:
+                if e.code == 10062:  # Unknown interaction
+                    self.bot.log.warning(f"Interaction expired (10062) in CourseSelect, cannot send general error")
+                else:
+                    self.bot.log.error(f"Failed to send general error in CourseSelect: {e}")
 
 
 class PaginationButton(discord.ui.Button):
@@ -314,8 +397,16 @@ class PaginationButton(discord.ui.Button):
         )
     
     async def callback(self, interaction: discord.Interaction):
-        # Defer the interaction immediately to prevent timeout
-        await interaction.response.defer()
+        try:
+            # Defer the interaction immediately to prevent timeout
+            await interaction.response.defer()
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in PaginationButton, cannot respond")
+                return
+            else:
+                self.bot.log.error(f"Failed to defer interaction in PaginationButton: {e}")
+                return
         
         # Calculate new page
         if self.action == "prev":
@@ -384,7 +475,19 @@ class PaginationButton(discord.ui.Button):
         
         embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
         
-        await interaction.edit_original_response(embed=embed, view=view)
+        try:
+            await interaction.edit_original_response(embed=embed, view=view)
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in PaginationButton, cannot edit response")
+            else:
+                self.bot.log.error(f"Failed to edit response in PaginationButton: {e}")
+        except Exception as e:
+            self.bot.log.error(f"Unexpected error in PaginationButton callback: {e}")
+            try:
+                await interaction.followup.send("Er is een fout opgetreden bij het wijzigen van de pagina.", ephemeral=True)
+            except Exception:
+                pass  # If we can't send error message, just log it
 
 
 class YearSelectView(discord.ui.View):

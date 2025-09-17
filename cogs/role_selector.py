@@ -45,7 +45,15 @@ class CategorySelect(discord.ui.Select):
         try:
             # Defer the interaction immediately to prevent timeout
             await interaction.response.defer()
-            
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.role_selector.bot.log.warning(f"Interaction expired (10062) in CategorySelect, cannot respond")
+                return
+            else:
+                self.role_selector.bot.log.error(f"Failed to defer interaction in CategorySelect: {e}")
+                return
+        
+        try:
             # Get the selected category
             selected_category = self.values[0]
             
@@ -56,6 +64,11 @@ class CategorySelect(discord.ui.Select):
             try:
                 # Since we deferred the interaction, we can only use followup
                 await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+            except discord.HTTPException as e:
+                if e.code == 10062:  # Unknown interaction
+                    self.role_selector.bot.log.warning(f"Interaction expired (10062) in CategorySelect, cannot send error message")
+                else:
+                    self.role_selector.bot.log.error(f"Failed to send error message in CategorySelect: {e}")
             except Exception as followup_error:
                 self.role_selector.bot.log.error(f"Failed to send error message via followup: {followup_error}")
                 pass  # If we can't send an error message, just log it
@@ -92,7 +105,15 @@ class RoleSelect(discord.ui.Select):
         try:
             # Defer the interaction immediately to prevent timeout
             await interaction.response.defer()
-            
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction
+                self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot respond")
+                return
+            else:
+                self.role_selector.bot.log.error(f"Failed to defer interaction in RoleSelect: {e}")
+                return
+        
+        try:
             # Get the guild and member
             guild = interaction.guild
             member = interaction.user
@@ -101,7 +122,13 @@ class RoleSelect(discord.ui.Select):
             categories = await self.role_selector.get_categories()
             category = next((c for c in categories if c.name == self.category_name), None)
             if not category:
-                await interaction.followup.send("Deze categorie bestaat niet meer.", ephemeral=True)
+                try:
+                    await interaction.followup.send("Deze categorie bestaat niet meer.", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:  # Unknown interaction
+                        self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot send error message")
+                    else:
+                        self.role_selector.bot.log.error(f"Failed to send error message in RoleSelect: {e}")
                 return
             
             # Get all role names in this category
@@ -133,11 +160,23 @@ class RoleSelect(discord.ui.Select):
                     await member.add_roles(*roles_to_add, reason="Role selector")
                     added_roles = [role.name for role in roles_to_add]
                 except discord.Forbidden:
-                    await interaction.followup.send("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
+                    try:
+                        await interaction.followup.send("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
+                    except discord.HTTPException as e:
+                        if e.code == 10062:  # Unknown interaction
+                            self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot send forbidden error")
+                        else:
+                            self.role_selector.bot.log.error(f"Failed to send forbidden error in RoleSelect: {e}")
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error adding roles: {e}")
-                    await interaction.followup.send("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
+                    try:
+                        await interaction.followup.send("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
+                    except discord.HTTPException as e:
+                        if e.code == 10062:  # Unknown interaction
+                            self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot send add roles error")
+                        else:
+                            self.role_selector.bot.log.error(f"Failed to send add roles error in RoleSelect: {e}")
                     return
             
             if roles_to_remove:
@@ -145,11 +184,23 @@ class RoleSelect(discord.ui.Select):
                     await member.remove_roles(*roles_to_remove, reason="Role selector")
                     removed_roles = [role.name for role in roles_to_remove]
                 except discord.Forbidden:
-                    await interaction.followup.send("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
+                    try:
+                        await interaction.followup.send("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
+                    except discord.HTTPException as e:
+                        if e.code == 10062:  # Unknown interaction
+                            self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot send forbidden error")
+                        else:
+                            self.role_selector.bot.log.error(f"Failed to send forbidden error in RoleSelect: {e}")
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error removing roles: {e}")
-                    await interaction.followup.send("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
+                    try:
+                        await interaction.followup.send("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
+                    except discord.HTTPException as e:
+                        if e.code == 10062:  # Unknown interaction
+                            self.role_selector.bot.log.warning(f"Interaction expired (10062) in RoleSelect, cannot send remove roles error")
+                        else:
+                            self.role_selector.bot.log.error(f"Failed to send remove roles error in RoleSelect: {e}")
                     return
             
             # Send a confirmation message
