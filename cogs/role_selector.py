@@ -435,7 +435,7 @@ class RoleSelector(commands.Cog):
                 # Find the selected category
                 category = next((c for c in categories if c.name == category_name), None)
                 if not category:
-                    await interaction.edit_original_response(content="Deze categorie bestaat niet.")
+                    await interaction.followup.send(content="Deze categorie bestaat niet.", ephemeral=True)
                     return
                 
                 # Create a new view
