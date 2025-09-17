@@ -10,6 +10,7 @@ MONGODB_PASSWORD: Final[str] = cast(str, getenv("MONGODB_PASSWORD"))
 MONGODB_IP_ADDRESS: Final[str] = cast(str, getenv("MONGODB_IP_ADDRESS"))
 MONGODB_PORT: Final[str] = cast(str, getenv("MONGODB_PORT", "27017"))
 MONGODB_USERNAME: Final[str] = cast(str, getenv("MONGODB_USERNAME", "dev"))
+MONGODB_DB: Final[str] = cast(str, getenv("MONGODB_DB"))
 WEBHOOK_URL: Final[str] = cast(str, getenv("WEBHOOK_URL"))
 SMTP_PASSWORD: Final[str] = cast(str, getenv("SMTP_PASSWORD", ""))
 SMTP_EMAIL: Final[str] = cast(str, getenv("SMTP_EMAIL", "toegepasteinformaticadiscord@gmail.com"))
@@ -27,6 +28,13 @@ MIGRATION_IMAP_PORT: Final[int] = int(cast(str, getenv("MIGRATION_IMAP_PORT", "9
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
+DISCORD_GUILD_ID_RAW = getenv("DISCORD_GUILD_ID", "").strip()
+
+if DISCORD_GUILD_ID_RAW.isdigit():
+    DISCORD_GUILD_ID: Final[int] = int(DISCORD_GUILD_ID_RAW)
+else:
+    DISCORD_GUILD_ID: Final[int] = 771394209419624489  # fallback
+
 
 
 __all__: Final[Tuple[str, ...]] = (
@@ -35,6 +43,7 @@ __all__: Final[Tuple[str, ...]] = (
     "MONGODB_IP_ADDRESS",
     "MONGODB_PORT",
     "MONGODB_USERNAME",
+    "MONGODB_DB",
     "WEBHOOK_URL",
     "SMTP_PASSWORD",
     "SMTP_EMAIL",
@@ -51,4 +60,5 @@ __all__: Final[Tuple[str, ...]] = (
     "ENCRYPTION_KEY",
     "OLD_CONNECTION_STRING",
     "POD_UID",
+    "DISCORD_GUILD_ID",
 )

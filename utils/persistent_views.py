@@ -171,7 +171,15 @@ class PersistentViewManager:
                 role_selector_cog = self.bot.get_cog("RoleSelector")
                 if role_selector_cog:
                     from cogs.role_selector import RoleSelectorView
-                    return RoleSelectorView(role_selector_cog)
+                    view = RoleSelectorView(role_selector_cog)
+                    # Refresh the view with current categories
+                    try:
+                        categories = await role_selector_cog.get_categories()
+                        await view.refresh(categories)
+                    except Exception as e:
+                        logger.error(f"Failed to refresh role selector view with categories: {e}")
+                        # Return the view anyway, it will work with empty categories
+                    return view
             
             elif view_type == "channel_menu":
                 from cogs.channel_menu import YearSelectView

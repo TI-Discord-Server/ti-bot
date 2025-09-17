@@ -29,6 +29,8 @@ from env import (
     MONGODB_IP_ADDRESS,
     MONGODB_PORT,
     MONGODB_USERNAME,
+    MONGODB_DB,
+    DISCORD_GUILD_ID,
     WEBHOOK_URL,
 
     POD_UID,
@@ -42,7 +44,55 @@ from utils.errors import (
     UnknownRole,
     UnknownUser,
 )
-DEFAULT_GUILD_ID = 771394209419624489  # Default guild ID fallback
+
+# ===== Begin ENV-compat helpers (compatible with your .env.example) =====
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+def _ensure_query_params(uri: str, extra: dict[str, str]) -> str:
+    """Merge query params into a MongoDB URI correctly."""
+    parts = urlsplit(uri)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    q.update({k: str(v) for k, v in extra.items() if v is not None})
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(q), parts.fragment))
+
+def _pick(name: str, default: str | None = None) -> str | None:
+    """Pick base env var; if not set, return default. (No per-ENV suffixes required)"""
+    return os.getenv(name) or default
+
+def _resolve_db_name() -> str:
+    """
+    Choose database name:
+    Always MONGODB_DB from env, no fallback.
+    """
+    if not MONGODB_DB:
+        raise RuntimeError("MONGODB_DB must be set in your .env")
+    return MONGODB_DB
+
+def _build_uri_from_example_env() -> tuple[str, str]:
+    """
+    Build a mongodb:// URI using only variables present in your .env.example.
+    AuthSource is omitted (default server-side). AuthMechanism SCRAM is set if auth used.
+    """
+    host = _pick("MONGODB_IP_ADDRESS", MONGODB_IP_ADDRESS or "localhost")
+    port = _pick("MONGODB_PORT", MONGODB_PORT or "27017")
+    user = MONGODB_USERNAME or ""
+    pwd = MONGODB_PASSWORD or ""
+    db_name = _resolve_db_name()
+
+    if user and pwd:
+        # user/pwd zijn hierboven al URL-encoded
+        uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{host}:{port}/{db_name}"
+        uri = _ensure_query_params(uri, {
+        "authMechanism": "SCRAM-SHA-256",
+        "authSource": db_name,
+    })
+    else:
+        uri = f"mongodb://{host}:{port}/{db_name}"
+
+    return uri, db_name
+# ===== End ENV-compat helpers =====
+
+DEFAULT_GUILD_ID = int(DISCORD_GUILD_ID) if DISCORD_GUILD_ID else 771394209419624489
 # Parse command line arguments
 def str_to_bool(v):
     """Convert string to boolean for argument parsing."""
@@ -125,8 +175,17 @@ class DiscordWebhookHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            # Schedule the asynchronous sending of the log record.
-            asyncio.create_task(self._async_emit(record))
+            loop = None
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                loop.create_task(self._async_emit(record))
+            else:
+                # Geen loop actief → run synchronously
+                asyncio.run(self._async_emit(record))
         except Exception:
             self.handleError(record)
 
@@ -274,26 +333,21 @@ class DiscordWebhookHandler(logging.Handler):
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-        # Connect to the MongoDB database with the async version of pymongo
-        mongodb_host = MONGODB_IP_ADDRESS or "localhost"
-        mongodb_port = MONGODB_PORT or "27017"
-        
-        if MONGODB_USERNAME and MONGODB_PASSWORD:
-            connection_string = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{mongodb_host}:{mongodb_port}/{MONGODB_USERNAME}?authMechanism=SCRAM-SHA-256"
-        else:
-            # No authentication
-            connection_string = f"mongodb://{mongodb_host}:{mongodb_port}/"
-        
-        # Add TLS parameters if TLS is enabled
+                # ===== MongoDB init (compatible with your .env.example) =====
+        uri, db_name = _build_uri_from_example_env()
+
+        # Voeg TLS toe indien CLI-flag gebruikt
         if args.tls:
-            connection_string += "&tls=true&tlsInsecure=true"
-            
+            uri = _ensure_query_params(uri, {"tls": "true", "tlsInsecure": "true"})
+
         motor = AsyncIOMotorClient(
-            connection_string,
+            uri,
             connect=True,
         )
         motor.get_io_loop = asyncio.get_running_loop
-        self.db = motor.bot
+        self.db = motor[db_name]
+        # ===== End MongoDB init =====
+
         self.color = discord.Color.blurple()
         self.token = BOT_TOKEN
         loop = asyncio.new_event_loop()
@@ -418,10 +472,14 @@ class Bot(commands.Bot):
             loop.create_task(self.graceful_shutdown())
         
         # Register signal handlers (SIGTERM for Kubernetes, SIGINT for Ctrl+C)
-        if hasattr(signal, 'SIGTERM'):
-            loop.add_signal_handler(signal.SIGTERM, signal_handler)
-        if hasattr(signal, 'SIGINT'):
-            loop.add_signal_handler(signal.SIGINT, signal_handler)
+        try:
+            if hasattr(signal, 'SIGTERM'):
+                loop.add_signal_handler(signal.SIGTERM, signal_handler)
+            if hasattr(signal, 'SIGINT'):
+                loop.add_signal_handler(signal.SIGINT, signal_handler)
+        except NotImplementedError:
+            # Signal handlers are not implemented on Windows for subprocesses
+            self.log.warning("Signal handlers not implemented in this environment; graceful shutdown may not work as expected.")
         
         loop.run_until_complete(self.__init())
 

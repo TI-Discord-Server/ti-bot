@@ -110,7 +110,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             for category in categories:
                 role_list = []
                 for role in category.roles:
-                    role_list.append(f"{role['emoji']} → @{role['role_name']}")
+                    role_list.append(f"{role['emoji']} → {role['role_name']}")
                 
                 embed.add_field(
                     name=f"**{category.name}**",
@@ -123,20 +123,24 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             view = RoleSelectorView(role_selector_cog)
             view.add_item(CategorySelect(role_selector_cog, categories))
             
+            # Always send the role menu as a separate message to the target channel
+            message = await target_channel.send(embed=embed, view=view)
+            
+            # Always respond with an ephemeral confirmation
             if target_channel == interaction.channel:
-                await interaction.response.send_message(embed=embed, view=view)
-                # Get the message from the interaction response
-                message = await interaction.original_response()
+                await interaction.response.send_message("✅ Role menu is aangemaakt!", ephemeral=True)
             else:
-                message = await target_channel.send(embed=embed, view=view)
                 await interaction.response.send_message(
                     f"✅ Role menu ingesteld in {target_channel.mention}", ephemeral=True)
             
-            # Store the persistent view message
+            # Store the persistent view message (but don't track it as the main role menu)
             if self.bot.persistent_view_manager:
                 await self.bot.persistent_view_manager.store_view_message(
                     "role_selector", target_channel.id, message.id, interaction.guild.id
                 )
+            
+            # Note: We don't update the role_selector cog's tracked message IDs here 
+            # because setup creates independent static messages that should never be edited
             
             self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup role menu in {target_channel.name} ({target_channel.id})")
         
