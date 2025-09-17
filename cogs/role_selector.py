@@ -211,11 +211,6 @@ class RoleSelector(commands.Cog):
                 {"name": "Virtual Class", "emoji": "💻", "role_name": "Virtual Class"},
                 {"name": "TIAO", "emoji": "🧠", "role_name": "TIAO"}
             ]),
-            RoleCategory("Studiejaren", [
-                {"name": "1e jaar", "emoji": "1️⃣", "role_name": "1e jaar"},
-                {"name": "2e jaar", "emoji": "2️⃣", "role_name": "2e jaar"},
-                {"name": "3e jaar", "emoji": "3️⃣", "role_name": "3e jaar"}
-            ]),
             RoleCategory("Studentenrollen", [
                 {"name": "IOEM", "emoji": "🤓", "role_name": "IOEM"},
                 {"name": "Buitenlandse Stage", "emoji": "✈️", "role_name": "Buitenlandse Stage"},
