@@ -515,7 +515,7 @@ class RoleSelector(commands.Cog):
             except Exception as e:
                 self.bot.log.error(f"Error building role selector: {e}")
                 try:
-                    await interaction.followup.send(content="Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
+                    await interaction.followup.send("Er is een fout opgetreden bij het laden van de rolselectie.", ephemeral=True)
                 except Exception as edit_error:
                     self.bot.log.error(f"Failed to edit interaction response: {edit_error}")
                     pass  # If we can't even send an error message, just log it
