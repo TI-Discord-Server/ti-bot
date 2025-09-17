@@ -29,7 +29,12 @@ ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
 DISCORD_GUILD_ID_RAW = getenv("DISCORD_GUILD_ID", "").strip()
-DISCORD_GUILD_ID: Final[int | None] = int(DISCORD_GUILD_ID_RAW) if DISCORD_GUILD_ID_RAW else None
+
+if DISCORD_GUILD_ID_RAW.isdigit():
+    DISCORD_GUILD_ID: Final[int] = int(DISCORD_GUILD_ID_RAW)
+else:
+    DISCORD_GUILD_ID: Final[int] = 771394209419624489  # fallback
+
 
 
 __all__: Final[Tuple[str, ...]] = (
