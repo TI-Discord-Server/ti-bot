@@ -62,11 +62,11 @@ def _pick(name: str, default: str | None = None) -> str | None:
 def _resolve_db_name() -> str:
     """
     Choose database name:
-    1) MONGODB_DB if provided
-    2) else MONGODB_USERNAME (common in your setup: 'bot')
-    3) else 'bot'
+    Always MONGODB_DB from env, no fallback.
     """
-    return _pick("MONGODB_DB") or (MONGODB_USERNAME if MONGODB_USERNAME else "bot")
+    if not MONGODB_DB:
+        raise RuntimeError("MONGODB_DB must be set in your .env")
+    return MONGODB_DB
 
 def _build_uri_from_example_env() -> tuple[str, str]:
     """
@@ -77,18 +77,18 @@ def _build_uri_from_example_env() -> tuple[str, str]:
     port = _pick("MONGODB_PORT", MONGODB_PORT or "27017")
     user = MONGODB_USERNAME or ""
     pwd = MONGODB_PASSWORD or ""
+    db_name = _resolve_db_name()
 
     if user and pwd:
         # user/pwd zijn hierboven al URL-encoded
-        uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{host}:{port}/"
+        uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{host}:{port}/{db_name}"
         uri = _ensure_query_params(uri, {
         "authMechanism": "SCRAM-SHA-256",
-        "authSource": _resolve_db_name(),
+        "authSource": db_name,
     })
     else:
-        uri = f"mongodb://{host}:{port}/"
+        uri = f"mongodb://{host}:{port}/{db_name}"
 
-    db_name = _resolve_db_name()
     return uri, db_name
 # ===== End ENV-compat helpers =====
 
