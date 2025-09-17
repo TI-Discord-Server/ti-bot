@@ -43,8 +43,8 @@ class CategorySelect(discord.ui.Select):
     
     async def callback(self, interaction: discord.Interaction):
         try:
-            # Defer the interaction immediately to prevent timeout
-            await interaction.response.defer()
+            # Defer the interaction with ephemeral response to prevent editing the original message
+            await interaction.response.defer(ephemeral=True)
             
             # Get the selected category
             selected_category = self.values[0]
@@ -90,8 +90,8 @@ class RoleSelect(discord.ui.Select):
     
     async def callback(self, interaction: discord.Interaction):
         try:
-            # Defer the interaction immediately to prevent timeout
-            await interaction.response.defer()
+            # Defer the interaction with ephemeral response
+            await interaction.response.defer(ephemeral=True)
             
             # Get the guild and member
             guild = interaction.guild
@@ -152,26 +152,33 @@ class RoleSelect(discord.ui.Select):
                     await interaction.followup.send("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
                     return
             
-            # Send a confirmation message
-            message = ""
+            # Build confirmation message
+            messages = []
             if added_roles:
-                message += f"Toegevoegde rollen: {', '.join(added_roles)}\n"
+                messages.append(f"✅ **Toegevoegde rollen:** {', '.join(added_roles)}")
             if removed_roles:
-                message += f"Verwijderde rollen: {', '.join(removed_roles)}\n"
+                messages.append(f"❌ **Verwijderde rollen:** {', '.join(removed_roles)}")
             
-            if not message:
-                message = "Geen wijzigingen aangebracht."
+            if not messages:
+                messages.append("ℹ️ Geen wijzigingen aangebracht in je rollen.")
             
-            # Update the view with the new role selections (edit the existing message)
-            # Refresh the member object to get updated roles
-            updated_member = await interaction.guild.fetch_member(interaction.user.id)
+            # Create embed for response
+            embed = discord.Embed(
+                title="🔄 Rollen Bijgewerkt",
+                description="\n".join(messages),
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Gebruik het menu opnieuw om je selecties te wijzigen")
+            
+            # Send confirmation as ephemeral response
+            await interaction.followup.send(embed=embed, ephemeral=True)
             
             # Invalidate cache for this user since roles changed
+            updated_member = await interaction.guild.fetch_member(interaction.user.id)
             cache_key = await self.role_selector._get_cache_key(self.category_name, updated_member.roles)
             if cache_key in self.role_selector.role_selector_cache:
                 del self.role_selector.role_selector_cache[cache_key]
-            
-            await self.role_selector.update_role_select_message(interaction, self.category_name, message, updated_member.roles)
+                
         except Exception as e:
             self.role_selector.bot.log.error(f"Error in RoleSelect callback: {e}")
             # Since we deferred the interaction, we can only use followup
@@ -417,8 +424,8 @@ class RoleSelector(commands.Cog):
                 # Create a fresh view based on cached data
                 view = await self._create_role_select_view(category_name, interaction.user.roles)
                 
-                # Since interaction is deferred, always use edit_original_response
-                await interaction.edit_original_response(embed=cached_embed, view=view)
+                # Always use followup for ephemeral response
+                await interaction.followup.send(embed=cached_embed, view=view, ephemeral=True)
                 
                 # Optionally refresh cache in background (non-blocking)
                 asyncio.create_task(self._refresh_cache_in_background(cache_key, category_name, interaction.user.roles))
@@ -446,7 +453,7 @@ class RoleSelector(commands.Cog):
                 
                 async def back_button_callback(back_interaction: discord.Interaction):
                     try:
-                        await back_interaction.response.defer()
+                        await back_interaction.response.defer(ephemeral=True)
                         
                         # Create a new view with the category select
                         category_view = discord.ui.View(timeout=180)
@@ -460,9 +467,10 @@ class RoleSelector(commands.Cog):
                         )
                         embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                         
-                        await back_interaction.edit_original_response(
+                        await back_interaction.followup.send(
                             embed=embed,
-                            view=category_view
+                            view=category_view,
+                            ephemeral=True
                         )
                     except Exception as e:
                         self.bot.log.error(f"Error in back button callback: {e}")
@@ -509,8 +517,8 @@ class RoleSelector(commands.Cog):
                     cache_key = await self._get_cache_key(category_name, interaction.user.roles)
                     self._cache_result(cache_key, embed, view)
                 
-                # Edit the deferred response with the role selector
-                await interaction.edit_original_response(embed=embed, view=view)
+                # Send ephemeral response instead of editing the original message
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
                     
             except Exception as e:
                 self.bot.log.error(f"Error building role selector: {e}")
@@ -556,7 +564,7 @@ class RoleSelector(commands.Cog):
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
-                await back_interaction.response.defer()
+                await back_interaction.response.defer(ephemeral=True)
                 
                 # Create a new view with the category select
                 category_view = discord.ui.View(timeout=180)
@@ -570,9 +578,10 @@ class RoleSelector(commands.Cog):
                 )
                 embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                 
-                await back_interaction.edit_original_response(
+                await back_interaction.followup.send(
                     embed=embed,
-                    view=category_view
+                    view=category_view,
+                    ephemeral=True
                 )
             except Exception as e:
                 self.bot.log.error(f"Error in back button callback (update_role_select_message): {e}")
@@ -646,7 +655,7 @@ class RoleSelector(commands.Cog):
         
         async def back_button_callback(back_interaction: discord.Interaction):
             try:
-                await back_interaction.response.defer()
+                await back_interaction.response.defer(ephemeral=True)
                 
                 # Create a new view with the category select
                 category_view = discord.ui.View(timeout=180)
@@ -660,9 +669,10 @@ class RoleSelector(commands.Cog):
                 )
                 embed.set_footer(text="Selecteer een categorie uit het dropdown menu")
                 
-                await back_interaction.edit_original_response(
+                await back_interaction.followup.send(
                     embed=embed,
-                    view=category_view
+                    view=category_view,
+                    ephemeral=True
                 )
             except Exception as e:
                 self.bot.log.error(f"Error in back button callback (_create_role_select_view): {e}")
