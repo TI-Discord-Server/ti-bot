@@ -262,9 +262,24 @@ class RoleSelector(commands.Cog):
         """Get all role categories from the database."""
         categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
         if not categories_doc:
+            self.bot.log.debug("No categories found in database, using default categories")
             return self.default_categories
         
-        return [RoleCategory.from_dict(category) for category in categories_doc.get("categories", [])]
+        categories = [RoleCategory.from_dict(category) for category in categories_doc.get("categories", [])]
+        self.bot.log.debug(f"Loaded {len(categories)} categories from database: {[cat.name for cat in categories]}")
+        
+        # Safety check: if we only have the "Studiejaren" category, this might indicate corruption
+        # The issue description mentions only "1e 2e 3e jaar" showing up, which is the Studiejaren category
+        if len(categories) == 1 and categories[0].name == "Studiejaren":
+            self.bot.log.warning("Only Studiejaren category found in database - this may indicate data corruption, falling back to defaults")
+            return self.default_categories
+        
+        # Safety check: if no categories at all, fall back to defaults
+        if not categories:
+            self.bot.log.warning("Empty categories list found in database, falling back to defaults")
+            return self.default_categories
+        
+        return categories
     
     async def save_categories(self, categories: List[RoleCategory]):
         """Save categories to the database."""
@@ -328,6 +343,7 @@ class RoleSelector(commands.Cog):
         """Update or create the role menu message."""
         channel = self.bot.get_channel(channel_id)
         if not channel:
+            self.bot.log.warning(f"Could not find channel {channel_id} for role menu update")
             return None
         
         # Create the embed
@@ -338,6 +354,8 @@ class RoleSelector(commands.Cog):
         )
         
         categories = await self.get_categories()
+        self.bot.log.debug(f"Updating role menu message with {len(categories)} categories")
+        
         for category in categories:
             role_list = []
             for role in category.roles:
@@ -359,6 +377,7 @@ class RoleSelector(commands.Cog):
             try:
                 message = await channel.fetch_message(message_id)
                 await message.edit(embed=embed, view=view)
+                self.bot.log.debug(f"Successfully updated role menu message {message_id} in channel {channel_id}")
                 
                 # Store the persistent view message in case it wasn't stored before
                 if self.bot.persistent_view_manager:
@@ -370,11 +389,12 @@ class RoleSelector(commands.Cog):
                         self.bot.log.warning(f"Failed to store persistent view for role selector: {e}")
                 
                 return message
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                self.bot.log.warning(f"Failed to update existing role menu message {message_id}: {e}")
         
         # Create a new message if we couldn't edit the existing one
         message = await channel.send(embed=embed, view=view)
+        self.bot.log.info(f"Created new role menu message {message.id} in channel {channel_id}")
         
         # Save the message ID and channel ID
         await self.bot.db.role_selector.update_one(

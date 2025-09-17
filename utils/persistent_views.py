@@ -134,6 +134,8 @@ class PersistentViewManager:
         guild_id = view_data["guild_id"]
         additional_data = view_data.get("additional_data", {})
         
+        logger.debug(f"Restoring {view_type} view for message {message_id} in channel {channel_id}")
+        
         # Get the channel and message
         channel = self.bot.get_channel(channel_id)
         if not channel:
@@ -149,6 +151,18 @@ class PersistentViewManager:
         except discord.Forbidden:
             logger.warning(f"No permission to access message {message_id} for view {view_type}")
             return False
+        
+        # Validate message content to prevent cross-contamination
+        if view_type == "role_selector" and message.embeds:
+            embed = message.embeds[0]
+            if embed.title and "vak" in embed.title.lower():
+                logger.warning(f"Detected potential cross-contamination: role_selector view on vak message {message_id}, skipping restoration")
+                return False
+        elif view_type == "channel_menu" and message.embeds:
+            embed = message.embeds[0]
+            if embed.title and "rollen" in embed.title.lower():
+                logger.warning(f"Detected potential cross-contamination: channel_menu view on role message {message_id}, skipping restoration")
+                return False
         
         # Create and add the appropriate view
         view = await self._create_view(view_type, guild_id, additional_data)
