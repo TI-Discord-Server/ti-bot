@@ -388,7 +388,10 @@ class RoleSelector(commands.Cog):
         # Find the selected category
         category = next((c for c in categories if c.name == category_name), None)
         if not category:
-            await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("Deze categorie bestaat niet.", ephemeral=True)
+            else:
+                await interaction.response.send_message("Deze categorie bestaat niet.", ephemeral=True)
             return
         
         # Create a new view
@@ -447,8 +450,25 @@ class RoleSelector(commands.Cog):
         
         embed.set_footer(text="Gebruik het dropdown menu om rollen te selecteren/deselecteren")
         
-        # Always edit the message since this is called after a role selection
-        await interaction.response.edit_message(embed=embed, view=view)
+        # Check if interaction has already been responded to and use appropriate method
+        try:
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed, view=view)
+            else:
+                await interaction.response.edit_message(embed=embed, view=view)
+        except discord.HTTPException as e:
+            # If editing fails, try to send a followup message instead
+            if e.code == 10062:  # Unknown interaction
+                self.bot.log.warning(f"Interaction expired (10062) in role selector, cannot update message")
+            else:
+                self.bot.log.error(f"Failed to update role selector message: {e}")
+                try:
+                    await interaction.followup.send(
+                        f"Rollen bijgewerkt! {message}" if message else "Rollen bijgewerkt!",
+                        ephemeral=True
+                    )
+                except Exception:
+                    pass  # If followup also fails, just give up
     
 
 
