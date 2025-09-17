@@ -262,7 +262,7 @@ class RoleSelector(commands.Cog):
             
             # Get user's relevant roles for this category
             user_category_roles = sorted([role.name for role in user_roles if role.name in category_role_names])
-            roles_hash = hashlib.md5(str(user_category_roles).encode()).hexdigest()
+            roles_hash = hashlib.sha256(str(user_category_roles).encode()).hexdigest()
             return f"{category_name}:{roles_hash}"
         except Exception as e:
             self.bot.log.warning(f"Error generating cache key: {e}")
