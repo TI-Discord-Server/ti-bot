@@ -467,7 +467,7 @@ class RoleSelector(commands.Cog):
                         f"Rollen bijgewerkt! {message}" if message else "Rollen bijgewerkt!",
                         ephemeral=True
                     )
-                except:
+                except Exception:
                     pass  # If followup also fails, just give up
     
 
