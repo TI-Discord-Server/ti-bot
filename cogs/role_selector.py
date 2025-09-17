@@ -266,6 +266,13 @@ class RoleSelector(commands.Cog):
             try:
                 message = await channel.fetch_message(message_id)
                 await message.edit(embed=embed, view=view)
+                
+                # Store the persistent view message in case it wasn't stored before
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "role_selector", channel.id, message.id, channel.guild.id
+                    )
+                
                 return message
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
@@ -283,6 +290,12 @@ class RoleSelector(commands.Cog):
         self.role_menu_message_id = message.id
         self.role_menu_channel_id = channel.id
         self.views[message.id] = view
+        
+        # Store the persistent view message
+        if self.bot.persistent_view_manager:
+            await self.bot.persistent_view_manager.store_view_message(
+                "role_selector", channel.id, message.id, channel.guild.id
+            )
         
         return message
     
