@@ -28,7 +28,9 @@ MIGRATION_IMAP_PORT: Final[int] = int(cast(str, getenv("MIGRATION_IMAP_PORT", "9
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
-DISCORD_GUILD_ID: Final[int] = int(cast(str, getenv("DISCORD_GUILD_ID", "771394209419624489")))
+DISCORD_GUILD_ID_RAW = getenv("DISCORD_GUILD_ID", "").strip()
+DISCORD_GUILD_ID: Final[int | None] = int(DISCORD_GUILD_ID_RAW) if DISCORD_GUILD_ID_RAW else None
+
 
 __all__: Final[Tuple[str, ...]] = (
     "BOT_TOKEN",
