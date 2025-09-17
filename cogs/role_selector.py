@@ -346,15 +346,23 @@ class RoleSelector(commands.Cog):
             self.bot.log.warning(f"Could not find channel {channel_id} for role menu update")
             return None
         
-        # Create the embed
+        # Get categories and validate them
+        categories = await self.get_categories()
+        self.bot.log.debug(f"Updating role menu message with {len(categories)} categories")
+        
+        # Additional safety check: ensure we have more than just year categories
+        # This prevents the main role selector from showing only year options
+        year_categories = ["Studiejaren"]
+        if len(categories) == 1 and categories[0].name in year_categories:
+            self.bot.log.warning("Role menu update attempted with only year categories - forcing default categories")
+            categories = self.default_categories
+        
+        # Create the embed with proper role selector content
         embed = discord.Embed(
             title="🎭 Kies je rollen!",
             description="Selecteer een categorie in het dropdown menu hieronder om rollen te kiezen.",
             color=discord.Color.blue()
         )
-        
-        categories = await self.get_categories()
-        self.bot.log.debug(f"Updating role menu message with {len(categories)} categories")
         
         for category in categories:
             role_list = []
@@ -369,6 +377,12 @@ class RoleSelector(commands.Cog):
         
         embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
         
+        # Validate embed content to prevent cross-contamination
+        # The role selector should have "rollen" in the title, not "vak" or "jaar"
+        if embed.title and "vak" in embed.title.lower():
+            self.bot.log.error("CRITICAL: Role selector embed contains vak content - this should not happen")
+            return None
+        
         # Create the view
         view = await RoleSelectorView(self).refresh(categories)
         
@@ -376,6 +390,14 @@ class RoleSelector(commands.Cog):
         if message_id:
             try:
                 message = await channel.fetch_message(message_id)
+                
+                # Double-check: if the existing message looks like a vak selector, don't update it
+                if message.embeds:
+                    existing_embed = message.embeds[0]
+                    if existing_embed.title and ("vak" in existing_embed.title.lower() or "selecteer je jaar" in existing_embed.description.lower() if existing_embed.description else False):
+                        self.bot.log.error(f"CRITICAL: Attempted to update vak selector message {message_id} with role selector content - aborting")
+                        return None
+                
                 await message.edit(embed=embed, view=view)
                 self.bot.log.debug(f"Successfully updated role menu message {message_id} in channel {channel_id}")
                 
