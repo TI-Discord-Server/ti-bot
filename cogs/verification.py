@@ -297,11 +297,25 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             old_record = await old_emails_collection.find_one({"user_id": user_id, "email_hash": email_hash})
             
             if not old_record:
-                await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
+                try:
+                    await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:
+                        self.bot.log.warning(f"Migration interaction expired (10062) when sending 'no record' message for user {interaction.user}")
+                    else:
+                        self.bot.log.error(f"Failed to send followup message: {e}")
                 return
 
             # Check if email bounces (indicating user is no longer a student)
-            await interaction.followup.send("🔄 Bezig met controleren of je e-mailadres nog actief is... Dit kan enkele minuten duren.", ephemeral=True)
+            try:
+                await interaction.followup.send("🔄 Bezig met controleren of je e-mailadres nog actief is... Dit kan enkele minuten duren.", ephemeral=True)
+            except discord.HTTPException as e:
+                if e.code == 10062:
+                    self.bot.log.warning(f"Migration interaction expired (10062) when sending 'checking email' message for user {interaction.user}")
+                    return  # Can't continue if we can't communicate with the user
+                else:
+                    self.bot.log.error(f"Failed to send followup message: {e}")
+                    # Continue anyway, the check might still work
             
             bounce_result = await self._check_email_bounce(old_email)
             
@@ -321,7 +335,13 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                     # self.bot.log.info(f"Successfully migrated verification for user {interaction.user} ({user_id}) with email {old_email} (email bounced)")
                 except Exception as e:
                     self.bot.log.error(f"Failed to store migrated verification record for user {interaction.user} ({user_id}) with email {old_email}: {e}", exc_info=True)
-                    await interaction.followup.send("❌ Er is een fout opgetreden bij het opslaan van je migratie. Probeer het opnieuw.", ephemeral=True)
+                    try:
+                        await interaction.followup.send("❌ Er is een fout opgetreden bij het opslaan van je migratie. Probeer het opnieuw.", ephemeral=True)
+                    except discord.HTTPException as follow_error:
+                        if follow_error.code == 10062:
+                            self.bot.log.warning(f"Migration followup expired (10062) when sending database error message for user {interaction.user}")
+                        else:
+                            self.bot.log.error(f"Failed to send database error followup: {follow_error}")
                     return
                 
                 # Assign verified role
@@ -337,16 +357,45 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 else:
                     self.bot.log.warning("Verified role not found in guild during migration")
                 
-                await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
+                try:
+                    await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:
+                        self.bot.log.warning(f"Migration success followup expired (10062) for user {interaction.user} ({user_id})")
+                    else:
+                        self.bot.log.error(f"Failed to send migration success message: {e}")
                 
             elif bounce_result == "delivered" or bounce_result == "no_bounce_yet":
-                await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.\n\n💬 Heb je problemen? DM de bot voor ondersteuning!", ephemeral=True)
+                try:
+                    await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.\n\n💬 Heb je problemen? DM de bot voor ondersteuning!", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:
+                        self.bot.log.warning(f"Migration 'still active' followup expired (10062) for user {interaction.user} ({user_id})")
+                    else:
+                        self.bot.log.error(f"Failed to send 'still active' message: {e}")
                 
             else:  # delayed, unknown, send_failed
-                await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
+                try:
+                    await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:
+                        self.bot.log.warning(f"Migration 'unknown status' followup expired (10062) for user {interaction.user} ({user_id})")
+                    else:
+                        self.bot.log.error(f"Failed to send 'unknown status' message: {e}")
 
+        except discord.HTTPException as e:
+            if e.code == 10062:  # Unknown interaction - interaction has expired
+                self.bot.log.warning(f"Migration interaction expired (10062) for user {interaction.user} ({user_id})")
+            else:
+                self.bot.log.error(f"Discord HTTP error during migration: {e}", exc_info=True)
         except Exception as e:
-            await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
+            try:
+                await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
+            except discord.HTTPException as follow_error:
+                if follow_error.code == 10062:
+                    self.bot.log.warning(f"Migration followup also expired (10062) for user {interaction.user} ({user_id})")
+                else:
+                    self.bot.log.error(f"Failed to send migration error followup: {follow_error}")
             self.bot.log.error(f"Migration error: {e}", exc_info=True)
 
     def _validate_migration_credentials(self) -> bool:
@@ -772,11 +821,23 @@ class Verification(commands.Cog):
                 kicked = True
                 
                 # Send followup message about successful kick
-                await interaction.followup.send("✅ Gebruiker succesvol gekickt en verificatie ingetrokken.", ephemeral=True)
+                try:
+                    await interaction.followup.send("✅ Gebruiker succesvol gekickt en verificatie ingetrokken.", ephemeral=True)
+                except discord.HTTPException as e:
+                    if e.code == 10062:
+                        self.bot.log.warning(f"Revoke verification success followup expired (10062) for user {interaction.user}")
+                    else:
+                        self.bot.log.error(f"Failed to send kick success message: {e}")
                 
             except Exception as e:
                 # Send followup message about failed kick
-                await interaction.followup.send("✅ Verificatie ingetrokken, maar gebruiker kon niet gekickt worden.", ephemeral=True)
+                try:
+                    await interaction.followup.send("✅ Verificatie ingetrokken, maar gebruiker kon niet gekickt worden.", ephemeral=True)
+                except discord.HTTPException as follow_e:
+                    if follow_e.code == 10062:
+                        self.bot.log.warning(f"Revoke verification failed-kick followup expired (10062) for user {interaction.user}")
+                    else:
+                        self.bot.log.error(f"Failed to send kick failure message: {follow_e}")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
