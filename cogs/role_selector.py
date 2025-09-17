@@ -399,7 +399,15 @@ class RoleSelector(commands.Cog):
                     pass  # If we can't even send an error message, just log it
         
         # Create background task to build role selector
-        asyncio.create_task(build_role_selector())
+        task = asyncio.create_task(build_role_selector())
+        def handle_task_result(task):
+            try:
+                exc = task.exception()
+                if exc:
+                    self.bot.log.error(f"Unhandled exception in build_role_selector: {exc}")
+            except asyncio.CancelledError:
+                self.bot.log.warning("build_role_selector task was cancelled.")
+        task.add_done_callback(handle_task_result)
     
     async def update_role_select_message(self, interaction: discord.Interaction, category_name: str, message: str = None, user_roles = None):
         """Update the existing role select message instead of creating a new one."""
