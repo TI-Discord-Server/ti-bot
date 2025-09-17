@@ -130,36 +130,52 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         code = ''.join(random.choices(string.digits, k=CODE_LENGTH))
         pending_codes[user_id] = (code, email, time.time())
         
-        # Try to send email first
-        email_sent = False
-        email_error = None
-        try:
-            send_email(
-                [email],
-                "Jouw verificatiecode voor de Discord-server",
-                f"Jouw verificatiecode is: {code}\nDeze code is 10 minuten geldig."
-            )
-            email_sent = True
-        except Exception as e:
-            email_error = str(e)
+        # Send immediate thinking response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
         
-        # Send appropriate response based on email sending result
-        try:
-            if email_sent:
-                await interaction.response.send_message(
-                    "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
-                    ephemeral=True
+        # Send email in background and respond with followup
+        async def send_email_background():
+            email_sent = False
+            email_error = None
+            try:
+                send_email(
+                    [email],
+                    "Jouw verificatiecode voor de Discord-server",
+                    f"Jouw verificatiecode is: {code}\nDeze code is 10 minuten geldig."
                 )
-            else:
+                email_sent = True
+            except Exception as e:
+                email_error = str(e)
                 # Remove the pending code since email failed
                 pending_codes.pop(user_id, None)
-                await interaction.response.send_message(
-                    f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {email_error}", ephemeral=True
-                )
-        except Exception as discord_error:
-            # If Discord response fails, log it but don't try to send another response
-            self.bot.log.error(f"Discord interaction response failed: {discord_error}")
-            # If email was sent but Discord response failed, the user can still use the code
+            
+            # Send followup response based on email sending result
+            try:
+                if email_sent:
+                    await interaction.followup.send(
+                        "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {email_error}", 
+                        ephemeral=True
+                    )
+            except Exception as discord_error:
+                # If Discord followup fails, log it
+                self.bot.log.error(f"Discord interaction followup failed: {discord_error}")
+                # If email was sent but Discord followup failed, the user can still use the code
+        
+        # Create background task to send email and track exceptions
+        task = asyncio.create_task(send_email_background())
+        def _log_task_exception(task):
+            try:
+                exc = task.exception()
+                if exc:
+                    self.bot.log.error(f"Unhandled exception in send_email_background: {exc}")
+            except Exception as callback_exc:
+                self.bot.log.error(f"Exception in task done callback: {callback_exc}")
+        task.add_done_callback(_log_task_exception)
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
     code = ui.TextInput(label="Code", placeholder="6-cijferige code", required=True)
