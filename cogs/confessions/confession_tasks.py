@@ -202,7 +202,7 @@ class ConfessionTasks(commands.Cog):
                 description=confession["content"],
                 color=discord.Color.green(),
             )
-            await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+            await public_channel.send(embed=embed)
 
             # Post new submit message
             await self._post_submit_message(public_channel)
