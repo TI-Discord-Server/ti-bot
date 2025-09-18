@@ -189,6 +189,10 @@ class PersistentViewManager:
                 from cogs.confessions.confession_view import ConfessionView
                 return ConfessionView(self.bot)
             
+            elif view_type == "rules":
+                from cogs.confessions.rules_modal import RulesView
+                return RulesView(self.bot)
+            
             elif view_type == "unban_request":
                 unban_cog = self.bot.get_cog("UnbanRequest")
                 if unban_cog and hasattr(unban_cog, 'unban_view'):

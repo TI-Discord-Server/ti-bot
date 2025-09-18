@@ -213,7 +213,13 @@ class ConfessionTasks(commands.Cog):
 
             if is_last_confession:
                 from cogs.confessions.confession_view import ConfessionView
-                await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+                message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+
+                # Sla dit bericht op zodat de knop persistent blijft
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "confession", public_channel.id, message.id, public_channel.guild.id
+                    )
             else:
                 await public_channel.send(embed=embed)
 
@@ -242,41 +248,6 @@ class ConfessionTasks(commands.Cog):
                 f"Confession {confession['_id']} blijft onder review vanwege gelijke stemmen."
             )
 
-    async def _delete_previous_submit_message(self, public_channel):
-        """Delete the previous submit confession message if it exists."""
-        try:
-            # Get the stored submit message ID from database
-            settings = await self.bot.db.settings.find_one({"_id": "confession_settings"})
-            if not settings or "submit_message_id" not in settings:
-                return
-            
-            submit_message_id = settings["submit_message_id"]
-            if not submit_message_id:
-                return
-            
-            # Try to fetch and delete the message
-            try:
-                submit_message = await public_channel.fetch_message(submit_message_id)
-                await submit_message.delete()
-                self.bot.log.debug(f"Deleted previous submit message {submit_message_id}")
-                
-                # Remove from persistent views database
-                if self.bot.persistent_view_manager:
-                    await self.bot.persistent_view_manager.remove_view_message(public_channel.id, submit_message_id)
-                
-            except discord.NotFound:
-                self.bot.log.debug(f"Previous submit message {submit_message_id} not found (already deleted)")
-                # Still try to remove from persistent views database in case it's there
-                if self.bot.persistent_view_manager:
-                    await self.bot.persistent_view_manager.remove_view_message(public_channel.id, submit_message_id)
-            except discord.Forbidden:
-                self.bot.log.warning(f"No permission to delete submit message {submit_message_id}")
-            except Exception as e:
-                self.bot.log.error(f"Error deleting submit message {submit_message_id}: {e}")
-                
-        except Exception as e:
-            self.bot.log.error(f"Error in _delete_previous_submit_message: {e}")
-
     async def _post_submit_message(self, public_channel):
         """Post a new submit confession message (eenmalig via command)."""
         self.bot.log.debug("Posting new submit confession message...")
@@ -290,6 +261,11 @@ class ConfessionTasks(commands.Cog):
 
             # Post het bericht met de knop
             submit_message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+
+            if self.bot.persistent_view_manager:
+                await self.bot.persistent_view_manager.store_view_message(
+                    "confession", public_channel.id, submit_message.id, public_channel.guild.id
+                )
 
             # ⚠️ Geen opslag in de database meer!
             # Zo kan er nooit automatisch iets mee gedaan worden

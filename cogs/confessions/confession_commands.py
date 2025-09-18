@@ -94,8 +94,6 @@ class ConfessionCommands(commands.Cog):
         )
         
         try:
-            # Delete previous submit message and post new one
-            await self.tasks._delete_previous_submit_message(public_channel)
             await self.tasks._post_submit_message(public_channel)
             
             await interaction.followup.send(
