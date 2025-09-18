@@ -279,6 +279,7 @@ class ConfessionTasks(commands.Cog):
 
     async def _post_submit_message(self, public_channel):
         """Post a new submit confession message (eenmalig via command)."""
+        self.bot.log.debug("Posting new submit confession message...")
         try:
             embed = discord.Embed(
                 title="📝 Submit a Confession",
