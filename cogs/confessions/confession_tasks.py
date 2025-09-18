@@ -193,9 +193,6 @@ class ConfessionTasks(commands.Cog):
                 await self.bot.db.confessions.count_documents({"status": "posted"}) + 1
             )
 
-            # Delete previous submit message if it exists
-            await self._delete_previous_submit_message(public_channel)
-
             # Post de confession
             embed = discord.Embed(
                 title=f"Confession #{posted_count}",
@@ -281,9 +278,8 @@ class ConfessionTasks(commands.Cog):
             self.bot.log.error(f"Error in _delete_previous_submit_message: {e}")
 
     async def _post_submit_message(self, public_channel):
-        """Post a new submit confession message and store its ID."""
+        """Post a new submit confession message (eenmalig via command)."""
         try:
-            # Create submit embed
             embed = discord.Embed(
                 title="📝 Submit a Confession",
                 description="Click the button below to submit an anonymous confession.",
@@ -298,25 +294,15 @@ class ConfessionTasks(commands.Cog):
                 ),
                 inline=False
             )
-            
-            # Post the message with confession view
+
+            # Post het bericht met de knop
             submit_message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
-            
-            # Store the message ID in database
-            await self.bot.db.settings.update_one(
-                {"_id": "confession_settings"},
-                {"$set": {"submit_message_id": submit_message.id}},
-                upsert=True
-            )
-            
-            # Store the persistent view message
-            if self.bot.persistent_view_manager:
-                await self.bot.persistent_view_manager.store_view_message(
-                    "confession", public_channel.id, submit_message.id, public_channel.guild.id
-                )
-            
-            self.bot.log.debug(f"Posted new submit message {submit_message.id}")
-            
+
+            # ⚠️ Geen opslag in de database meer!
+            # Zo kan er nooit automatisch iets mee gedaan worden
+
+            self.bot.log.debug(f"Posted one-time submit message {submit_message.id}")
+
         except Exception as e:
             self.bot.log.error(f"Error posting submit message: {e}")
 
