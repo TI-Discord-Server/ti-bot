@@ -286,15 +286,7 @@ class ConfessionTasks(commands.Cog):
                 description="Click the button below to submit an anonymous confession.",
                 color=discord.Color.blue()
             )
-            embed.add_field(
-                name="ℹ️ How it works",
-                value=(
-                    "• Your confession will be reviewed by moderators\n"
-                    "• If approved, it will be posted anonymously\n"
-                    "• All submissions are completely anonymous"
-                ),
-                inline=False
-            )
+            
 
             # Post het bericht met de knop
             submit_message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))

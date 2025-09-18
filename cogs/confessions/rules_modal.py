@@ -1,25 +1,14 @@
 import discord
-from discord.ui import Modal, TextInput
+from discord.ui import View, Button
 from .confession_modal import ConfessionModal
 
-class RulesModal(Modal, title="Regels voor Confessions"):
+class RulesView(View):
     def __init__(self, bot):
-        super().__init__()
+        super().__init__(timeout=60)  # sluit na 60 sec
         self.bot = bot
-        self.rules = TextInput(
-            label="Lees deze regels",
-            style=discord.TextStyle.paragraph,
-            default=(
-                "1. Geen namen of persoonlijke info\n"
-                "2. Geen haatspraak of pesten\n"
-                "3. Max 4000 tekens\n"
-                "4. Respecteer anderen"
-            ),
-            required=False
-        )
-        self.rules.disabled = True  # Alleen lezen
-        self.add_item(self.rules)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        # Na akkoord opent de echte confession modal
+    @discord.ui.button(label="✅ Ik ga akkoord", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, button: Button):
+        # Als de user akkoord gaat, open de echte confession modal
         await interaction.response.send_modal(ConfessionModal(self.bot))
+        self.stop()
