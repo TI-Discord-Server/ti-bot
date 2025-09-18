@@ -196,16 +196,29 @@ class ConfessionTasks(commands.Cog):
             # Delete previous submit message if it exists
             await self._delete_previous_submit_message(public_channel)
 
-            # Post the confession
+            # Post de confession
             embed = discord.Embed(
                 title=f"Confession #{posted_count}",
                 description=confession["content"],
                 color=discord.Color.green(),
             )
-            await public_channel.send(embed=embed)
 
-            # Post new submit message
-            await self._post_submit_message(public_channel)
+            # Bepaal of dit de laatste van de dag is
+            settings = await self.get_settings()
+            post_times = settings.get("post_times", [])
+            last_post_time = post_times[-1] if post_times else None
+
+            is_last_confession = False
+            if last_post_time:
+                hour, minute = map(int, last_post_time.split(":"))
+                now = datetime.datetime.now(LOCAL_TIMEZONE)
+                is_last_confession = now.hour == hour and now.minute == minute
+
+            if is_last_confession:
+                from cogs.confessions.confession_view import ConfessionView
+                await public_channel.send(embed=embed, view=ConfessionView(self.bot))
+            else:
+                await public_channel.send(embed=embed)
 
             await self.bot.db.confessions.update_one(
                 {"_id": confession["_id"]},
