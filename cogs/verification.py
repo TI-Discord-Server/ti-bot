@@ -133,7 +133,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         pending_codes[user_id] = (code, email, time.time())
         
         # Send immediate thinking response to avoid timeout
-        await interaction.response.defer(ephemeral=True)
+        # await interaction.response.defer(ephemeral=True)
         
         # Send email in background and respond with followup
         async def send_email_background():
