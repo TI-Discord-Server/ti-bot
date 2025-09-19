@@ -241,7 +241,10 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
         # Assign verified role (replace 'Verified' with your role name)
         guild = interaction.guild
-        role = discord.utils.get(guild.roles, name="Verified")
+        settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
+        verified_role_id = settings.get("verified_role_id")
+
+        role = guild.get_role(verified_role_id) if verified_role_id else None
         if role:
             try:
                 await interaction.user.add_roles(role)
