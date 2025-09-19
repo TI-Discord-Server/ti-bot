@@ -38,111 +38,81 @@ class YearSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # Defer the interaction immediately to prevent timeout
-        await interaction.response.defer(ephemeral=True)
-        
-        # Get the selected year
-        year = self.values[0]
-        
-        # Get all channels in the selected year category
-        year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
-        category_name = f"━━━ {year_emoji_map[year]} {year}E JAAR ━━━"
-        
-        category = discord.utils.get(interaction.guild.categories, name=category_name)
-        if not category:
-            await interaction.followup.send(
-                f"Categorie {category_name} niet gevonden. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
-            return
-        
-        # Get all text channels in this category
-        channels = [channel for channel in category.channels if isinstance(channel, discord.TextChannel)]
-        
-        if not channels:
-            await interaction.followup.send(
-                f"Geen kanalen gevonden in {category_name}. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
-            return
-        
-        # Get the user's current roles for this year's channels using the cache
-        channel_menu_cog = self.bot.get_cog('ChannelMenu')
-        if channel_menu_cog:
-            user_channel_roles = await channel_menu_cog.get_user_channel_roles(interaction.guild, interaction.user, channels)
-        else:
-            user_channel_roles = []
-        
-        # Create a paginated multi-select menu for the channels
-        view = discord.ui.View(timeout=None)
-        view.bot = self.bot  # Pass the bot reference to the view
-        
-        # Filter out general channels first
-        filtered_channels = [
-            channel for channel in channels 
-            if not any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"])
-        ]
-        
-        # Calculate pagination
-        channels_per_page = 25
-        total_pages = (len(filtered_channels) + channels_per_page - 1) // channels_per_page
-        
-        if total_pages <= 1:
-            # No pagination needed
-            view.add_item(CourseSelect(filtered_channels, year, self.bot, user_channel_roles, 0, 1))
-        else:
-            # Add pagination - start with first page
-            page_channels = filtered_channels[:channels_per_page]
-            view.add_item(CourseSelect(page_channels, year, self.bot, user_channel_roles, 0, total_pages))
-            
-            # Add navigation buttons
-            view.add_item(PaginationButton("◀️", "prev", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=True))
-            view.add_item(PaginationButton("▶️", "next", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=(total_pages <= 1)))
-        
-        # Create embed for course selection
-        year_colors = {"1": discord.Color.green(), "2": discord.Color.gold(), "3": discord.Color.red()}
-        year_emojis = {"1": "🟩", "2": "🟨", "3": "🟥"}
-        
-        # Update title to show pagination info if needed
-        title = f"{year_emojis[year]} Jaar {year} - Vakselectie"
-        if total_pages > 1:
-            title += f" (Pagina 1/{total_pages})"
-        
-        embed = discord.Embed(
-            title=title,
-            description="Selecteer de vakken die je wilt volgen uit het dropdown menu hieronder.",
-            color=year_colors[year]
-        )
-        
-        if user_channel_roles:
-            embed.add_field(
-                name="✅ Je huidige selecties",
-                value=", ".join(user_channel_roles),
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name="ℹ️ Info",
-                value="Je hebt nog geen vakken geselecteerd.",
-                inline=False
-            )
-        
-        # Add pagination info if multiple pages
-        if total_pages > 1:
-            page_channels = filtered_channels[:channels_per_page]
-            embed.add_field(
-                name="📄 Paginatie",
-                value=f"Pagina 1 van {total_pages} ({len(page_channels)} vakken op deze pagina)\nGebruik de ◀️ ▶️ knoppen om tussen pagina's te navigeren.",
-                inline=False
-            )
-        
-        embed.set_footer(text="Selecteer vakken om toegang te krijgen, deselecteer om toegang te verwijderen")
-        
-        await interaction.followup.send(
-            embed=embed,
-            view=view,
+        # Directe feedback naar de gebruiker
+        await interaction.response.send_message(
+            f"⏳ Even geduld... het menu voor jaar {self.values[0]} wordt geladen.",
             ephemeral=True
         )
+
+        async def build_menu():
+            try:
+                year = self.values[0]
+                year_emoji_map = {"1": "🟩", "2": "🟨", "3": "🟥"}
+                category_name = f"━━━ {year_emoji_map[year]} {year}E JAAR ━━━"
+
+                category = discord.utils.get(interaction.guild.categories, name=category_name)
+                if not category:
+                    await interaction.followup.send(
+                        f"❌ Categorie {category_name} niet gevonden. Contacteer een beheerder.",
+                        ephemeral=True
+                    )
+                    return
+
+                channels = [c for c in category.channels if isinstance(c, discord.TextChannel)]
+                if not channels:
+                    await interaction.followup.send(
+                        f"❌ Geen kanalen gevonden in {category_name}.",
+                        ephemeral=True
+                    )
+                    return
+
+                # Huidige user-rollen ophalen via cog (cache)
+                channel_menu_cog = self.bot.get_cog('ChannelMenu')
+                user_channel_roles = []
+                if channel_menu_cog:
+                    user_channel_roles = await channel_menu_cog.get_user_channel_roles(interaction.guild, interaction.user, channels)
+
+                # Embed & view opbouwen
+                view = discord.ui.View(timeout=None)
+                view.bot = self.bot
+
+                filtered_channels = [c for c in channels if not any(c.name.startswith(p) for p in ["algemeen", "general", "announcements"])]
+                channels_per_page = 25
+                total_pages = (len(filtered_channels) + channels_per_page - 1) // channels_per_page
+
+                if total_pages <= 1:
+                    view.add_item(CourseSelect(filtered_channels, year, self.bot, user_channel_roles, 0, 1))
+                else:
+                    page_channels = filtered_channels[:channels_per_page]
+                    view.add_item(CourseSelect(page_channels, year, self.bot, user_channel_roles, 0, total_pages))
+                    view.add_item(PaginationButton("◀️", "prev", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=True))
+                    view.add_item(PaginationButton("▶️", "next", year, filtered_channels, user_channel_roles, 0, total_pages, disabled=(total_pages <= 1)))
+
+                year_colors = {"1": discord.Color.green(), "2": discord.Color.gold(), "3": discord.Color.red()}
+                year_emojis = {"1": "🟩", "2": "🟨", "3": "🟥"}
+
+                title = f"{year_emojis[year]} Jaar {year} - Vakselectie"
+                if total_pages > 1:
+                    title += f" (Pagina 1/{total_pages})"
+
+                embed = discord.Embed(
+                    title=title,
+                    description="Selecteer de vakken die je wilt volgen uit het dropdown menu hieronder.",
+                    color=year_colors[year]
+                )
+
+                if user_channel_roles:
+                    embed.add_field(name="✅ Je huidige selecties", value=", ".join(user_channel_roles), inline=False)
+                else:
+                    embed.add_field(name="ℹ️ Info", value="Je hebt nog geen vakken geselecteerd.", inline=False)
+
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+            except Exception as e:
+                self.bot.log.error(f"Error in YearSelect callback: {e}", exc_info=True)
+                await interaction.followup.send("❌ Er is een fout opgetreden bij het laden van het menu.", ephemeral=True)
+
+        asyncio.create_task(build_menu())
 
 
 class CourseSelect(discord.ui.Select):
@@ -191,110 +161,79 @@ class CourseSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        
-        try:
-            # Get the channel menu cog for cache access
-            channel_menu_cog = self.bot.get_cog('ChannelMenu')
-            if not channel_menu_cog:
-                await interaction.followup.send("Kanaal menu systeem niet beschikbaar.", ephemeral=True)
-                return
-            
-            # Get the channel-role mapping from cache
-            mapping = await channel_menu_cog.get_channel_role_mapping(interaction.guild)
-            
-            # Get the selected channel IDs
-            selected_channel_ids = set(self.values)
-            
-            # Process each channel in this year's category
-            added_roles = []
-            removed_roles = []
-            
-            for channel in self.channels:
-                # Skip general channels
-                if any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"]):
-                    continue
-                
-                channel_id = str(channel.id)
-                if channel_id not in mapping:
-                    continue
-                
-                role_name = mapping[channel_id]
-                role = discord.utils.get(interaction.guild.roles, name=role_name)
-                
-                # If role doesn't exist, create it
-                if not role:
-                    role_color = discord.Color.green() if self.year == "1" else discord.Color.gold() if self.year == "2" else discord.Color.red()
-                    role = await interaction.guild.create_role(
-                        name=role_name,
-                        color=role_color,
-                        mentionable=False,
-                        reason=f"Created for channel access to {channel.name}"
-                    )
-                    
-                    # Set permissions for this role on the channel
-                    await channel.set_permissions(role, read_messages=True)
-                    
-                    # Hide the channel from @everyone if not already hidden
-                    everyone_role = interaction.guild.default_role
-                    current_perms = channel.overwrites_for(everyone_role)
-                    if current_perms.read_messages is not False:
-                        await channel.set_permissions(everyone_role, read_messages=False)
-                    
-                    # Update cache since we created a new role
-                    await channel_menu_cog.get_channel_role_mapping(interaction.guild, force_refresh=True)
-                else:
-                    # Role exists, ensure it has proper permissions (in case they were changed)
-                    current_perms = channel.overwrites_for(role)
-                    if current_perms.read_messages is not True:
+        # Onmiddellijk feedback geven
+        await interaction.response.send_message(
+            "⏳ Je keuzes worden verwerkt, dit kan enkele seconden duren...",
+            ephemeral=True
+        )
+
+        async def apply_changes():
+            added_roles, removed_roles = [], []
+            try:
+                channel_menu_cog = self.bot.get_cog('ChannelMenu')
+                if not channel_menu_cog:
+                    await interaction.followup.send("❌ Kanaal menu systeem niet beschikbaar.", ephemeral=True)
+                    return
+
+                mapping = await channel_menu_cog.get_channel_role_mapping(interaction.guild)
+                selected_channel_ids = set(self.values)
+
+                for channel in self.channels:
+                    if any(channel.name.startswith(prefix) for prefix in ["algemeen", "general", "announcements"]):
+                        continue
+
+                    channel_id = str(channel.id)
+                    if channel_id not in mapping:
+                        continue
+
+                    role_name = mapping[channel_id]
+                    role = discord.utils.get(interaction.guild.roles, name=role_name)
+
+                    if not role:
+                        role_color = discord.Color.green() if self.year == "1" else discord.Color.gold() if self.year == "2" else discord.Color.red()
+                        role = await interaction.guild.create_role(
+                            name=role_name,
+                            color=role_color,
+                            mentionable=False,
+                            reason=f"Created for channel access to {channel.name}"
+                        )
                         await channel.set_permissions(role, read_messages=True)
-                
-                # Determine if user wants this role (selected in dropdown)
-                user_wants_role = channel_id in selected_channel_ids
-                user_has_role = role in interaction.user.roles
-                
-                # Add or remove role based on selection
-                if user_wants_role and not user_has_role:
-                    await interaction.user.add_roles(role, reason=f"User selected {channel.name} in channel menu")
-                    added_roles.append(role)
-                elif not user_wants_role and user_has_role:
-                    await interaction.user.remove_roles(role, reason=f"User deselected {channel.name} in channel menu")
-                    removed_roles.append(role)
-            
-            # Send confirmation message
-            messages = []
-            if added_roles:
-                added_channels = ", ".join([role.name for role in added_roles])
-                messages.append(f"✅ **Toegang gekregen tot:** {added_channels}")
-            
-            if removed_roles:
-                removed_channels = ", ".join([role.name for role in removed_roles])
-                messages.append(f"❌ **Toegang verwijderd van:** {removed_channels}")
-            
-            if not messages:
-                messages.append("ℹ️ Geen wijzigingen aangebracht in je toegang tot vakken.")
-            
-            # Create embed for response
-            embed = discord.Embed(
-                title="🔄 Vakselectie Bijgewerkt",
-                description="\n".join(messages),
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text="Gebruik het menu opnieuw om je selecties te wijzigen")
-            
-            await interaction.followup.send(embed=embed, ephemeral=True)
-                
-        except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ Ik heb geen toestemming om rollen te beheren. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
-        except Exception as e:
-            self.bot.log.error(f"Error in CourseSelect callback: {e}", exc_info=True)
-            await interaction.followup.send(
-                f"❌ Er is een onverwachte fout opgetreden: {str(e)}. Neem contact op met een beheerder.",
-                ephemeral=True
-            )
+                        everyone_role = interaction.guild.default_role
+                        if channel.overwrites_for(everyone_role).read_messages is not False:
+                            await channel.set_permissions(everyone_role, read_messages=False)
+
+                        await channel_menu_cog.get_channel_role_mapping(interaction.guild, force_refresh=True)
+
+                    user_wants_role = channel_id in selected_channel_ids
+                    user_has_role = role in interaction.user.roles
+
+                    if user_wants_role and not user_has_role:
+                        await interaction.user.add_roles(role)
+                        added_roles.append(role.name)
+                    elif not user_wants_role and user_has_role:
+                        await interaction.user.remove_roles(role)
+                        removed_roles.append(role.name)
+
+                messages = []
+                if added_roles:
+                    messages.append(f"✅ Toegevoegd: {', '.join(added_roles)}")
+                if removed_roles:
+                    messages.append(f"❌ Verwijderd: {', '.join(removed_roles)}")
+                if not messages:
+                    messages.append("ℹ️ Geen wijzigingen.")
+
+                embed = discord.Embed(
+                    title="🔄 Vakselectie Bijgewerkt",
+                    description="\n".join(messages),
+                    color=discord.Color.blue()
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+
+            except Exception as e:
+                self.bot.log.error(f"Error in CourseSelect callback: {e}", exc_info=True)
+                await interaction.followup.send("❌ Er is een onverwachte fout opgetreden.", ephemeral=True)
+
+        asyncio.create_task(apply_changes())
 
 
 class PaginationButton(discord.ui.Button):
