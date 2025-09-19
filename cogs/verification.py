@@ -98,6 +98,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         email = self.email.value.strip()
         user_id = interaction.user.id
 
+        # Altijd meteen defer, om timeout te vermijden
         await interaction.response.defer(ephemeral=True)
 
         # Check if user is already verified
@@ -114,9 +115,8 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             )
             return
 
-        # Check if email is already used by checking all records and decrypting
-        all_records = self.bot.db.verifications.find({})
-        async for record in all_records:
+        # Check if email is already used
+        async for record in self.bot.db.verifications.find({}):
             try:
                 decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
                 if decrypted_email == email:
@@ -125,59 +125,32 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
                     )
                     return
             except Exception:
-                # Skip invalid encrypted emails or corrupted records
                 continue
 
-        # Generate code and store in memory
+        # Generate code and store
         code = ''.join(random.choices(string.digits, k=CODE_LENGTH))
         pending_codes[user_id] = (code, email, time.time())
-        
-        # Send immediate thinking response to avoid timeout
-        # await interaction.response.defer(ephemeral=True)
-        
-        # Send email in background and respond with followup
+
         async def send_email_background():
-            email_sent = False
-            email_error = None
             try:
                 send_email(
                     [email],
                     "Jouw verificatiecode voor de Discord-server",
                     f"Jouw verificatiecode is: {code}\nDeze code is 10 minuten geldig."
                 )
-                email_sent = True
+                await interaction.followup.send(
+                    "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
+                    ephemeral=True
+                )
             except Exception as e:
-                email_error = str(e)
-                # Remove the pending code since email failed
                 pending_codes.pop(user_id, None)
-            
-            # Send followup response based on email sending result
-            try:
-                if email_sent:
-                    await interaction.followup.send(
-                        "✅ De code is verstuurd naar je studentenmail. Controleer je inbox (en spam). Gebruik de knop 'Ik heb een code' om je code in te voeren.",
-                        ephemeral=True
-                    )
-                else:
-                    await interaction.followup.send(
-                        f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {email_error}", 
-                        ephemeral=True
-                    )
-            except Exception as discord_error:
-                # If Discord followup fails, log it
-                self.bot.log.error(f"Discord interaction followup failed: {discord_error}")
-                # If email was sent but Discord followup failed, the user can still use the code
-        
-        # Create background task to send email and track exceptions
-        task = asyncio.create_task(send_email_background())
-        def _log_task_exception(task):
-            try:
-                exc = task.exception()
-                if exc:
-                    self.bot.log.error(f"Unhandled exception in send_email_background: {exc}")
-            except Exception as callback_exc:
-                self.bot.log.error(f"Exception in task done callback: {callback_exc}")
-        task.add_done_callback(_log_task_exception)
+                await interaction.followup.send(
+                    f"❌ Er is een fout opgetreden bij het versturen van de e-mail: {e}",
+                    ephemeral=True
+                )
+
+        asyncio.create_task(send_email_background())
+
 
 class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
     code = ui.TextInput(label="Code", placeholder="6-cijferige code", required=True)
@@ -284,22 +257,20 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         old_email = self.old_email.value.strip()
         user_id = interaction.user.id
 
+        # Altijd defer eerst
         await interaction.response.defer(ephemeral=True)
 
-        # Check if user is already verified in new system
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
             await interaction.followup.send("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
 
-        # Validate email format
         if not EMAIL_REGEX.match(old_email):
             await interaction.followup.send("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
-        # Check if email is already used by another account in the new system
-        all_records = self.bot.db.verifications.find({})
-        async for record in all_records:
+        # Check if email already used
+        async for record in self.bot.db.verifications.find({}):
             try:
                 decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
                 if decrypted_email == old_email:
@@ -308,120 +279,45 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                     )
                     return
             except Exception:
-                # Skip invalid encrypted emails or corrupted records
                 continue
 
-        await interaction.response.defer(ephemeral=True)
-
         try:
-            # Create hash of the provided email (same method as old system)
             email_hash = hashlib.sha256(old_email.encode()).hexdigest()
+            old_record = await self.bot.db["oldEmails"].find_one({"user_id": user_id, "email_hash": email_hash})
 
-            # Check if this user was verified with this email in the old system (using migrated data)
-            old_emails_collection = self.bot.db["oldEmails"]
-            old_record = await old_emails_collection.find_one({"user_id": user_id, "email_hash": email_hash})
-            
             if not old_record:
-                try:
-                    await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
-                except discord.HTTPException as e:
-                    if e.code == 10062:
-                        self.bot.log.warning(f"Migration interaction expired (10062) when sending 'no record' message for user {interaction.user}")
-                    else:
-                        self.bot.log.error(f"Failed to send followup message: {e}")
+                await interaction.followup.send("❌ Geen verificatie gevonden voor dit e-mailadres in het oude systeem.", ephemeral=True)
                 return
 
-            # Check if email bounces (indicating user is no longer a student)
-            try:
-                await interaction.followup.send("🔄 Bezig met controleren of je e-mailadres nog actief is... Dit kan enkele minuten duren.", ephemeral=True)
-            except discord.HTTPException as e:
-                if e.code == 10062:
-                    self.bot.log.warning(f"Migration interaction expired (10062) when sending 'checking email' message for user {interaction.user}")
-                    return  # Can't continue if we can't communicate with the user
-                else:
-                    self.bot.log.error(f"Failed to send followup message: {e}")
-                    # Continue anyway, the check might still work
-            
+            await interaction.followup.send("🔄 Bezig met controleren of je e-mailadres nog actief is... Dit kan enkele minuten duren.", ephemeral=True)
+
             bounce_result = await self._check_email_bounce(old_email)
-            
+
             if bounce_result == "bounced":
-                # Email bounces - user is no longer a student, allow migration
-                fernet = Fernet(ENCRYPTION_KEY.encode())
                 encrypted_email = fernet.encrypt(old_email.encode()).decode()
-                
-                # Store in new system with migration flag
-                try:
-                    await self.bot.db.verifications.insert_one({
-                        "user_id": user_id,
-                        "encrypted_email": encrypted_email,
-                        "migrated": True
-                    })
-                    # Migration success logging disabled per user request
-                    # self.bot.log.info(f"Successfully migrated verification for user {interaction.user} ({user_id}) with email {old_email} (email bounced)")
-                except Exception as e:
-                    self.bot.log.error(f"Failed to store migrated verification record for user {interaction.user} ({user_id}) with email {old_email}: {e}", exc_info=True)
-                    try:
-                        await interaction.followup.send("❌ Er is een fout opgetreden bij het opslaan van je migratie. Probeer het opnieuw.", ephemeral=True)
-                    except discord.HTTPException as follow_error:
-                        if follow_error.code == 10062:
-                            self.bot.log.warning(f"Migration followup expired (10062) when sending database error message for user {interaction.user}")
-                        else:
-                            self.bot.log.error(f"Failed to send database error followup: {follow_error}")
-                    return
-                
-                # Assign verified role
-                guild = interaction.guild
-                role = discord.utils.get(guild.roles, name="Verified")
+                await self.bot.db.verifications.insert_one({
+                    "user_id": user_id,
+                    "encrypted_email": encrypted_email,
+                    "migrated": True
+                })
+
+                role = discord.utils.get(interaction.guild.roles, name="Verified")
                 if role:
                     try:
                         await interaction.user.add_roles(role)
-                        # Migration role assignment success logging disabled per user request
-                        # self.bot.log.info(f"Assigned Verified role to migrated user {interaction.user} ({user_id})")
                     except Exception as e:
-                        self.bot.log.error(f"Failed to assign Verified role to migrated user {interaction.user} ({user_id}): {e}", exc_info=True)
-                else:
-                    self.bot.log.warning("Verified role not found in guild during migration")
-                
-                try:
-                    await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
-                except discord.HTTPException as e:
-                    if e.code == 10062:
-                        self.bot.log.warning(f"Migration success followup expired (10062) for user {interaction.user} ({user_id})")
-                    else:
-                        self.bot.log.error(f"Failed to send migration success message: {e}")
-                
-            elif bounce_result == "delivered" or bounce_result == "no_bounce_yet":
-                try:
-                    await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.\n\n💬 Heb je problemen? DM de bot voor ondersteuning!", ephemeral=True)
-                except discord.HTTPException as e:
-                    if e.code == 10062:
-                        self.bot.log.warning(f"Migration 'still active' followup expired (10062) for user {interaction.user} ({user_id})")
-                    else:
-                        self.bot.log.error(f"Failed to send 'still active' message: {e}")
-                
-            else:  # delayed, unknown, send_failed
-                try:
-                    await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
-                except discord.HTTPException as e:
-                    if e.code == 10062:
-                        self.bot.log.warning(f"Migration 'unknown status' followup expired (10062) for user {interaction.user} ({user_id})")
-                    else:
-                        self.bot.log.error(f"Failed to send 'unknown status' message: {e}")
+                        self.bot.log.error(f"Failed to assign role during migration: {e}", exc_info=True)
 
-        except discord.HTTPException as e:
-            if e.code == 10062:  # Unknown interaction - interaction has expired
-                self.bot.log.warning(f"Migration interaction expired (10062) for user {interaction.user} ({user_id})")
+                await interaction.followup.send("✅ Migratie succesvol! Je verificatie is overgebracht naar het nieuwe systeem.", ephemeral=True)
+
+            elif bounce_result in ("delivered", "no_bounce_yet"):
+                await interaction.followup.send("❌ Dit e-mailadres is nog actief. Migratie is alleen beschikbaar voor ex-studenten.", ephemeral=True)
             else:
-                self.bot.log.error(f"Discord HTTP error during migration: {e}", exc_info=True)
+                await interaction.followup.send("❌ Kon de status van het e-mailadres niet bepalen. Probeer het later opnieuw.", ephemeral=True)
+
         except Exception as e:
-            try:
-                await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.\n\n💬 Blijft dit probleem bestaan? DM de bot voor ondersteuning!", ephemeral=True)
-            except discord.HTTPException as follow_error:
-                if follow_error.code == 10062:
-                    self.bot.log.warning(f"Migration followup also expired (10062) for user {interaction.user} ({user_id})")
-                else:
-                    self.bot.log.error(f"Failed to send migration error followup: {follow_error}")
             self.bot.log.error(f"Migration error: {e}", exc_info=True)
+            await interaction.followup.send("❌ Er is een fout opgetreden tijdens de migratie. Probeer het later opnieuw.", ephemeral=True)
 
     def _validate_migration_credentials(self) -> bool:
         """Validate that migration email credentials are properly configured"""
