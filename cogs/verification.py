@@ -98,19 +98,16 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         email = self.email.value.strip()
         user_id = interaction.user.id
 
-        # Altijd meteen defer, om timeout te vermijden
-        await interaction.response.defer(ephemeral=True)
-
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
             return
 
         if not EMAIL_REGEX.match(email):
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Dit is geen geldig HOGENT studentenmailadres.", ephemeral=True
             )
             return
@@ -120,7 +117,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             try:
                 decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
                 if decrypted_email == email:
-                    await interaction.followup.send(
+                    await interaction.response.send_message(
                         "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
                     )
                     return
@@ -161,20 +158,18 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
     async def on_submit(self, interaction: Interaction):
         user_id = interaction.user.id
-
-        await interaction.response.defer(ephemeral=True)
         
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
             return
         
         entry = pending_codes.get(user_id)
         if not entry:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Je hebt geen actieve verificatiecode aangevraagd. Gebruik eerst 'Stuur code'.", ephemeral=True
             )
             return
@@ -182,13 +177,13 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
         code, email, timestamp = entry
         if time.time() - timestamp > CODE_EXPIRY:
             pending_codes.pop(user_id, None)
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Je code is verlopen. Vraag een nieuwe code aan.", ephemeral=True
             )
             return
 
         if self.code.value.strip() != code:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Verkeerde code. Probeer het opnieuw.", ephemeral=True
             )
             return
@@ -204,7 +199,7 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
             # self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
         except Exception as e:
             self.bot.log.error(f"Failed to store verification record for user {interaction.user} ({user_id}) with email {email}: {e}", exc_info=True)
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Er is een fout opgetreden bij het opslaan van je verificatie. Probeer het opnieuw.",
                 ephemeral=True
             )
@@ -228,7 +223,7 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
         else:
             self.bot.log.warning("Verified role not found in guild")
 
-        await interaction.followup.send(
+        await interaction.response.send_message(
             "✅ Je bent succesvol geverifieerd! Je hebt nu toegang tot de server.",
             ephemeral=True
         )
@@ -257,16 +252,13 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         old_email = self.old_email.value.strip()
         user_id = interaction.user.id
 
-        # Altijd defer eerst
-        await interaction.response.defer(ephemeral=True)
-
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.followup.send("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
+            await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
 
         if not EMAIL_REGEX.match(old_email):
-            await interaction.followup.send("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
+            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
         # Check if email already used
@@ -274,7 +266,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             try:
                 decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
                 if decrypted_email == old_email:
-                    await interaction.followup.send(
+                    await interaction.response.send_message(
                         "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
                     )
                     return
