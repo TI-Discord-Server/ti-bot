@@ -4,6 +4,7 @@ import string
 import asyncio
 import time
 import hashlib
+import hmac
 import imaplib
 import email
 import uuid
@@ -17,6 +18,7 @@ from discord.ext import commands
 from discord import app_commands, ui, Interaction
 from motor import motor_asyncio
 
+from utils.crypto import make_email_index
 from utils.email_sender import send_email
 from env import (
     ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT,
@@ -112,17 +114,16 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             )
             return
 
-        # Check if email is already used
-        async for record in self.bot.db.verifications.find({}):
-            try:
-                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-                if decrypted_email == email:
-                    await interaction.response.send_message(
-                        "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
-                    )
-                    return
-            except Exception:
-                continue
+        # Bereken blind index met HMAC
+        email_index = make_email_index(email)
+
+        # Check if email already exists via blind index
+        exists = await self.bot.db.verifications.find_one({"email_index": email_index})
+        if exists:
+            await interaction.followup.send(
+                "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+            )
+            return
 
         # Generate code and store
         code = ''.join(random.choices(string.digits, k=CODE_LENGTH))
@@ -190,10 +191,12 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
         # Store in DB: user_id (plaintext), encrypted_email
         encrypted_email = fernet.encrypt(email.encode()).decode()
+        email_index = make_email_index(email)
         try:
             await self.bot.db.verifications.insert_one({
                 "user_id": user_id,
-                "encrypted_email": encrypted_email
+                "encrypted_email": encrypted_email,
+                "email_index": email_index
             })
             # Verification success logging disabled per user request
             # self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
@@ -261,17 +264,14 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
-        # Check if email already used
-        async for record in self.bot.db.verifications.find({}):
-            try:
-                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-                if decrypted_email == old_email:
-                    await interaction.response.send_message(
-                        "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
-                    )
-                    return
-            except Exception:
-                continue
+        # Check if email already used via HMAC index
+        email_index = make_email_index(old_email)
+        exists = await self.bot.db.verifications.find_one({"email_index": email_index})
+        if exists:
+            await interaction.response.send_message(
+                "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+            )
+            return
 
         try:
             email_hash = hashlib.sha256(old_email.encode()).hexdigest()
@@ -290,6 +290,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 await self.bot.db.verifications.insert_one({
                     "user_id": user_id,
                     "encrypted_email": encrypted_email,
+                    "email_index": make_email_index(old_email),
                     "migrated": True
                 })
 
@@ -640,17 +641,10 @@ class Verification(commands.Cog):
             # Search by user ID
             record = await self.bot.db.verifications.find_one({"user_id": user.id})
         else:
-            # Search by email (decrypt all records)
-            all_records = self.bot.db.verifications.find({})
-            async for r in all_records:
-                try:
-                    decrypted_email = fernet.decrypt(r['encrypted_email'].encode()).decode()
-                    if decrypted_email == email:
-                        record = r
-                        break
-                except Exception:
-                    # Skip invalid encrypted emails or corrupted records
-                    continue
+            # Search by email using HMAC index
+            email_index = make_email_index(email)
+            record = await self.bot.db.verifications.find_one({"email_index": email_index})
+
         
         if not record:
             search_term = f"gebruiker {user.mention}" if user else f"e-mailadres {email}"
@@ -851,8 +845,44 @@ class Verification(commands.Cog):
             # Wait 1 hour before next cleanup
             await asyncio.sleep(3600)
 
+    @app_commands.command(name="migrate_email_index", description="Voeg email_index toe aan alle oude verificaties (Admin only)")
+    async def migrate_email_index(self, interaction: Interaction):
+        # Alleen admins laten draaien
+        if not any(r.permissions.administrator for r in interaction.user.roles):
+            await interaction.response.send_message("❌ Alleen administrators mogen dit commando uitvoeren.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("🔄 Start migratie van email_index...", ephemeral=True)
+
+        updated = 0
+        failed = 0
+
+        async for record in self.bot.db.verifications.find({}):
+            if "email_index" in record:
+                continue  # al gemigreerd
+
+            try:
+                decrypted_email = fernet.decrypt(record["encrypted_email"].encode()).decode()
+                email_index = make_email_index(decrypted_email)
+
+                await self.bot.db.verifications.update_one(
+                    {"_id": record["_id"]},
+                    {"$set": {"email_index": email_index}}
+                )
+                updated += 1
+            except Exception as e:
+                failed += 1
+                self.bot.log.error(f"Failed to migrate record {record['_id']}: {e}")
+
+        await interaction.followup.send(
+            f"✅ Migratie voltooid! {updated} records bijgewerkt. ⚠️ {failed} mislukt.",
+            ephemeral=True
+        )
+
 async def setup(bot):
     cog = Verification(bot)
+    # Zorg dat de index er is
+    await bot.db.verifications.create_index("email_index", unique=True)
     # Persistent views are now handled centrally by PersistentViewManager
     bot.loop.create_task(cog.cleanup_orphaned_records())
     await bot.add_cog(cog)
