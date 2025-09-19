@@ -15,11 +15,12 @@ from email.mime.text import MIMEText
 
 import discord
 from discord.ext import commands
-from discord import app_commands, ui, Interaction
+from discord import ui, Interaction, app_commands
 from motor import motor_asyncio
 
 from utils.crypto import make_email_index
 from utils.email_sender import send_email
+from utils.checks import developer
 from env import (
     ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT,
     MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD, MIGRATION_SMTP_SERVER, MIGRATION_SMTP_PORT,
@@ -845,13 +846,9 @@ class Verification(commands.Cog):
             # Wait 1 hour before next cleanup
             await asyncio.sleep(3600)
 
-    @app_commands.command(name="migrate_email_index", description="Voeg email_index toe aan alle oude verificaties (Admin only)")
+    @app_commands.command(name="migrate_email_index", description="Voeg email_index toe aan alle oude verificaties")
+    @developer()
     async def migrate_email_index(self, interaction: Interaction):
-        # Alleen admins laten draaien
-        if not any(r.permissions.administrator for r in interaction.user.roles):
-            await interaction.response.send_message("❌ Alleen administrators mogen dit commando uitvoeren.", ephemeral=True)
-            return
-
         await interaction.response.send_message("🔄 Start migratie van email_index...", ephemeral=True)
 
         updated = 0
