@@ -671,20 +671,12 @@ class Verification(commands.Cog):
             await interaction.response.send_message("🔄 Verificatie wordt ingetrokken en gebruiker wordt gekickt...", ephemeral=True)
         
         # Remove verification from database
-        try:
-            # Get email for logging before deletion
-            email_info = ""
-            try:
-                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-                email_info = f" (email: {decrypted_email})"
-            except Exception:
-                email_info = " (email: [decryption failed])"
-            
+        try:            
             result = await self.bot.db.verifications.delete_one({"_id": record["_id"]})
             
             if result.deleted_count > 0:
                 target_info = f"user {member} ({record['user_id']})" if member else f"user ID {record['user_id']}"
-                self.bot.log.info(f"Manually revoked verification for {target_info}{email_info} by admin {interaction.user} ({interaction.user.id})")
+                self.bot.log.info(f"Manually revoked verification for {target_info} by admin {interaction.user} ({interaction.user.id})")
             else:
                 self.bot.log.warning(f"Failed to delete verification record for user ID {record['user_id']} during manual revocation")
                 
@@ -754,19 +746,12 @@ class Verification(commands.Cog):
             # Check if user had a verification record before removing
             existing_record = await self.bot.db.verifications.find_one({"user_id": member.id})
             
-            if existing_record:
-                # Decrypt email for logging (if possible)
-                try:
-                    decrypted_email = fernet.decrypt(existing_record['encrypted_email'].encode()).decode()
-                    email_info = f" (email: {decrypted_email})"
-                except Exception:
-                    email_info = " (email: [decryption failed])"
-                
+            if existing_record:                
                 # Remove verification record
                 result = await self.bot.db.verifications.delete_one({"user_id": member.id})
                 
                 if result.deleted_count > 0:
-                    self.bot.log.info(f"Removed verification record for user {member} ({member.id}) who left the server{email_info}")
+                    self.bot.log.info(f"Removed verification record for user {member} ({member.id}) who left the server")
                 else:
                     self.bot.log.warning(f"Failed to remove verification record for user {member} ({member.id}) who left the server")
             else:
@@ -814,21 +799,13 @@ class Verification(commands.Cog):
                     member = guild.get_member(user_id)
                     if not member:
                         # User is no longer in the server, remove their verification record
-                        try:
-                            # Try to decrypt email for logging
-                            email_info = ""
-                            try:
-                                decrypted_email = fernet.decrypt(record['encrypted_email'].encode()).decode()
-                                email_info = f" (email: {decrypted_email})"
-                            except Exception:
-                                email_info = " (email: [decryption failed])"
-                            
+                        try:                            
                             # Remove the record
                             result = await self.bot.db.verifications.delete_one({"user_id": user_id})
                             
                             if result.deleted_count > 0:
                                 cleanup_count += 1
-                                self.bot.log.info(f"Cleaned up orphaned verification record for user ID {user_id}{email_info} (no longer in server)")
+                                self.bot.log.info(f"Cleaned up orphaned verification record for user ID {user_id} (no longer in server)")
                             else:
                                 self.bot.log.warning(f"Failed to delete orphaned verification record for user ID {user_id}")
                                 
