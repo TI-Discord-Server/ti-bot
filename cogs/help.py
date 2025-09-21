@@ -204,4 +204,3 @@ class Help(commands.Cog, name="help"):
 async def setup(bot):
     help_cog = Help(bot)
     await bot.add_cog(help_cog)
-    bot.log.info("Help cog loaded successfully")
