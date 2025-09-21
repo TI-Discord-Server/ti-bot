@@ -855,8 +855,19 @@ class Verification(commands.Cog):
 
 async def setup(bot):
     cog = Verification(bot)
-    # Zorg dat de index er is
-    await bot.db.verifications.create_index("email_index", unique=True)
-    # Persistent views are now handled centrally by PersistentViewManager
-    bot.loop.create_task(cog.cleanup_orphaned_records())
     await bot.add_cog(cog)
+
+    # Index maken in de achtergrond (niet blokkeren bij load)
+    async def ensure_index():
+        try:
+            await bot.wait_until_ready()
+            await bot.db.verifications.create_index("email_index", unique=True)
+            bot.log.info("✅ email_index ensured on verifications collection")
+        except Exception as e:
+            bot.log.error(f"Failed to ensure email_index: {e}", exc_info=True)
+
+    bot.loop.create_task(ensure_index())
+
+    # Start cleanup taak
+    bot.loop.create_task(cog.cleanup_orphaned_records())
+
