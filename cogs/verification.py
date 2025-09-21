@@ -115,14 +115,22 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             )
             return
 
-        # Bereken blind index met HMAC
-        email_index = make_email_index(email)
+        try:
+            # Bereken blind index met HMAC
+            email_index = make_email_index(email)
 
-        # Check if email already exists via blind index
-        exists = await self.bot.db.verifications.find_one({"email_index": email_index})
-        if exists:
+            # Check if email already exists via blind index
+            exists = await self.bot.db.verifications.find_one({"email_index": email_index})
+            if exists:
+                await interaction.followup.send(
+                    "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+                )
+                return
+        except Exception as e:
+            self.bot.log.error(f"Error checking email existence for {email}: {e}", exc_info=True)
             await interaction.followup.send(
-                "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+                "❌ Er is een fout opgetreden bij het verwerken van je e-mailadres. Probeer het later opnieuw.",
+                ephemeral=True
             )
             return
 
@@ -265,12 +273,20 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
-        # Check if email already used via HMAC index
-        email_index = make_email_index(old_email)
-        exists = await self.bot.db.verifications.find_one({"email_index": email_index})
-        if exists:
+        try:
+            # Check if email already used via HMAC index
+            email_index = make_email_index(old_email)
+            exists = await self.bot.db.verifications.find_one({"email_index": email_index})
+            if exists:
+                await interaction.response.send_message(
+                    "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+                )
+                return
+        except Exception as e:
+            self.bot.log.error(f"Error checking email existence for migration {old_email}: {e}", exc_info=True)
             await interaction.response.send_message(
-                "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
+                "❌ Er is een fout opgetreden bij het verwerken van je e-mailadres. Probeer het later opnieuw.",
+                ephemeral=True
             )
             return
 
@@ -642,9 +658,17 @@ class Verification(commands.Cog):
             # Search by user ID
             record = await self.bot.db.verifications.find_one({"user_id": user.id})
         else:
-            # Search by email using HMAC index
-            email_index = make_email_index(email)
-            record = await self.bot.db.verifications.find_one({"email_index": email_index})
+            try:
+                # Search by email using HMAC index
+                email_index = make_email_index(email)
+                record = await self.bot.db.verifications.find_one({"email_index": email_index})
+            except Exception as e:
+                self.bot.log.error(f"Error checking email existence for unverify {email}: {e}", exc_info=True)
+                await interaction.response.send_message(
+                    "❌ Er is een fout opgetreden bij het verwerken van het e-mailadres. Probeer het later opnieuw.",
+                    ephemeral=True
+                )
+                return
 
         
         if not record:
