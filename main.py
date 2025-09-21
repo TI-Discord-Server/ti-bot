@@ -502,6 +502,7 @@ class Bot(commands.Bot):
             if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
                 try:
                     await self.load_extension("cogs." + m)
+                    self.log.info(f"Loaded {m} cog")
                 except Exception:
                     self.log.critical(f"Couldn't load {m} cog", exc_info=True)
 
