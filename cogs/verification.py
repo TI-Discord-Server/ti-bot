@@ -102,7 +102,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         email = self.email.value.strip()
         user_id = interaction.user.id
 
-        await interaction.response.send_message("📨 Je e-mailadres wordt gecontroleerd en de code wordt verstuurd...", ephemeral=True)  
+        await interaction.followup.send("📨 Je e-mailadres wordt gecontroleerd en de code wordt verstuurd...", ephemeral=True)
 
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
