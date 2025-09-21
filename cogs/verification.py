@@ -98,6 +98,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         self.bot = bot
 
     async def on_submit(self, interaction: Interaction):
+        await interaction.response.defer(ephemeral=True)
         email = self.email.value.strip()
         user_id = interaction.user.id
 
