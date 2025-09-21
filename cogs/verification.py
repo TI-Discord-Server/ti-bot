@@ -861,7 +861,11 @@ async def setup(bot):
     async def ensure_index():
         try:
             await bot.wait_until_ready()
-            await bot.db.verifications.create_index("email_index", unique=True)
+            await bot.db.verifications.create_index(
+                "email_index",
+                unique=True,
+                partialFilterExpression={"email_index": {"$exists": True, "$type": "string"}}
+            )
             bot.log.info("✅ email_index ensured on verifications collection")
         except Exception as e:
             bot.log.error(f"Failed to ensure email_index: {e}", exc_info=True)
