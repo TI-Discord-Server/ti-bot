@@ -103,17 +103,16 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         user_id = interaction.user.id
 
         await interaction.followup.send("📨 Je e-mailadres wordt gecontroleerd en de code wordt verstuurd...", ephemeral=True)
-
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
             return
 
         if not EMAIL_REGEX.match(email):
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Dit is geen geldig HOGENT studentenmailadres.", ephemeral=True
             )
             return
@@ -213,7 +212,7 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
             # Verification success logging disabled per user request
             # self.bot.log.info(f"Successfully verified user {interaction.user} ({user_id}) with email {email}")
         except Exception as e:
-            self.bot.log.error(f"Failed to store verification record for user {interaction.user} ({user_id}) with email {email}: {e}", exc_info=True)
+            self.bot.log.error(f"Failed to store verification record for user {interaction.user} ({user_id}): {e}", exc_info=True)
             await interaction.response.send_message(
                 "❌ Er is een fout opgetreden bij het opslaan van je verificatie. Probeer het opnieuw.",
                 ephemeral=True
@@ -224,10 +223,7 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
         # Assign verified role (replace 'Verified' with your role name)
         guild = interaction.guild
-        settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
-        verified_role_id = settings.get("verified_role_id")
-
-        role = guild.get_role(verified_role_id) if verified_role_id else None
+        role = discord.utils.get(guild.roles, name="Verified")
         if role:
             try:
                 await interaction.user.add_roles(role)
@@ -269,14 +265,14 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         user_id = interaction.user.id
 
         await interaction.followup.send("🔄 Bezig met migreren van je verificatie...", ephemeral=True)
-
+        
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.followup.send("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
+            await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
 
         if not EMAIL_REGEX.match(old_email):
-            await interaction.followup.send("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
+            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
         try:
@@ -310,6 +306,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
 
             if bounce_result == "bounced":
                 encrypted_email = fernet.encrypt(old_email.encode()).decode()
+
                 await self.bot.db.verifications.insert_one({
                     "user_id": user_id,
                     "encrypted_email": encrypted_email,
@@ -318,6 +315,10 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                 })
 
                 role = discord.utils.get(interaction.guild.roles, name="Verified")
+                settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
+                verified_role_id = settings.get("verified_role_id")
+                role = guild.get_role(verified_role_id) if verified_role_id else None
+
                 if role:
                     try:
                         await interaction.user.add_roles(role)
@@ -701,7 +702,8 @@ class Verification(commands.Cog):
             await interaction.response.send_message("🔄 Verificatie wordt ingetrokken en gebruiker wordt gekickt...", ephemeral=True)
         
         # Remove verification from database
-        try:            
+
+        try:
             result = await self.bot.db.verifications.delete_one({"_id": record["_id"]})
             
             if result.deleted_count > 0:
