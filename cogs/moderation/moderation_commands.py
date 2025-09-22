@@ -376,12 +376,12 @@ class ModCommands(commands.Cog, name="ModCommands"):
     ):
         await self.mute_system.handle_unmute_command(interaction, member, reason)
 
-    @app_commands.command(name="history", description="Laat de recente straffen van een member zien.")
+    @app_commands.command(name="history", description="Laat de recente straffen van een gebruiker zien.")
     @has_role("The Council")
-    @app_commands.describe(member="De gebruiker om de voorgaande straffen van te bekijken")
-    async def history(self, interaction: discord.Interaction, member: discord.Member):
+    @app_commands.describe(user="De gebruiker om de voorgaande straffen van te bekijken")
+    async def history(self, interaction: discord.Interaction, user: discord.User):
         infractions = await self.infractions_collection.find(
-            {"guild_id": interaction.guild.id, "user_id": member.id}
+            {"guild_id": interaction.guild.id, "user_id": user.id}
         ).sort("timestamp", pymongo.DESCENDING).limit(10).to_list(length=None)
         
         # Dutch translations for infraction types
@@ -402,7 +402,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
             # Parse timestamp - handle both datetime objects and ISO strings
             timestamp = infraction['timestamp']
             if isinstance(timestamp, str):
-                # Parse ISO string to datetime
                 timestamp = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             
             localized_timestamp = to_local(timestamp)
@@ -412,11 +411,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
             # Extract duration information if present in reason
             duration_info = ""
             if "(duur:" in reason:
-                # Extract duration from reason like "reason (duur: 1h)"
                 duration_match = re.search(r'\(duur: ([^)]+)\)', reason)
                 if duration_match:
                     duration_info = f" **({duration_match.group(1)})**"
-                    # Remove duration from reason for cleaner display
                     reason = re.sub(r'\s*\(duur: [^)]+\)', '', reason)
             
             # Get moderator info if available
@@ -431,22 +428,32 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 except:
                     moderator_info = ""
             
-            infraction_list += f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> - **{infraction_type}**{duration_info}{moderator_info}\n**Reden:** {reason}\n\n"
+            infraction_list += (
+                f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> "
+                f"- **{infraction_type}**{duration_info}{moderator_info}\n"
+                f"**Reden:** {reason}\n\n"
+            )
 
         if not infraction_list:
             infraction_list = "Geen voorgaande straffen gevonden voor deze gebruiker."
 
+        # Check of user nog lid is
+        member = interaction.guild.get_member(user.id)
+
         embed = discord.Embed(
-            title=f"Strafgeschiedenis voor {member.name}",
+            title=f"Strafgeschiedenis voor {user.name}",
             color=discord.Color.blue(),
             description=infraction_list,
         )
-        embed.add_field(
-            name="Lid Sinds",
-            value=f"<t:{int(time.mktime(to_local(member.joined_at).timetuple()))}:D>",
-            inline=False,
-        )
-        embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
+
+        if member and member.joined_at:
+            embed.add_field(
+                name="Lid Sinds",
+                value=f"<t:{int(time.mktime(to_local(member.joined_at).timetuple()))}:D>",
+                inline=False,
+            )
+
+        embed.set_thumbnail(url=user.avatar.url if user.avatar else user.default_avatar.url)
         await interaction.response.send_message(embed=embed)
 
 
