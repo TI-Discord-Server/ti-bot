@@ -107,13 +107,13 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
             return
 
         if not EMAIL_REGEX.match(email):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Dit is geen geldig HOGENT studentenmailadres.", ephemeral=True
             )
             return
@@ -268,13 +268,15 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         old_email = self.old_email.value.strip()
         user_id = interaction.user.id
 
+        await interaction.followup.send("🔄 Bezig met migreren van je verificatie...", ephemeral=True)
+
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
+            await interaction.followup.send("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
 
         if not EMAIL_REGEX.match(old_email):
-            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
+            await interaction.followup.send("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
         try:
@@ -282,13 +284,13 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
             email_index = make_email_index(old_email)
             exists = await self.bot.db.verifications.find_one({"email_index": email_index})
             if exists:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "❌ Dit e-mailadres is al gekoppeld aan een andere Discord-account.", ephemeral=True
                 )
                 return
         except Exception as e:
             self.bot.log.error(f"Error checking email existence for migration {old_email}: {e}", exc_info=True)
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Er is een fout opgetreden bij het verwerken van je e-mailadres. Probeer het later opnieuw.",
                 ephemeral=True
             )
