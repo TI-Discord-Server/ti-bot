@@ -139,11 +139,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
         # Generate code and store
         code = ''.join(random.choices(string.digits, k=CODE_LENGTH))
         pending_codes[user_id] = (code, email, time.time())
-        
-        # Send immediate thinking response to avoid timeout
-        await interaction.response.defer(ephemeral=True)
-        
-        # Send email in background and respond with followup
+
         async def send_email_background():
             try:
                 send_email(
@@ -318,7 +314,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                     "migrated": True
                 })
 
-                guild = interaction.guild
+                role = discord.utils.get(interaction.guild.roles, name="Verified")
                 settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
                 verified_role_id = settings.get("verified_role_id")
                 role = guild.get_role(verified_role_id) if verified_role_id else None
