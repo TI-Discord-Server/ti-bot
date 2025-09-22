@@ -21,6 +21,7 @@ from motor import motor_asyncio
 from utils.crypto import make_email_index
 from utils.email_sender import send_email
 from utils.checks import developer
+from utils.verification_check import ensure_verified_role
 from env import (
     ENCRYPTION_KEY, SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT, IMAP_SERVER, IMAP_PORT,
     MIGRATION_SMTP_EMAIL, MIGRATION_SMTP_PASSWORD, MIGRATION_SMTP_SERVER, MIGRATION_SMTP_PORT,
@@ -51,6 +52,7 @@ class VerificationView(ui.View):
             await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
+            await ensure_verified_role(self.bot, interaction)
             return
         
         await interaction.response.send_modal(EmailModal(self.bot))
@@ -63,6 +65,7 @@ class VerificationView(ui.View):
             await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
+            await ensure_verified_role(self.bot, interaction)
             return
         
         await interaction.response.send_modal(CodeModal(self.bot))
@@ -75,6 +78,7 @@ class VerificationView(ui.View):
             await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
+            await ensure_verified_role(self.bot, interaction)
             return
         
         embed = discord.Embed(
@@ -109,6 +113,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
             await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
+            await ensure_verified_role(self.bot, interaction)
             return
 
         if not EMAIL_REGEX.match(email):
@@ -177,6 +182,7 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
             await interaction.response.send_message(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
+            await ensure_verified_role(self.bot, interaction)
             return
         
         entry = pending_codes.get(user_id)
@@ -223,7 +229,9 @@ class CodeModal(ui.Modal, title="Voer je verificatiecode in"):
 
         # Assign verified role (replace 'Verified' with your role name)
         guild = interaction.guild
-        role = discord.utils.get(guild.roles, name="Verified")
+        settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
+        verified_role_id = settings.get("verified_role_id")
+        role = guild.get_role(verified_role_id) if verified_role_id else None
         if role:
             try:
                 await interaction.user.add_roles(role)
