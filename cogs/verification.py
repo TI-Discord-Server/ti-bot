@@ -314,6 +314,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
                     "migrated": True
                 })
 
+                guild = interaction.guild
                 role = discord.utils.get(interaction.guild.roles, name="Verified")
                 settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
                 verified_role_id = settings.get("verified_role_id")
