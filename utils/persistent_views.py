@@ -182,8 +182,8 @@ class PersistentViewManager:
                     return view
             
             elif view_type == "channel_menu":
-                from cogs.channel_menu import YearSelectView
-                return YearSelectView(self.bot)
+                from cogs.channel_menu import YearButtonsView
+                return YearButtonsView(self.bot)
             
             elif view_type == "confession":
                 from cogs.confessions.confession_view import ConfessionView

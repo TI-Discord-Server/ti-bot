@@ -102,7 +102,7 @@ class ConfigurationView(discord.ui.View):
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
     
-    async def create_main_embed(self):
+    async def create_embed(self):
         """Create the main configuration embed."""
         try:
             embed = discord.Embed(
@@ -150,10 +150,44 @@ class BaseConfigView(discord.ui.View):
     
     @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary, row=4)
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Go back to main configuration menu."""
-        view = ConfigurationView(self.bot, self.user_id, self.visible)
-        embed = await view.create_main_embed()
-        await interaction.response.edit_message(embed=embed, view=view)
+        """Go back to the appropriate config view."""
+        try:
+            self.bot.log.debug(f"Back button clicked for {self.settings_id}.")
+            
+            # Determine which config view to return to based on settings_id and field_name
+            if self.settings_id == "server_settings":
+                view = ServerConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "modmail_settings":
+                view = ModmailConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "confession_settings":
+                view = ConfessionsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "reports_settings":
+                view = ReportsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "verification_settings":
+                view = VerificationConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "channel_menu_settings":
+                view = RolesChannelsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "mod_settings":
+                view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+            elif self.settings_id == "exam_settings":
+                view = ExamResultsConfigView(self.bot, self.user_id, True)
+            else:
+                view = ConfigurationView(self.bot, self.user_id, True)
+            
+            embed = await view.create_embed()
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
+            error_embed = discord.Embed(
+                title="❌ Fout",
+                description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            except discord.InteractionResponded:
+                await interaction.followup.send(embed=error_embed, ephemeral=True)
 
 
 class ServerConfigView(BaseConfigView):
@@ -162,6 +196,7 @@ class ServerConfigView(BaseConfigView):
     async def create_embed(self):
         """Create server configuration embed."""
         try:
+            self.settings_id = "baseconfig"
             settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
             
             embed = discord.Embed(
@@ -376,6 +411,7 @@ class ModmailConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create modmail configuration embed."""
+        self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "modmail_settings"}) or {}
         
         embed = discord.Embed(
@@ -444,6 +480,7 @@ class ConfessionsConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create confessions configuration embed."""
+        self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "confession_settings"}) or {}
         
         embed = discord.Embed(
@@ -533,6 +570,7 @@ class ReportsConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create reports configuration embed."""
+        self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "reports_settings"}) or {}
         
         embed = discord.Embed(
@@ -601,6 +639,7 @@ class VerificationConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create verification configuration embed."""
+        self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "verification_settings"}) or {}
         
         embed = discord.Embed(
@@ -644,6 +683,7 @@ class RolesChannelsConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create roles and channels configuration embed."""
+        self.settings_id = "baseconfig"
         embed = discord.Embed(
             title="🎭 Rollen & Kanalen Instellingen",
             description="Configuratie voor rol en kanaal menu systemen",
@@ -712,13 +752,12 @@ class RolesChannelsConfigView(BaseConfigView):
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
 
-
 # Channel and Role Selection Views
-class ChannelSelectView(discord.ui.View):
+class ChannelSelectView(BaseConfigView):
     """View for selecting channels."""
     
     def __init__(self, bot, user_id: int, settings_id: str, field_name: str, channel_type: str):
-        super().__init__(timeout=300)
+        super().__init__(self, bot, user_id)
         self.bot = bot
         self.user_id = user_id
         self.settings_id = settings_id
@@ -804,41 +843,44 @@ class ChannelSelectView(discord.ui.View):
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
     
-    @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary)
-    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Go back to the appropriate config view."""
-        try:
-            self.bot.log.debug(f"Back button clicked for {self.settings_id}.{self.field_name}")
+    # @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary)
+    # async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    #     """Go back to the appropriate config view."""
+    #     try:
+    #         self.bot.log.debug(f"Back button clicked for {self.settings_id}.{self.field_name}")
             
-            # Determine which config view to return to based on settings_id and field_name
-            if self.settings_id == "modmail_settings":
-                view = ModmailConfigView(self.bot, self.user_id, True)
-            elif self.settings_id == "confession_settings":
-                view = ConfessionsConfigView(self.bot, self.user_id, True)
-            elif self.settings_id == "reports_settings":
-                view = ReportsConfigView(self.bot, self.user_id, True)
-            elif self.settings_id == "mod_settings":
-                # All mod_settings fields now go to UnbanRequestsConfigView
-                view = UnbanRequestsConfigView(self.bot, self.user_id, True)
-                self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
-            else:
-                view = ConfigurationView(self.bot, self.user_id, True)
-                self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
+    #         # Determine which config view to return to based on settings_id and field_name
+    #         if self.settings_id == "modmail_settings":
+    #             view = ModmailConfigView(self.bot, self.user_id, True)
+    #         elif self.settings_id == "confession_settings":
+    #             view = ConfessionsConfigView(self.bot, self.user_id, True)
+    #         elif self.settings_id == "reports_settings":
+    #             view = ReportsConfigView(self.bot, self.user_id, True)
+    #         elif self.settings_id == "mod_settings":
+    #             # All mod_settings fields now go to UnbanRequestsConfigView
+    #             view = UnbanRequestsConfigView(self.bot, self.user_id, True)
+    #             self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
+    #         elif self.settings_id == "channel_menu_settings":
+    #             view = RolesChannelsConfigView(self.bot, self.user_id, True)
+    #             self.bot.log.debug(f"Returning to RolesChannelsConfigView for field {self.field_name}")
+    #         else:
+    #             view = ConfigurationView(self.bot, self.user_id, True)
+    #             self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
             
-            embed = await view.create_embed()
-            await interaction.response.edit_message(embed=embed, view=view)
+    #         embed = await view.create_embed()
+    #         await interaction.response.edit_message(embed=embed, view=view)
             
-        except Exception as e:
-            self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
-            error_embed = discord.Embed(
-                title="❌ Fout",
-                description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
-                color=discord.Color.red()
-            )
-            try:
-                await interaction.response.send_message(embed=error_embed, ephemeral=True)
-            except discord.InteractionResponded:
-                await interaction.followup.send(embed=error_embed, ephemeral=True)
+    #     except Exception as e:
+    #         self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
+    #         error_embed = discord.Embed(
+    #             title="❌ Fout",
+    #             description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
+    #             color=discord.Color.red()
+    #         )
+    #         try:
+    #             await interaction.response.send_message(embed=error_embed, ephemeral=True)
+    #         except discord.InteractionResponded:
+    #             await interaction.followup.send(embed=error_embed, ephemeral=True)
     
     async def on_timeout(self):
         """Handle timeout."""
@@ -1025,6 +1067,7 @@ class ExamResultsConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create exam results configuration embed."""
+        self.settings_id = "baseconfig" 
         try:
             self.bot.log.debug("Creating exam results configuration embed")
             settings = await self.bot.db.settings.find_one({"_id": "exam_results_settings"}) or {}
@@ -1079,25 +1122,6 @@ class ExamResultsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van het datum menu:\n```{str(e)}```",
-                color=discord.Color.red()
-            )
-            try:
-                await interaction.response.send_message(embed=error_embed, ephemeral=True)
-            except discord.InteractionResponded:
-                await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
-    @discord.ui.button(label="← Terug naar Menu", style=discord.ButtonStyle.secondary, emoji="🏠")
-    async def back_to_main(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Go back to main configuration menu."""
-        try:
-            view = ConfigurationView(self.bot, self.user_id, self.visible)
-            embed = await view.create_main_embed()
-            await interaction.response.edit_message(embed=embed, view=view)
-        except Exception as e:
-            self.bot.log.error(f"Error going back to main menu: {e}", exc_info=True)
-            error_embed = discord.Embed(
-                title="❌ Fout",
-                description=f"Er is een fout opgetreden:\n```{str(e)}```",
                 color=discord.Color.red()
             )
             try:
@@ -1267,7 +1291,7 @@ class Configure(commands.Cog):
             await interaction.response.defer(ephemeral=not visible)
             
             view = ConfigurationView(self.bot, interaction.user.id, visible)
-            embed = await view.create_main_embed()
+            embed = await view.create_embed()
             await interaction.followup.send(embed=embed, view=view, ephemeral=not visible)
             self.bot.log.info("Configure command completed successfully")
             
@@ -1313,6 +1337,7 @@ class RoleCategoryManagementView(BaseConfigView):
     
     async def create_embed(self):
         """Create category management embed."""
+        self.settings_id = "channel_menu_settings"
         embed = discord.Embed(
             title="📁 Categorie Beheer",
             description="Beheer rol categorieën",
@@ -1369,6 +1394,7 @@ class RoleManagementView(BaseConfigView):
     
     async def create_embed(self):
         """Create role management embed."""
+        self.settings_id = "channel_menu_settings"
         embed = discord.Embed(
             title="🎭 Rol Beheer",
             description="Beheer rollen in categorieën",
@@ -1750,6 +1776,7 @@ class UnbanRequestsConfigView(BaseConfigView):
     
     async def create_embed(self):
         """Create unban requests configuration embed."""
+        self.settings_id = "baseconfig"
         try:
             self.bot.log.debug("Creating unban requests configuration embed")
             settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
@@ -2048,7 +2075,6 @@ class UnbanRequestsConfigView(BaseConfigView):
                 "❌ Er is een fout opgetreden bij het verzenden van het unban request bericht.",
                 ephemeral=True
             )
-
 
 async def setup(bot):
     await bot.add_cog(Configure(bot))
