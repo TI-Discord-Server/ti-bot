@@ -172,6 +172,20 @@ class ConfessionTasks(commands.Cog):
                 f"Geen matching message gevonden voor confession {confession['_id']}"
             )
             return
+        
+        # --- Bepaal of dit de laatste post-run van de dag is ---
+        settings = await self.get_settings()
+        post_times = settings.get("post_times", [])
+        is_last_confession = False
+        if post_times:
+            try:
+                last_post_time = post_times[-1]
+                hour, minute = map(int, last_post_time.split(":"))
+                now = datetime.datetime.now(LOCAL_TIMEZONE)
+                is_last_confession = (now.hour == hour and now.minute == minute)
+            except Exception as e:
+                self.bot.log.error(f"Kon last_post_time niet parsen: {e}")
+        # --------------------------------------------------------
 
         allow_votes = 0
         deny_votes = 0
@@ -200,19 +214,7 @@ class ConfessionTasks(commands.Cog):
                 color=discord.Color.green(),
             )
 
-            # Bepaal of dit de laatste van de dag is
-            settings = await self.get_settings()
-            post_times = settings.get("post_times", [])
-            last_post_time = post_times[-1] if post_times else None
-
-            is_last_confession = False
-            if last_post_time:
-                hour, minute = map(int, last_post_time.split(":"))
-                now = datetime.datetime.now(LOCAL_TIMEZONE)
-                is_last_confession = now.hour == hour and now.minute == minute
-
             if is_last_confession:
-                from cogs.confessions.confession_view import ConfessionView
                 message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
 
                 # Sla dit bericht op zodat de knop persistent blijft
@@ -238,15 +240,37 @@ class ConfessionTasks(commands.Cog):
             await matching_message.delete()
             self.bot.log.info(f"Confession {confession['_id']} werd verworpen.")
 
-        else:
-            await self.bot.db.confessions.update_one(
-                {"_id": confession["_id"]},
-                {"$set": {"status": "pending", "message_id": None}},
-            )
-            await matching_message.delete()
-            self.bot.log.info(
-                f"Confession {confession['_id']} blijft onder review vanwege gelijke stemmen."
-            )
+            # ⬇️ Als dit de laatste confession van de dag is → losse knop posten
+            if is_last_confession:
+                # Verwijder eventueel vorige losse knop
+                settings = await self.get_settings()
+                last_button_id = settings.get("last_button_message_id")
+                if last_button_id:
+                    try:
+                        old_msg = await public_channel.fetch_message(last_button_id)
+                        await old_msg.delete()
+                        self.bot.log.debug(f"Oude losse knop {last_button_id} verwijderd")
+                    except discord.NotFound:
+                        self.bot.log.debug("Vorige losse knop niet meer gevonden (al verwijderd)")
+                    except Exception as e:
+                        self.bot.log.error(f"Fout bij verwijderen oude losse knop {last_button_id}: {e}")
+
+
+                message = await public_channel.send(
+                    content="Klik hieronder voor een confession te maken ⬇️",
+                    view=ConfessionView(self.bot)
+                )
+
+                if self.bot.persistent_view_manager:
+                    await self.bot.persistent_view_manager.store_view_message(
+                        "confession", public_channel.id, message.id, public_channel.guild.id
+                    )
+                    # Sla ID van dit losse knopbericht op
+                await self.bot.db.settings.update_one(
+                    {"_id": "confession_settings"},
+                    {"$set": {"last_button_message_id": message.id}},
+                    upsert=True
+                )
 
     async def _post_submit_message(self, public_channel):
         """Post a new submit confession message (eenmalig via command)."""

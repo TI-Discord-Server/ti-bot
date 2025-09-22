@@ -90,102 +90,88 @@ class RoleSelect(discord.ui.Select):
     
     async def callback(self, interaction: discord.Interaction):
         try:
-            # Defer the interaction with ephemeral response
-            await interaction.response.defer(ephemeral=True)
-            
-            # Get the guild and member
             guild = interaction.guild
-            member = interaction.user
-            
+            member = interaction.user  # Geen fetch_member nodig
+
             # Get all roles in this category
             categories = await self.role_selector.get_categories()
             category = next((c for c in categories if c.name == self.category_name), None)
             if not category:
-                await interaction.followup.send("Deze categorie bestaat niet meer.", ephemeral=True)
+                await interaction.response.send_message("Deze categorie bestaat niet meer.", ephemeral=True)
                 return
-            
-            # Get all role names in this category
+
             category_role_names = [role_data["role_name"] for role_data in category.roles]
-            
-            # Get the roles the user selected
             selected_role_names = self.values
-            
-            # Get the actual role objects
+
             roles_to_add = []
             roles_to_remove = []
-            
+
             for role_name in category_role_names:
                 role = discord.utils.get(guild.roles, name=role_name)
                 if not role:
                     continue
-                
+
                 if role_name in selected_role_names and role not in member.roles:
                     roles_to_add.append(role)
                 elif role_name not in selected_role_names and role in member.roles:
                     roles_to_remove.append(role)
-            
-            # Add and remove roles
+
             added_roles = []
             removed_roles = []
-            
+
             if roles_to_add:
                 try:
                     await member.add_roles(*roles_to_add, reason="Role selector")
                     added_roles = [role.name for role in roles_to_add]
                 except discord.Forbidden:
-                    await interaction.followup.send("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
+                    await interaction.response.send_message("Ik heb geen toestemming om rollen toe te voegen.", ephemeral=True)
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error adding roles: {e}")
-                    await interaction.followup.send("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
+                    await interaction.response.send_message("Er is een fout opgetreden bij het toevoegen van rollen.", ephemeral=True)
                     return
-            
+
             if roles_to_remove:
                 try:
                     await member.remove_roles(*roles_to_remove, reason="Role selector")
                     removed_roles = [role.name for role in roles_to_remove]
                 except discord.Forbidden:
-                    await interaction.followup.send("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
+                    await interaction.response.send_message("Ik heb geen toestemming om rollen te verwijderen.", ephemeral=True)
                     return
                 except Exception as e:
                     self.role_selector.bot.log.error(f"Error removing roles: {e}")
-                    await interaction.followup.send("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
+                    await interaction.response.send_message("Er is een fout opgetreden bij het verwijderen van rollen.", ephemeral=True)
                     return
-            
-            # Build confirmation message
+
+            # Maak een feedbackbericht
             messages = []
             if added_roles:
                 messages.append(f"✅ **Toegevoegde rollen:** {', '.join(added_roles)}")
             if removed_roles:
                 messages.append(f"❌ **Verwijderde rollen:** {', '.join(removed_roles)}")
-            
             if not messages:
                 messages.append("ℹ️ Geen wijzigingen aangebracht in je rollen.")
-            
-            # Create embed for response
+
             embed = discord.Embed(
                 title="🔄 Rollen Bijgewerkt",
                 description="\n".join(messages),
                 color=discord.Color.blue()
             )
             embed.set_footer(text="Gebruik het menu opnieuw om je selecties te wijzigen")
-            
-            # Send confirmation as ephemeral response
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            
-            # Invalidate cache for this user since roles changed
-            updated_member = await interaction.guild.fetch_member(interaction.user.id)
-            cache_key = await self.role_selector._get_cache_key(self.category_name, updated_member.roles)
+
+            # Direct response in plaats van defer + followup
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            # Cache invalideren alleen voor deze gebruiker & category
+            cache_key = await self.role_selector._get_cache_key(self.category_name, member.roles)
             if cache_key in self.role_selector.role_selector_cache:
                 del self.role_selector.role_selector_cache[cache_key]
-                
+
         except Exception as e:
             self.role_selector.bot.log.error(f"Error in RoleSelect callback: {e}")
-            # Since we deferred the interaction, we can only use followup
             try:
-                await interaction.followup.send("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
-            except Exception as followup_error:
-                self.role_selector.bot.log.error(f"Failed to send error message via followup: {followup_error}")
+                await interaction.response.send_message("Er is een fout opgetreden. Probeer het opnieuw.", ephemeral=True)
+            except Exception:
                 pass  # If we can't send an error message, just log it
 
 class RoleSelectorView(discord.ui.View):
