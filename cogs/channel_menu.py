@@ -183,18 +183,17 @@ class ChannelMenu(commands.Cog):
         self.bot = bot
 
     async def parse_channel_topic(self, channel: discord.TextChannel) -> Tuple[str, List[str]]:
-        """Haal rolnaam en tracks uit een kanaalbeschrijving (topic)."""
-        if not channel.topic:
-            return None, []
+        """Gebruik altijd de kanaalnaam als rolnaam, en haal tracks uit de laatste regel van het topic."""
+        # Rolnaam = kanaalnaam → mooi geformatteerd (Spaties ipv - en hoofdletters)
+        role_name = " ".join(word.capitalize() for word in channel.name.replace("-", " ").split())
 
-        # Rolnaam tussen ** **
-        role_match = re.search(r"\*\*(.*?)\*\*", channel.topic)
-        role_name = role_match.group(1).strip() if role_match else None
-
-        # Laatste regel bevat de tracks
-        lines = [l.strip("• ").strip() for l in channel.topic.splitlines() if l.strip()]
-        track_line = lines[-1] if lines else None
-        tracks = [t.strip() for t in track_line.split(",")] if track_line else []
+        tracks: List[str] = []
+        if channel.topic:
+            # Laatste niet-lege regel pakken
+            lines = [l.strip("• ").strip() for l in channel.topic.splitlines() if l.strip()]
+            if lines:
+                track_line = lines[-1]
+                tracks = [t.strip() for t in track_line.split(",")]
 
         return role_name, tracks
 
