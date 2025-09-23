@@ -103,7 +103,7 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
 
     async def on_submit(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        email = self.email.value.strip()    
+        email = self.email.value.lower().strip()  
         user_id = interaction.user.id
 
         await interaction.followup.send("📨 Je e-mailadres wordt gecontroleerd en de code wordt verstuurd...", ephemeral=True)
@@ -269,7 +269,7 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
 
     async def on_submit(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        old_email = self.old_email.value.strip()
+        old_email = self.old_email.value.lower().strip()
         user_id = interaction.user.id
 
         await interaction.followup.send("🔄 Bezig met migreren van je verificatie...", ephemeral=True)
