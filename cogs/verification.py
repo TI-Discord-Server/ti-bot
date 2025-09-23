@@ -103,21 +103,21 @@ class EmailModal(ui.Modal, title="Studentenmail verifiëren"):
 
     async def on_submit(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        email = self.email.value.strip()
+        email = self.email.value.strip()    
         user_id = interaction.user.id
 
         await interaction.followup.send("📨 Je e-mailadres wordt gecontroleerd en de code wordt verstuurd...", ephemeral=True)
         # Check if user is already verified
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "✅ Je bent al geverifieerd! Je hebt al toegang tot de server.", ephemeral=True
             )
             await ensure_verified_role(self.bot, interaction)
             return
 
         if not EMAIL_REGEX.match(email):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Dit is geen geldig HOGENT studentenmailadres.", ephemeral=True
             )
             return
@@ -276,11 +276,11 @@ class MigrationModal(ui.Modal, title="Migratie van Oude Verificatie"):
         
         existing_record = await self.bot.db.verifications.find_one({"user_id": user_id})
         if existing_record:
-            await interaction.response.send_message("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
+            await interaction.followup.send("❌ Je bent al geverifieerd in het nieuwe systeem.", ephemeral=True)
             return
 
         if not EMAIL_REGEX.match(old_email):
-            await interaction.response.send_message("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
+            await interaction.followup.send("❌ Ongeldig e-mailadres. Gebruik je volledige HOGENT e-mailadres.", ephemeral=True)
             return
 
         try:

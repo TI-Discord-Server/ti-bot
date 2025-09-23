@@ -150,30 +150,34 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
             if not channel_menu_cog:
                 self.bot.log.error(f"ChannelMenu cog not loaded when {interaction.user.name} ({interaction.user.id}) tried to setup channel menu")
                 await interaction.response.send_message(
-                    "❌ Channel menu systeem is niet geladen.", ephemeral=True)
+                    "❌ Channel menu systeem is niet geladen.", ephemeral=True
+                )
                 return
-            
-            # Create embed for channel menu (same as in setup_channel_menu)
+
+            # Embed voor het nieuwe channel menu
             embed = discord.Embed(
-                title="📚 Kanaal Selectie",
-                description="Selecteer eerst je jaar, dan kun je kiezen welke vakken je wilt volgen.\n"
-                           "Je krijgt alleen toegang tot de kanalen die je selecteert.",
+                title="📚 Rollenmenu",
+                description=(
+                    "Klik op het studiejaar waarvoor je rollen wil kiezen.\n"
+                    "Daarna kies je je afstudeerrichting en tenslotte de bijhorende rollen."
+                ),
                 color=discord.Color.purple()
             )
             embed.add_field(
                 name="📋 Instructies",
-                value="1️⃣ Kies je studiejaar uit het dropdown menu\n"
-                      "2️⃣ Selecteer de vakken die je wilt volgen\n"
-                      "3️⃣ Je krijgt automatisch toegang tot de geselecteerde kanalen",
+                value=(
+                    "1️⃣ Klik op het juiste studiejaar\n"
+                    "2️⃣ Kies je afstudeerrichting\n"
+                    "3️⃣ Selecteer de gewenste rollen"
+                ),
                 inline=False
             )
-            embed.set_footer(text="Gebruik het dropdown menu om je jaar te selecteren")
-            
-            # Import and create the view
+            embed.set_footer(text="Gebruik de knoppen hieronder om een studiejaar te kiezen")
+
             try:
-                from cogs.channel_menu import YearSelectView
-                view = YearSelectView(self.bot)
-                
+                from cogs.channel_menu import YearButtonsView
+                view = YearButtonsView(self.bot)
+
                 if target_channel == interaction.channel:
                     await interaction.response.defer(ephemeral=True)
                     message = await target_channel.send(embed=embed, view=view)
@@ -182,22 +186,20 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
                     await interaction.response.defer(ephemeral=True)
                     message = await target_channel.send(embed=embed, view=view)
                     await interaction.followup.send(
-                        f"✅ Channel menu ingesteld in {target_channel.mention}", ephemeral=True)
-                
+                        f"✅ Channel menu ingesteld in {target_channel.mention}", ephemeral=True
+                    )
+
                 # Store the persistent view message
                 if self.bot.persistent_view_manager:
                     await self.bot.persistent_view_manager.store_view_message(
                         "channel_menu", target_channel.id, message.id, interaction.guild.id
                     )
-                
-                # Ensure categories exist in the background
-                await channel_menu_cog.ensure_categories_exist(interaction.guild)
-                self.bot.log.info(f"{interaction.user.name} ({interaction.user.id}) setup channel menu in {target_channel.name} ({target_channel.id})")
-                
+
             except ImportError as e:
-                self.bot.log.error(f"Could not import ChannelMenuView when {interaction.user.name} ({interaction.user.id}) tried to setup channel menu: {e}")
+                self.bot.log.error(f"Could not import YearButtonsView when {interaction.user.name} ({interaction.user.id}) tried to setup channel menu: {e}")
                 await interaction.response.send_message(
-                    "❌ Kon channel menu view niet laden.", ephemeral=True)
+                    "❌ Kon channel menu view niet laden.", ephemeral=True
+                )
                 return
         
         elif component == "verification":
