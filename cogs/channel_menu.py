@@ -38,10 +38,7 @@ class YearButton(discord.ui.Button):
         )
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
 
-        if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-        else:
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class TrackSelect(discord.ui.Select):
@@ -88,10 +85,7 @@ class TrackSelect(discord.ui.Select):
         )
         view = RoleSelectView(self.bot, self.year, selected_track, options, self.color)
 
-        if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-        else:
-            await interaction.response.edit_message(embed=embed, view=view)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class CourseSelect(discord.ui.Select):
@@ -178,7 +172,7 @@ class BackToTracksButton(discord.ui.Button):
             timestamp=datetime.datetime.now()
         )
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
-        await interaction.response.edit_message(embed=embed, view=view)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class ChannelMenu(commands.Cog):
