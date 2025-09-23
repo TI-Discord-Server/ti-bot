@@ -14,10 +14,9 @@ class YearButton(discord.ui.Button):
         self.color = color
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
         tracks = await channel_menu_cog.get_tracks_for_year(interaction.guild, self.year)
-
-        await interaction.response.defer(ephemeral=True)
 
         if not tracks:
             await interaction.followup.send(
@@ -45,12 +44,11 @@ class TrackSelect(discord.ui.Select):
         super().__init__(placeholder="Selecteer je afstudeerrichting...", min_values=1, max_values=1, options=options, custom_id=f"track_select_{year}")
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         selected_track = self.values[0]
 
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
         roles = await channel_menu_cog.get_roles_for_track(interaction.guild, self.year, selected_track)
-
-        await interaction.response.defer(ephemeral=True)
 
         if not roles:
             await interaction.followup.send(
