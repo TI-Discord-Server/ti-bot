@@ -842,46 +842,7 @@ class ChannelSelectView(BaseConfigView):
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
-    # @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary)
-    # async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-    #     """Go back to the appropriate config view."""
-    #     try:
-    #         self.bot.log.debug(f"Back button clicked for {self.settings_id}.{self.field_name}")
-            
-    #         # Determine which config view to return to based on settings_id and field_name
-    #         if self.settings_id == "modmail_settings":
-    #             view = ModmailConfigView(self.bot, self.user_id, True)
-    #         elif self.settings_id == "confession_settings":
-    #             view = ConfessionsConfigView(self.bot, self.user_id, True)
-    #         elif self.settings_id == "reports_settings":
-    #             view = ReportsConfigView(self.bot, self.user_id, True)
-    #         elif self.settings_id == "mod_settings":
-    #             # All mod_settings fields now go to UnbanRequestsConfigView
-    #             view = UnbanRequestsConfigView(self.bot, self.user_id, True)
-    #             self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
-    #         elif self.settings_id == "channel_menu_settings":
-    #             view = RolesChannelsConfigView(self.bot, self.user_id, True)
-    #             self.bot.log.debug(f"Returning to RolesChannelsConfigView for field {self.field_name}")
-    #         else:
-    #             view = ConfigurationView(self.bot, self.user_id, True)
-    #             self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
-            
-    #         embed = await view.create_embed()
-    #         await interaction.response.edit_message(embed=embed, view=view)
-            
-    #     except Exception as e:
-    #         self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
-    #         error_embed = discord.Embed(
-    #             title="❌ Fout",
-    #             description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
-    #             color=discord.Color.red()
-    #         )
-    #         try:
-    #             await interaction.response.send_message(embed=error_embed, ephemeral=True)
-    #         except discord.InteractionResponded:
-    #             await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
+  
     async def on_timeout(self):
         """Handle timeout."""
         for item in self.children:
