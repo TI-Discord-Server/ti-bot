@@ -88,7 +88,10 @@ class TrackSelect(discord.ui.Select):
         )
         view = RoleSelectView(self.bot, self.year, selected_track, options, self.color)
 
-        await interaction.response.edit_message(embed=embed, view=view)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        else:
+            await interaction.response.edit_message(embed=embed, view=view)
 
 
 class CourseSelect(discord.ui.Select):
