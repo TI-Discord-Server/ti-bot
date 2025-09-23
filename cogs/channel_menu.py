@@ -8,23 +8,19 @@ from typing import List, Tuple
 
 class YearButton(discord.ui.Button):
     def __init__(self, bot, year: str, label: str, emoji: str, color: discord.Color):
-        super().__init__(
-            label=label,
-            style=discord.ButtonStyle.primary,
-            emoji=emoji,
-            custom_id=f"year_button_{year}"
-        )
+        super().__init__(label=label, style=discord.ButtonStyle.primary, emoji=emoji, custom_id=f"year_button_{year}")
         self.bot = bot
         self.year = year
         self.color = color
 
     async def callback(self, interaction: discord.Interaction):
-        # Tracks dynamisch ophalen uit kanaalbeschrijvingen
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
         tracks = await channel_menu_cog.get_tracks_for_year(interaction.guild, self.year)
 
+        await interaction.response.defer(ephemeral=True)
+
         if not tracks:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ Geen afstudeerrichtingen gevonden voor jaar {self.year}.",
                 ephemeral=True
             )
@@ -38,42 +34,33 @@ class YearButton(discord.ui.Button):
         )
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 class TrackSelect(discord.ui.Select):
-    def __init__(self, bot, year: str, options: List[discord.SelectOption], color: discord.Color):
+    def __init__(self, bot, year: str, options: list[discord.SelectOption], color: discord.Color):
         self.bot = bot
         self.year = year
         self.color = color
-        super().__init__(
-            placeholder="Selecteer je afstudeerrichting...",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id=f"track_select_{year}"
-        )
+        super().__init__(placeholder="Selecteer je afstudeerrichting...", min_values=1, max_values=1, options=options, custom_id=f"track_select_{year}")
 
     async def callback(self, interaction: discord.Interaction):
         selected_track = self.values[0]
 
-        # Rollen dynamisch ophalen
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
         roles = await channel_menu_cog.get_roles_for_track(interaction.guild, self.year, selected_track)
 
+        await interaction.response.defer(ephemeral=True)
+
         if not roles:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ Geen rollen gevonden voor {selected_track} ({self.year}).",
                 ephemeral=True
             )
             return
 
         options = [
-            discord.SelectOption(
-                label=role.name,
-                value=str(role.id),
-                default=role in interaction.user.roles
-            )
+            discord.SelectOption(label=role.name, value=str(role.id), default=role in interaction.user.roles)
             for role in roles
         ]
 
@@ -85,21 +72,15 @@ class TrackSelect(discord.ui.Select):
         )
         view = RoleSelectView(self.bot, self.year, selected_track, options, self.color)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 class CourseSelect(discord.ui.Select):
-    def __init__(self, bot, year: str, track: str, options: List[discord.SelectOption]):
+    def __init__(self, bot, year: str, track: str, options: list[discord.SelectOption]):
         self.bot = bot
         self.year = year
         self.track = track
-        super().__init__(
-            placeholder="Selecteer/deselecteer je vakrollen...",
-            min_values=0,
-            max_values=len(options),
-            options=options,
-            custom_id=f"course_select_{year}_{track}"
-        )
+        super().__init__(placeholder="Selecteer/deselecteer je vakrollen...", min_values=0, max_values=len(options), options=options, custom_id=f"course_select_{year}_{track}")
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -140,14 +121,14 @@ class YearButtonsView(discord.ui.View):
 
 
 class TrackSelectView(discord.ui.View):
-    def __init__(self, bot, year: str, tracks: List[str], color: discord.Color):
+    def __init__(self, bot, year: str, tracks: list[str], color: discord.Color):
         super().__init__(timeout=None)
         self.bot = bot
         self.add_item(TrackSelect(bot, year, [discord.SelectOption(label=t, value=t) for t in tracks], color))
 
 
 class RoleSelectView(discord.ui.View):
-    def __init__(self, bot, year: str, track: str, options: List[discord.SelectOption], color: discord.Color):
+    def __init__(self, bot, year: str, track: str, options: list[discord.SelectOption], color: discord.Color):
         super().__init__(timeout=None)
         self.bot = bot
         self.add_item(CourseSelect(bot, year, track, options))
@@ -165,6 +146,8 @@ class BackToTracksButton(discord.ui.Button):
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
         tracks = await channel_menu_cog.get_tracks_for_year(interaction.guild, self.year)
 
+        await interaction.response.defer(ephemeral=True)
+
         embed = discord.Embed(
             title=f"📘 Jaar {self.year}",
             description="Selecteer je afstudeerrichting.",
@@ -172,8 +155,8 @@ class BackToTracksButton(discord.ui.Button):
             timestamp=datetime.datetime.now()
         )
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 class ChannelMenu(commands.Cog):
     def __init__(self, bot):
