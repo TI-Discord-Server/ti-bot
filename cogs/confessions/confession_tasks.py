@@ -160,19 +160,7 @@ class ConfessionTasks(commands.Cog):
         message_dict = {str(msg.id): msg for msg in messages}
 
         confession = await self.bot.db.confessions.find_one({"status": "under_review"})
-        if not confession:
-            self.bot.log.info("Geen confessions beschikbaar om te posten.")
-            return
 
-        message_id = str(confession.get("message_id"))
-        matching_message = message_dict.get(message_id)
-
-        if not matching_message:
-            self.bot.log.warning(
-                f"Geen matching message gevonden voor confession {confession['_id']}"
-            )
-            return
-        
         # --- Bepaal of dit de laatste post-run van de dag is ---
         settings = await self.get_settings()
         post_times = settings.get("post_times", [])
@@ -186,6 +174,22 @@ class ConfessionTasks(commands.Cog):
             except Exception as e:
                 self.bot.log.error(f"Kon last_post_time niet parsen: {e}")
         # --------------------------------------------------------
+
+        if not confession:
+            self.bot.log.info("Geen confessions beschikbaar om te posten.")
+            if is_last_confession:
+                await self.post_submit_button(public_channel)
+                self.bot.log.info("Losse knop voor confession submission gepost.")
+            return
+
+        message_id = str(confession.get("message_id"))
+        matching_message = message_dict.get(message_id)
+
+        if not matching_message:
+            self.bot.log.warning(
+                f"Geen matching message gevonden voor confession {confession['_id']}"
+            )
+            return
 
         allow_votes = 0
         deny_votes = 0
@@ -242,35 +246,9 @@ class ConfessionTasks(commands.Cog):
 
             # ⬇️ Als dit de laatste confession van de dag is → losse knop posten
             if is_last_confession:
-                # Verwijder eventueel vorige losse knop
-                settings = await self.get_settings()
-                last_button_id = settings.get("last_button_message_id")
-                if last_button_id:
-                    try:
-                        old_msg = await public_channel.fetch_message(last_button_id)
-                        await old_msg.delete()
-                        self.bot.log.debug(f"Oude losse knop {last_button_id} verwijderd")
-                    except discord.NotFound:
-                        self.bot.log.debug("Vorige losse knop niet meer gevonden (al verwijderd)")
-                    except Exception as e:
-                        self.bot.log.error(f"Fout bij verwijderen oude losse knop {last_button_id}: {e}")
+                await self.post_submit_button(public_channel)
+                self.bot.log.info("Losse knop voor confession submission gepost.")
 
-
-                message = await public_channel.send(
-                    content="Klik hieronder voor een confession te maken ⬇️",
-                    view=ConfessionView(self.bot)
-                )
-
-                if self.bot.persistent_view_manager:
-                    await self.bot.persistent_view_manager.store_view_message(
-                        "confession", public_channel.id, message.id, public_channel.guild.id
-                    )
-                    # Sla ID van dit losse knopbericht op
-                await self.bot.db.settings.update_one(
-                    {"_id": "confession_settings"},
-                    {"$set": {"last_button_message_id": message.id}},
-                    upsert=True
-                )
 
     async def _post_submit_message(self, public_channel):
         """Post a new submit confession message (eenmalig via command)."""
@@ -299,6 +277,36 @@ class ConfessionTasks(commands.Cog):
         except Exception as e:
             self.bot.log.error(f"Error posting submit message: {e}")
 
+    async def post_submit_button(self, public_channel):
+        # Verwijder eventueel vorige losse knop
+        settings = await self.get_settings()
+        last_button_id = settings.get("last_button_message_id")
+        if last_button_id:
+            try:
+                old_msg = await public_channel.fetch_message(last_button_id)
+                await old_msg.delete()
+                self.bot.log.debug(f"Oude losse knop {last_button_id} verwijderd")
+            except discord.NotFound:
+                self.bot.log.debug("Vorige losse knop niet meer gevonden (al verwijderd)")
+            except Exception as e:
+                self.bot.log.error(f"Fout bij verwijderen oude losse knop {last_button_id}: {e}")
+
+
+        message = await public_channel.send(
+            content="Klik hieronder voor een confession te maken ⬇️",
+            view=ConfessionView(self.bot)
+        )
+
+        if self.bot.persistent_view_manager:
+            await self.bot.persistent_view_manager.store_view_message(
+                "confession", public_channel.id, message.id, public_channel.guild.id
+            )
+            # Sla ID van dit losse knopbericht op
+        await self.bot.db.settings.update_one(
+            {"_id": "confession_settings"},
+            {"$set": {"last_button_message_id": message.id}},
+            upsert=True
+        )
 
 async def setup(bot):
     await bot.add_cog(ConfessionTasks(bot))
