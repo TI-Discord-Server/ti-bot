@@ -130,31 +130,6 @@ class RoleSelectView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
         self.add_item(CourseSelect(bot, year, track, options))
-        self.add_item(BackToTracksButton(bot, year, color))
-
-
-class BackToTracksButton(discord.ui.Button):
-    def __init__(self, bot, year: str, color: discord.Color):
-        super().__init__(label="⬅️ Terug naar tracks", style=discord.ButtonStyle.secondary)
-        self.bot = bot
-        self.year = year
-        self.color = color
-
-    async def callback(self, interaction: discord.Interaction):
-        channel_menu_cog = self.bot.get_cog("ChannelMenu")
-        tracks = await channel_menu_cog.get_tracks_for_year(interaction.guild, self.year)
-
-        await interaction.response.defer(ephemeral=True)
-
-        embed = discord.Embed(
-            title=f"📘 Jaar {self.year}",
-            description="Selecteer je afstudeerrichting.",
-            color=self.color,
-            timestamp=datetime.datetime.now()
-        )
-        view = TrackSelectView(self.bot, self.year, tracks, self.color)
-
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 class ChannelMenu(commands.Cog):
     def __init__(self, bot):
