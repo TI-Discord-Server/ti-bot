@@ -893,6 +893,55 @@ class Verification(commands.Cog):
             ephemeral=True
         )
 
+    @app_commands.command(
+        name="cleanup_unverified",
+        description="Verwijder alle rollen van leden die niet verified zijn."
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def cleanup_unverified(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+
+        # Haal de verified rol uit de database
+        settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
+        verified_role_id = settings.get("verified_role_id")
+        verified_role = guild.get_role(verified_role_id) if verified_role_id else None
+
+        if not verified_role:
+            await interaction.followup.send("❌ Verified rol niet gevonden in de instellingen.", ephemeral=True)
+            return
+
+        cleaned = []
+        skipped = []
+
+        for member in guild.members:
+            if member.bot:
+                continue
+
+            if verified_role not in member.roles:
+                roles_to_remove = [r for r in member.roles if r != guild.default_role]
+                if roles_to_remove:
+                    try:
+                        await member.remove_roles(
+                            *roles_to_remove,
+                            reason="Niet verified, opgeschoond"
+                        )
+                        cleaned.append(member.display_name)
+
+                        # Kleine delay om rate limit te vermijden
+                        await asyncio.sleep(1.2)
+
+                    except discord.Forbidden:
+                        skipped.append(member.display_name)
+                    except discord.HTTPException as e:
+                        skipped.append(f"{member.display_name} (HTTP fout: {e})")
+
+        msg = f"✅ {len(cleaned)} leden opgeschoond."
+        if skipped:
+            msg += f"\n⚠️ {len(skipped)} leden konden niet opgeschoond worden."
+
+        await interaction.followup.send(msg, ephemeral=True)
+
 async def setup(bot):
     cog = Verification(bot)
     await bot.add_cog(cog)
