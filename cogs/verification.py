@@ -897,7 +897,7 @@ class Verification(commands.Cog):
         name="cleanup_unverified",
         description="Verwijder alle rollen van leden die niet verified zijn."
     )
-    @app_commands.checks.has_permissions(administrator=True)
+    @developer()
     async def cleanup_unverified(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
