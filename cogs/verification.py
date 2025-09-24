@@ -29,7 +29,7 @@ from env import (
 )
 from cryptography.fernet import Fernet
 
-EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@student\.hogent\.be$")
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%]+@student\.hogent\.be$")
 CODE_LENGTH = 6
 CODE_EXPIRY = 600  # 10 minutes
 
