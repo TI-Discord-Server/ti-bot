@@ -942,6 +942,86 @@ class Verification(commands.Cog):
 
         await interaction.followup.send(msg, ephemeral=True)
 
+    @app_commands.command(
+        name="manual_verify",
+        description="Verifieer een gebruiker handmatig met een studentenmail (zonder code)."
+    )
+    @app_commands.describe(user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres")
+    @developer()
+    async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
+        await interaction.response.defer(ephemeral=True)
+
+        email = email.lower().strip()
+
+        # Validatie emailadres
+        if not EMAIL_REGEX.match(email):
+            await interaction.followup.send(
+                "❌ Ongeldig e-mailadres. Gebruik een volledig HOGENT studentenmailadres.",
+                ephemeral=True
+            )
+            return
+
+        # Bestaat de gebruiker al in de DB?
+        existing = await self.bot.db.verifications.find_one({"user_id": user.id})
+        if existing:
+            await interaction.followup.send(
+                f"⚠️ {user.mention} is al geverifieerd.",
+                ephemeral=True
+            )
+            return
+
+        try:
+            # Bereken blind index
+            email_index = make_email_index(email)
+
+            # Controleer of dit mailadres al gebruikt wordt
+            exists = await self.bot.db.verifications.find_one({"email_index": email_index})
+            if exists:
+                await interaction.followup.send(
+                    "❌ Dit e-mailadres is al gekoppeld aan een andere gebruiker.",
+                    ephemeral=True
+                )
+                return
+
+            # Encrypt en opslaan
+            encrypted_email = fernet.encrypt(email.encode()).decode()
+            await self.bot.db.verifications.insert_one({
+                "user_id": user.id,
+                "encrypted_email": encrypted_email,
+                "email_index": email_index,
+                "manual": True,  # flag dat dit manueel gebeurd is
+                "verified_by": interaction.user.id,
+                "timestamp": int(time.time())
+            })
+
+            # Rol toekennen
+            settings = await self.bot.db.settings.find_one({"_id": "verification_settings"})
+            verified_role_id = settings.get("verified_role_id")
+            role = interaction.guild.get_role(verified_role_id) if verified_role_id else None
+            if role:
+                await user.add_roles(role, reason="Handmatig geverifieerd door moderator")
+            
+            await interaction.followup.send(
+                f"✅ {user.mention} is succesvol handmatig geverifieerd met e-mail `{email}`.",
+                ephemeral=True
+            )
+            try:
+                await user.send(
+                    f"✅ Je bent handmatig geverifieerd in **{interaction.guild.name}**.\n"
+                    f"Je gekoppelde studentenmail: `{email}`"
+                )
+            except discord.Forbidden:
+                pass
+
+            self.bot.log.info(f"User {user} ({user.id}) handmatig geverifieerd door {interaction.user} ({interaction.user.id}) met email {email}")
+
+        except Exception as e:
+            self.bot.log.error(f"Fout bij handmatige verificatie van {user} ({user.id}): {e}", exc_info=True)
+            await interaction.followup.send(
+                "❌ Er is een fout opgetreden bij de handmatige verificatie. Probeer opnieuw.",
+                ephemeral=True
+            )
+
 async def setup(bot):
     cog = Verification(bot)
     await bot.add_cog(cog)
