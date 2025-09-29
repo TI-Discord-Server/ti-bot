@@ -51,26 +51,32 @@ De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` a
 - `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB-authenticatie
 - `MONGODB_PORT`: De poort van je MongoDB-server (standaardwaarde = 27017)
 - `MONGODB_USERNAME`: De naam van de MongoDB-gebruiker en database (standaard = bot)
-- `WEBHOOK_URL`: Discord webhook URL voor logging (optioneel)
+- `MONGODB_DB`: De naam van de MongoDB-database (standaard = bot)
 - `SMTP_PASSWORD`: Het wachtwoord voor SMTP-authenticatie (voor e-mailverificatie)
 - `SMTP_EMAIL`: Het e-mailadres dat gebruikt wordt voor het versturen van verificatie-e-mails
 - `SMTP_SERVER`: De SMTP-server voor het versturen van e-mails (bijv. smtp.gmail.com)
+- `SMTP_PORT`: De poort van de SMTP-server (bijv. 465 voor SSL, 587 voor STARTTLS)
+- `IMAP_SERVER`: De IMAP-server voor het ontvangen van e-mails (bijv. imap.gmail.com)
+- `IMAP_PORT`: De poort van de IMAP-server (standaard IMAP SSL poort = 993)
 - `ENCRYPTION_KEY`: Een Fernet-encryptiesleutel voor het beveiligen van gevoelige gegevens
-- `OLD_CONNECTION_STRING`: MongoDB connection string voor oude database (optioneel, voor migratie van verificatiegegevens)
+- `EMAIL_INDEX_KEY`: Een 32-tekens lange sleutel voor het indexeren van e-mailadressen
 
 **Voorbeeld (.env):**
 ```env
 BOT_TOKEN='XXX'
 MONGODB_IP_ADDRESS='mongo' # Laat dit ongewijzigd bij gebruik van docker-compose
 MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
-WEBHOOK_URL='https://discord.com/api/webhooks/123456789/abcdef...'
 MONGODB_PORT=27017
 MONGODB_USERNAME=bot
-SMTP_PASSWORD='app_password_for_email' # App-specifiek wachtwoord voor e-mail
+MONGODB_DB=bot
+SMTP_PASSWORD='password' # Is niet het wachtwoord van het account, is een wachtwoord enkel voor SMTP
 SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
-SMTP_SERVER='smtp.gmail.com'
-ENCRYPTION_KEY='generated_fernet_key' # Genereer met het generate_key.py script
-OLD_CONNECTION_STRING='mongodb://username:password@host:port/database' # Optioneel: voor migratie
+SMTP_SERVER='smtp.gmail.com' # Bijvoorbeeld: smtp.forwardemail.net
+SMTP_PORT=587 # Bijvoorbeeld: 465 voor SSL, 587 voor STARTTLS
+IMAP_SERVER='imap.gmail.com' # Bijvoorbeeld: imap.forwardemail.net
+IMAP_PORT=993 # Standaard IMAP SSL poort
+ENCRYPTION_KEY='password'
+EMAIL_INDEX_KEY='another_32_characters_long_key!'
 ```
 
 ### Fernet Encryptiesleutel Genereren
