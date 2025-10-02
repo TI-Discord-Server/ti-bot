@@ -1,11 +1,11 @@
-name: commit-format-styling-checks
+name: staging-pr-checks
 
 on:
   pull_request:
     branches: [ "staging-v3" ]
 
 jobs:
-  pre-commit-check:
+  format-styling-checks:
     runs-on: ubuntu-latest
 
     steps:
