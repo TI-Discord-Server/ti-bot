@@ -1,12 +1,19 @@
-import discord
 from typing import Callable, Optional
+
+import discord
 
 
 class TimeoutFallbackView(discord.ui.View):
     """View for confirming fallback to muted role when timeout exceeds 28 days."""
-    
-    def __init__(self, original_user: discord.Member, target_member: discord.Member, 
-                 duration: str, reason: str, mute_callback: Optional[Callable] = None):
+
+    def __init__(
+        self,
+        original_user: discord.Member,
+        target_member: discord.Member,
+        duration: str,
+        reason: str,
+        mute_callback: Optional[Callable] = None,
+    ):
         super().__init__(timeout=60.0)
         self.original_user = original_user
         self.target_member = target_member
@@ -19,34 +26,40 @@ class TimeoutFallbackView(discord.ui.View):
         """Only allow the original command user to interact with the buttons."""
         if interaction.user.id != self.original_user.id:
             await interaction.response.send_message(
-                "Only the person who ran the command can interact with these buttons.", 
-                ephemeral=True
+                "Only the person who ran the command can interact with these buttons.",
+                ephemeral=True,
             )
             return False
         return True
 
-    @discord.ui.button(label="Ja, Gebruik Muted Role", style=discord.ButtonStyle.success, emoji="✅")
-    async def confirm_mute_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(
+        label="Ja, Gebruik Muted Role", style=discord.ButtonStyle.success, emoji="✅"
+    )
+    async def confirm_mute_fallback(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Confirm using muted role as fallback."""
         if self.responded:
             return
         self.responded = True
-        
+
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         # Update the message to show it's being processed
         embed = discord.Embed(
             title="Verwerken...",
             description=f"Muted role gebruiken voor {self.target_member.mention} voor {self.duration}...",
-            color=discord.Color.yellow()
+            color=discord.Color.yellow(),
         )
         await interaction.response.edit_message(embed=embed, view=self)
-        
+
         # Execute the mute callback with scheduled unmute
         if self.mute_callback:
-            await self.mute_callback(interaction, self.target_member, self.reason, self.duration, scheduled=True)
+            await self.mute_callback(
+                interaction, self.target_member, self.reason, self.duration, scheduled=True
+            )
 
     @discord.ui.button(label="Nee, Annuleren", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_fallback(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -54,15 +67,15 @@ class TimeoutFallbackView(discord.ui.View):
         if self.responded:
             return
         self.responded = True
-        
+
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         embed = discord.Embed(
             title="Geannuleerd",
             description=f"De timeout operatie voor {self.target_member.mention} is geannuleerd.",
-            color=discord.Color.red()
+            color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=self)
 
@@ -76,10 +89,17 @@ class TimeoutFallbackView(discord.ui.View):
 
 class OverwriteConfirmationView(discord.ui.View):
     """View for confirming overwrite of existing timeout/mute."""
-    
-    def __init__(self, original_user: discord.Member, target_member: discord.Member, 
-                 action_type: str, new_duration: str = None, reason: str = None, 
-                 timeout_callback: Optional[Callable] = None, mute_callback: Optional[Callable] = None):
+
+    def __init__(
+        self,
+        original_user: discord.Member,
+        target_member: discord.Member,
+        action_type: str,
+        new_duration: str = None,
+        reason: str = None,
+        timeout_callback: Optional[Callable] = None,
+        mute_callback: Optional[Callable] = None,
+    ):
         super().__init__(timeout=60.0)
         self.original_user = original_user
         self.target_member = target_member
@@ -94,8 +114,8 @@ class OverwriteConfirmationView(discord.ui.View):
         """Only allow the original command user to interact with the buttons."""
         if interaction.user.id != self.original_user.id:
             await interaction.response.send_message(
-                "Only the person who ran the command can interact with these buttons.", 
-                ephemeral=True
+                "Only the person who ran the command can interact with these buttons.",
+                ephemeral=True,
             )
             return False
         return True
@@ -106,22 +126,24 @@ class OverwriteConfirmationView(discord.ui.View):
         if self.responded:
             return
         self.responded = True
-        
+
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         # Update the message to show it's being processed
         embed = discord.Embed(
             title="Verwerken...",
             description=f"Bestaande {self.action_type} overschrijven voor {self.target_member.mention}...",
-            color=discord.Color.yellow()
+            color=discord.Color.yellow(),
         )
         await interaction.response.edit_message(embed=embed, view=self)
-        
+
         # Execute the appropriate callback
         if self.action_type == "timeout" and self.timeout_callback:
-            await self.timeout_callback(interaction, self.target_member, self.new_duration, self.reason, overwrite=True)
+            await self.timeout_callback(
+                interaction, self.target_member, self.new_duration, self.reason, overwrite=True
+            )
         elif self.action_type == "mute" and self.mute_callback:
             await self.mute_callback(interaction, self.target_member, self.reason, overwrite=True)
 
@@ -131,15 +153,15 @@ class OverwriteConfirmationView(discord.ui.View):
         if self.responded:
             return
         self.responded = True
-        
+
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         embed = discord.Embed(
             title="Geannuleerd",
             description=f"De {self.action_type} operatie voor {self.target_member.mention} is geannuleerd.",
-            color=discord.Color.red()
+            color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=self)
 

@@ -1,6 +1,8 @@
-import discord
-from discord.ext import tasks, commands
 import datetime
+
+import discord
+from discord.ext import commands, tasks
+
 from cogs.confessions.confession_view import ConfessionView
 from utils.timezone import LOCAL_TIMEZONE, local_time
 
@@ -37,12 +39,8 @@ class ConfessionTasks(commands.Cog):
                 "review_time": "17:00",
                 "post_times": ["9:00", "12:00"],
             }
-            await self.bot.db.settings.insert_one(
-                {"_id": "confession_settings", **settings}
-            )
-            self.bot.log.info(
-                "Standaard confession instellingen aangemaakt in de database."
-            )
+            await self.bot.db.settings.insert_one({"_id": "confession_settings", **settings})
+            self.bot.log.info("Standaard confession instellingen aangemaakt in de database.")
         return settings
 
     async def update_review_schedule(self):
@@ -80,7 +78,7 @@ class ConfessionTasks(commands.Cog):
         if not review_channel_id:
             self.bot.log.error("Review kanaal ID niet geconfigureerd.")
             return
-            
+
         review_channel = self.bot.get_channel(review_channel_id)
         if not review_channel:
             self.bot.log.error("Reviewkanaal niet gevonden.")
@@ -91,9 +89,7 @@ class ConfessionTasks(commands.Cog):
             return
 
         for confession in confessions:
-            embed = discord.Embed(
-                description=confession["content"], color=discord.Color.blue()
-            )
+            embed = discord.Embed(description=confession["content"], color=discord.Color.blue())
             message = await review_channel.send(embed=embed)
             await message.add_reaction("✅")
             await message.add_reaction("❌")
@@ -109,23 +105,20 @@ class ConfessionTasks(commands.Cog):
         post_times = settings["post_times"]
 
         if not post_times:
-            self.bot.log.warning(
-                "Geen post-tijden ingesteld. Post-taak wordt niet gestart."
-            )
+            self.bot.log.warning("Geen post-tijden ingesteld. Post-taak wordt niet gestart.")
             return
 
         try:
             times = [
-                local_time(
-                    hour=int(t.split(":")[0]),
-                    minute=int(t.split(":")[1])
-                )
+                local_time(hour=int(t.split(":")[0]), minute=int(t.split(":")[1]))
                 for t in post_times
             ]
 
             if self.post_approved and self.post_approved.is_running():
                 self.post_approved.cancel()
-                self.bot.log.info(f"Post-taak gestopt voor update naar tijden: {times} (Brussels tijd)")
+                self.bot.log.info(
+                    f"Post-taak gestopt voor update naar tijden: {times} (Brussels tijd)"
+                )
 
             @tasks.loop(time=times)
             async def post_approved_task():
@@ -144,11 +137,11 @@ class ConfessionTasks(commands.Cog):
     async def run_post_approved(self):
         review_channel_id = await self.get_review_channel_id()
         public_channel_id = await self.get_public_channel_id()
-        
+
         if not review_channel_id or not public_channel_id:
             self.bot.log.error("Review of public kanaal ID niet geconfigureerd.")
             return
-            
+
         review_channel = self.bot.get_channel(review_channel_id)
         public_channel = self.bot.get_channel(public_channel_id)
 
@@ -170,7 +163,7 @@ class ConfessionTasks(commands.Cog):
                 last_post_time = post_times[-1]
                 hour, minute = map(int, last_post_time.split(":"))
                 now = datetime.datetime.now(LOCAL_TIMEZONE)
-                is_last_confession = (now.hour == hour and now.minute == minute)
+                is_last_confession = now.hour == hour and now.minute == minute
             except Exception as e:
                 self.bot.log.error(f"Kon last_post_time niet parsen: {e}")
         # --------------------------------------------------------
@@ -202,14 +195,10 @@ class ConfessionTasks(commands.Cog):
             elif reaction.emoji == "❌":
                 deny_votes = len(non_bot_users)
 
-        self.bot.log.debug(
-            f"Confession {confession['_id']} - ✅ {allow_votes}, ❌ {deny_votes}"
-        )
+        self.bot.log.debug(f"Confession {confession['_id']} - ✅ {allow_votes}, ❌ {deny_votes}")
 
         if allow_votes > deny_votes:
-            posted_count = (
-                await self.bot.db.confessions.count_documents({"status": "posted"}) + 1
-            )
+            posted_count = await self.bot.db.confessions.count_documents({"status": "posted"}) + 1
 
             # Post de confession
             embed = discord.Embed(
@@ -249,7 +238,6 @@ class ConfessionTasks(commands.Cog):
                 await self.post_submit_button(public_channel)
                 self.bot.log.info("Losse knop voor confession submission gepost.")
 
-
     async def _post_submit_message(self, public_channel):
         """Post a new submit confession message (eenmalig via command)."""
         self.bot.log.debug("Posting new submit confession message...")
@@ -257,9 +245,8 @@ class ConfessionTasks(commands.Cog):
             embed = discord.Embed(
                 title="📝 Submit a Confession",
                 description="Click the button below to submit an anonymous confession.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
-            
 
             # Post het bericht met de knop
             submit_message = await public_channel.send(embed=embed, view=ConfessionView(self.bot))
@@ -291,10 +278,8 @@ class ConfessionTasks(commands.Cog):
             except Exception as e:
                 self.bot.log.error(f"Fout bij verwijderen oude losse knop {last_button_id}: {e}")
 
-
         message = await public_channel.send(
-            content="Klik hieronder voor een confession te maken ⬇️",
-            view=ConfessionView(self.bot)
+            content="Klik hieronder voor een confession te maken ⬇️", view=ConfessionView(self.bot)
         )
 
         if self.bot.persistent_view_manager:
@@ -305,8 +290,9 @@ class ConfessionTasks(commands.Cog):
         await self.bot.db.settings.update_one(
             {"_id": "confession_settings"},
             {"$set": {"last_button_message_id": message.id}},
-            upsert=True
+            upsert=True,
         )
+
 
 async def setup(bot):
     await bot.add_cog(ConfessionTasks(bot))

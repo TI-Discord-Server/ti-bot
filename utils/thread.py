@@ -7,36 +7,35 @@ Note: "Thread" in this context refers to a modmail conversation thread,
 which is implemented using Discord channels (not Discord's thread feature).
 Each modmail conversation creates a dedicated Discord channel.
 """
+
 import asyncio
 import base64
-import copy
 import functools
 import io
 import re
 import traceback
 import typing
 import warnings
-from datetime import timedelta, datetime
-
-import isodate
+from datetime import datetime, timedelta
 
 import discord
-from discord.ext.commands import MissingRequiredArgument, CommandError
-from lottie.importers import importers as l_importers
+import isodate
+from discord.ext.commands import CommandError, MissingRequiredArgument
 from lottie.exporters import exporters as l_exporters
+from lottie.importers import importers as l_importers
 
 from .timezone import LOCAL_TIMEZONE
-from .models import DummyMessage
 from .utils import (
-    is_image_url,
-    parse_channel_topic,
-    match_user_id,
-    create_thread_channel,
     AcceptButton,
-    DenyButton,
     ConfirmThreadCreationView,
+    DenyButton,
     DummyParam,
+    create_thread_channel,
+    is_image_url,
+    match_user_id,
+    parse_channel_topic,
 )
+
 
 class Thread:
     """Represents a discord Modmail channel thread."""
@@ -128,7 +127,9 @@ class Thread:
         if recipient_id in manager.cache:
             thread = manager.cache[recipient_id]
         else:
-            recipient = manager.bot.get_user(recipient_id) or await manager.bot.fetch_user(recipient_id)
+            recipient = manager.bot.get_user(recipient_id) or await manager.bot.fetch_user(
+                recipient_id
+            )
 
             thread = cls(manager, recipient or recipient_id, channel)
 
@@ -155,7 +156,9 @@ class Thread:
             # Get modmail category from database
             settings = await self.bot.db.settings.find_one({"_id": "modmail_settings"})
             if settings and "modmail_category_id" in settings:
-                category = discord.utils.get(self.bot.guild.categories, id=settings["modmail_category_id"])
+                category = discord.utils.get(
+                    self.bot.guild.categories, id=settings["modmail_category_id"]
+                )
             else:
                 self.bot.log.warning("No modmail category configured in database")
 
@@ -187,7 +190,10 @@ class Thread:
             mention = "@here"
 
         async def send_genesis_message():
-            info_embed = self._format_info_embed(recipient, discord.Color.blurple(),)
+            info_embed = self._format_info_embed(
+                recipient,
+                discord.Color.blurple(),
+            )
             try:
                 msg = await channel.send(mention, embed=info_embed)
                 self.bot.loop.create_task(msg.pin())
@@ -206,12 +212,13 @@ class Thread:
             )
 
             embed.set_footer(
-                text="Je bericht is verzonden", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128)
+                text="Je bericht is verzonden",
+                icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128),
             )
             embed.title = "Modmail Aangemaakt"
 
             if creator is None or creator == recipient:
-                msg = await recipient.send(embed=embed)
+                await recipient.send(embed=embed)
 
         await asyncio.gather(
             send_genesis_message(),
@@ -219,7 +226,13 @@ class Thread:
         )
         self.bot.dispatch("thread_ready", self, creator, category, initial_message)
 
-    def _format_info_embed(self, user,color, log_url=None, log_count=None, ):
+    def _format_info_embed(
+        self,
+        user,
+        color,
+        log_url=None,
+        log_count=None,
+    ):
         """Get information about a member of a server
         supports users from the guild or not."""
         member = self.bot.guild.get_member(user.id)
@@ -288,7 +301,9 @@ class Thread:
 
         mutual_guilds = [g for g in self.bot.guilds if user in g.members]
         if member is None or len(mutual_guilds) > 1:
-            embed.add_field(name="Gedeelde Server(s)", value=", ".join(g.name for g in mutual_guilds))
+            embed.add_field(
+                name="Gedeelde Server(s)", value=", ".join(g.name for g in mutual_guilds)
+            )
 
         return embed
 
@@ -296,20 +311,20 @@ class Thread:
         await asyncio.sleep(after)
         return self.bot.loop.create_task(self._close(closer, silent, delete_channel, message, True))
 
-    async def store_and_send_log(self,
-                                 closer: typing.Union[discord.Member, discord.User],
-                                 log_channel: discord.TextChannel):
+    async def store_and_send_log(
+        self, closer: typing.Union[discord.Member, discord.User], log_channel: discord.TextChannel
+    ):
 
         def format_discord_timestamp(text):
             """Convert Discord timestamps (<t:1234567890:R>) into human-readable format."""
             matches = re.findall(r"<t:(\d+):R>", text)
             for match in matches:
-                timestamp = datetime.utcfromtimestamp(int(match)).strftime('%Y-%m-%d %H:%M:%S')
+                timestamp = datetime.utcfromtimestamp(int(match)).strftime("%Y-%m-%d %H:%M:%S")
                 text = text.replace(f"<t:{match}:R>", f"<span class='timestamp'>{timestamp}</span>")
             return text
 
         def replace_mentions(text, guild):
-            """ Replaces user, role, and channel mentions with readable names. """
+            """Replaces user, role, and channel mentions with readable names."""
             if not text:
                 return ""
 
@@ -318,7 +333,7 @@ class Thread:
                 role_mention_pattern = re.compile(r"<@&(\d+)>")
                 text = role_mention_pattern.sub(
                     lambda m: f"@{guild.get_role(int(m.group(1))).name if guild.get_role(int(m.group(1))) else 'Unknown Role'}",
-                    text
+                    text,
                 )
 
             # Replace channel mentions
@@ -326,7 +341,7 @@ class Thread:
                 channel_mention_pattern = re.compile(r"<#(\d+)>")
                 text = channel_mention_pattern.sub(
                     lambda m: f"#{guild.get_channel(int(m.group(1))).name if guild.get_channel(int(m.group(1))) else 'Unknown Channel'}",
-                    text
+                    text,
                 )
 
             # Replace user mentions
@@ -334,7 +349,7 @@ class Thread:
                 user_mention_pattern = re.compile(r"<@(\d+)>")
                 text = user_mention_pattern.sub(
                     lambda m: f"@{guild.get_member(int(m.group(1))).display_name if guild.get_member(int(m.group(1))) else 'Unknown User'}",
-                    text
+                    text,
                 )
 
             return text
@@ -346,17 +361,24 @@ class Thread:
         messages = []
 
         async for msg in channel.history(limit=None, oldest_first=True):
-            timestamp = msg.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            timestamp = msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             author_name = msg.author.display_name
             content = msg.content or ""
 
             # Replace mentions with actual names
             for mention in msg.mentions:
-                content = content.replace(f"<@{mention.id}>", f"<span class='mention'>@{mention.display_name}</span>")
+                content = content.replace(
+                    f"<@{mention.id}>", f"<span class='mention'>@{mention.display_name}</span>"
+                )
             for role in msg.role_mentions:
-                content = content.replace(f"<@&{role.id}>", f"<span class='role'>@{role.name}</span>")
+                content = content.replace(
+                    f"<@&{role.id}>", f"<span class='role'>@{role.name}</span>"
+                )
             for channel_mention in msg.channel_mentions:
-                content = content.replace(f"<#{channel_mention.id}>", f"<span class='channel'>#{channel_mention.name}</span>")
+                content = content.replace(
+                    f"<#{channel_mention.id}>",
+                    f"<span class='channel'>#{channel_mention.name}</span>",
+                )
 
             # Convert timestamps
             content = format_discord_timestamp(content)
@@ -391,14 +413,18 @@ class Thread:
                             embed_content += f"<p><strong>{replace_mentions(field.name, msg.guild)}:</strong> {replace_mentions(field.value, msg.guild)}</p>"
 
                     if embed.thumbnail:
-                        embed_content += f'<img src="{embed.thumbnail.url}" class="embed-thumbnail">'
+                        embed_content += (
+                            f'<img src="{embed.thumbnail.url}" class="embed-thumbnail">'
+                        )
 
                     if embed.image:
                         embed_content += f'<img src="{embed.image.url}" class="embed-image">'
 
                     if embed.footer:
-                        embed_content += f"<p class='footer'>"
-                        timestamp_str = embed.timestamp.strftime('%Y-%m-%d %H:%M') if embed.timestamp else ""
+                        embed_content += "<p class='footer'>"
+                        timestamp_str = (
+                            embed.timestamp.strftime("%Y-%m-%d %H:%M") if embed.timestamp else ""
+                        )
                         if embed.footer.text:
                             embed_content += f"{embed.footer.text} "
                         embed_content += f"{timestamp_str}</p>"
@@ -444,19 +470,38 @@ class Thread:
         # Send to log channel
         if log_channel:
             try:
-                await log_channel.send(f"{nsfw}Transcript for {channel.name} (closed by {closer.mention}):", file=file)
+                await log_channel.send(
+                    f"{nsfw}Transcript for {channel.name} (closed by {closer.mention}):", file=file
+                )
             except discord.NotFound:
-                self.bot.log.error(f"Modmail log channel {log_channel.id} not found when trying to send transcript for ticket {channel.id}")
-                raise Exception(f"Het geconfigureerde modmail log kanaal (ID: {log_channel.id}) bestaat niet meer.")
+                self.bot.log.error(
+                    f"Modmail log channel {log_channel.id} not found when trying to send transcript for ticket {channel.id}"
+                )
+                raise Exception(
+                    f"Het geconfigureerde modmail log kanaal (ID: {log_channel.id}) bestaat niet meer."
+                )
             except discord.Forbidden:
-                self.bot.log.error(f"No permission to send to modmail log channel {log_channel.id} when trying to send transcript for ticket {channel.id}")
-                raise Exception(f"Geen toestemming om berichten te sturen naar het modmail log kanaal (ID: {log_channel.id}).")
+                self.bot.log.error(
+                    f"No permission to send to modmail log channel {log_channel.id} when trying to send transcript for ticket {channel.id}"
+                )
+                raise Exception(
+                    f"Geen toestemming om berichten te sturen naar het modmail log kanaal (ID: {log_channel.id})."
+                )
             except discord.HTTPException as e:
-                self.bot.log.error(f"HTTP error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}")
-                raise Exception(f"Discord API fout bij versturen transcript naar log kanaal: {str(e)}")
+                self.bot.log.error(
+                    f"HTTP error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}"
+                )
+                raise Exception(
+                    f"Discord API fout bij versturen transcript naar log kanaal: {str(e)}"
+                )
             except Exception as e:
-                self.bot.log.error(f"Unexpected error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}", exc_info=True)
-                raise Exception(f"Onverwachte fout bij versturen transcript naar log kanaal: {str(e)}")
+                self.bot.log.error(
+                    f"Unexpected error when sending transcript to modmail log channel {log_channel.id} for ticket {channel.id}: {e}",
+                    exc_info=True,
+                )
+                raise Exception(
+                    f"Onverwachte fout bij versturen transcript naar log kanaal: {str(e)}"
+                )
 
         # Store in MongoDB
         _, recipient_id = parse_channel_topic(channel.topic)
@@ -465,10 +510,9 @@ class Thread:
             "ticket_id": channel.id,
             "closed_by": closer.id,
             "timestamp": datetime.now(LOCAL_TIMEZONE),
-            "log_html": log_html
+            "log_html": log_html,
         }
         await self.bot.db.modmail_logs.insert_one(log_entry)
-
 
     async def close(
         self,
@@ -482,13 +526,13 @@ class Thread:
         try:
             self.manager.cache.pop(self.id)
         except KeyError as e:
-            self.bot.log.error("Thread already closed: %s",e)
+            self.bot.log.error("Thread already closed: %s", e)
             return
 
-        #Logging
+        # Logging
         await self.store_and_send_log(closer, log_channel)
 
-        #No notification to user
+        # No notification to user
         if not silent:
             embed = discord.Embed(
                 title="Modmail Gesloten",
@@ -498,7 +542,10 @@ class Thread:
             if not message:
                 message = "Staff heeft deze Modmail chat gesloten"
             embed.description = message
-            embed.set_footer(text="Reageren zal een nieuwe modmail chat aanmaken", icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128))
+            embed.set_footer(
+                text="Reageren zal een nieuwe modmail chat aanmaken",
+                icon_url=self.bot.get_guild_icon(guild=self.bot.guild, size=128),
+            )
 
             try:
                 # Create DM channel if it doesn't exist, then send
@@ -506,7 +553,9 @@ class Thread:
                     await self.recipient.create_dm()
                 await self.recipient.dm_channel.send(embed=embed)
             except Exception as e:
-                self.bot.log.warning(f"Could not send close notification to user {self.recipient.id}: {e}")
+                self.bot.log.warning(
+                    f"Could not send close notification to user {self.recipient.id}: {e}"
+                )
 
         await self.channel.delete()
         self.bot.dispatch("thread_close", self, closer, silent, message)
@@ -538,16 +587,22 @@ class Thread:
 
         # Grab message
         close_message = self.bot.formatter.format(
-            "This thread has been closed automatically due to inactivity after {timeout}.", timeout=human_time
+            "This thread has been closed automatically due to inactivity after {timeout}.",
+            timeout=human_time,
         )
 
         time_marker_regex = "%t"
         if len(re.findall(time_marker_regex, close_message)) == 1:
             close_message = re.sub(time_marker_regex, str(human_time), close_message)
-        elif len(re.findall(time_marker_regex, close_message)) > 1:\
-            self.bot.log.warning("The thread_auto_close_response should only contain one '%s' to specify time.", time_marker_regex)
+        elif len(re.findall(time_marker_regex, close_message)) > 1:
+            self.bot.log.warning(
+                "The thread_auto_close_response should only contain one '%s' to specify time.",
+                time_marker_regex,
+            )
 
-        await self.close(closer=self.bot.user, after=int(seconds), message=close_message, auto_close=True)
+        await self.close(
+            closer=self.bot.user, after=int(seconds), message=close_message, auto_close=True
+        )
 
     async def find_linked_messages(
         self,
@@ -556,7 +611,11 @@ class Thread:
         note: bool = True,
     ) -> typing.Tuple[discord.Message, typing.List[typing.Optional[discord.Message]]]:
         if message1 is not None:
-            if not message1.embeds or not message1.embeds[0].author.url or message1.author != self.bot.user:
+            if (
+                not message1.embeds
+                or not message1.embeds[0].author.url
+                or message1.author != self.bot.user
+            ):
                 self.bot.log.warning("1")
                 raise ValueError("Malformed thread message. 1")
 
@@ -607,7 +666,11 @@ class Thread:
             if not (msg.embeds and msg.embeds[0].author):
                 continue
             try:
-                if msg.embeds[0].author == sender and msg.embeds[0].description == desc and msg.embeds[0].timestamp == time :
+                if (
+                    msg.embeds[0].author == sender
+                    and msg.embeds[0].description == desc
+                    and msg.embeds[0].timestamp == time
+                ):
                     messages.append(msg)
                     break
             except ValueError:
@@ -638,9 +701,7 @@ class Thread:
 
         await asyncio.gather(*tasks)
 
-    async def delete_message(
-        self, message = None, note: bool = True
-    ) -> None:
+    async def delete_message(self, message=None, note: bool = True) -> None:
 
         message1, *message2 = await self.find_linked_messages(message_id=message, note=note)
         tasks = []
@@ -743,7 +804,8 @@ class Thread:
                 from_mod=True,
                 anonymous=anonymous,
                 plain=plain,
-        ))
+            )
+        )
 
         try:
             user_msg = await asyncio.gather(*user_msg_tasks)
@@ -758,10 +820,7 @@ class Thread:
                     "geblokkeerd door de ontvanger."
                 )
             else:
-                description = (
-                    "Je bericht kon niet worden bezorgd door "
-                    "een onbekende fout."
-                )
+                description = "Je bericht kon niet worden bezorgd door " "een onbekende fout."
             msg = await message.channel.send(
                 embed=discord.Embed(
                     color=discord.Color.red(),
@@ -819,11 +878,11 @@ class Thread:
                     icon_url=avatar_url,
                 )
         else:
-            #Notes
+            # Notes
             bot_avatar_url = self.bot.user.avatar.url if self.bot.user.avatar else None
             embed.set_author(
                 name=f"{'Permanente' if persistent_note else ''} Notitie door {author.name}",
-                icon_url=bot_avatar_url
+                icon_url=bot_avatar_url,
             )
 
         ext = [(a.url, a.filename, False) for a in message.attachments]
@@ -868,7 +927,11 @@ class Thread:
                 discord.StickerFormatType.gif,
             ):
                 images.append(
-                    (f"https://media.discordapp.net/stickers/{i.id}.{i.format.file_extension}", i.name, True)
+                    (
+                        f"https://media.discordapp.net/stickers/{i.id}.{i.format.file_extension}",
+                        i.name,
+                        True,
+                    )
                 )
             elif i.format == discord.StickerFormatType.lottie:
                 # save the json lottie representation
@@ -945,7 +1008,9 @@ class Thread:
         file_upload_count = 1
 
         for url, filename, _ in attachments:
-            embed.add_field(name=f"Bestand upload ({file_upload_count})", value=f"[{filename}]({url})")
+            embed.add_field(
+                name=f"Bestand upload ({file_upload_count})", value=f"[{filename}]({url})"
+            )
             file_upload_count += 1
 
         if from_mod:
@@ -1074,7 +1139,6 @@ class ThreadManager:
                     await channel.edit(topic=f"User ID: {user_id}")
             return thread
 
-
         if recipient:
             recipient_id = recipient.id
 
@@ -1089,7 +1153,9 @@ class ThreadManager:
                 if not thread.cancelled and (
                     not thread.channel or not self.bot.get_channel(thread.channel.id)
                 ):
-                    self.bot.log.warning("Found existing thread for %s but the channel is invalid.", recipient_id)
+                    self.bot.log.warning(
+                        "Found existing thread for %s but the channel is invalid.", recipient_id
+                    )
                     # Just remove from cache and set cancelled, don't try to close invalid channel
                     thread.cancelled = True
                     try:
@@ -1104,8 +1170,7 @@ class ThreadManager:
                 return recipient_id == user_id
 
             channel = next(
-                (x for x in self.bot.guild.text_channels if x.topic and check(x.topic)),
-                None
+                (x for x in self.bot.guild.text_channels if x.topic and check(x.topic)), None
             )
 
             if channel:
@@ -1175,9 +1240,13 @@ class ThreadManager:
                 return thread
             else:
                 if thread.channel and self.bot.get_channel(thread.channel.id):
-                    self.bot.log.warning("Found an existing thread for %s, abort creating.", recipient)
+                    self.bot.log.warning(
+                        "Found an existing thread for %s, abort creating.", recipient
+                    )
                     return thread
-                self.bot.log.warning("Found an existing thread for %s, closing previous thread.", recipient)
+                self.bot.log.warning(
+                    "Found an existing thread for %s, closing previous thread.", recipient
+                )
                 self.bot.loop.create_task(
                     thread.close(closer=self.bot.user, silent=True, delete_channel=False)
                 )
@@ -1219,16 +1288,16 @@ class ThreadManager:
                 thread.cancelled = True
                 self.bot.loop.create_task(
                     destination.send(
-                        embed=discord.Embed(
-                            title="Geannuleerd", color=discord.Color.red()
-                        )
+                        embed=discord.Embed(title="Geannuleerd", color=discord.Color.red())
                     )
                 )
             if thread.cancelled:
                 del self.cache[recipient.id]
                 return thread
 
-        self.bot.loop.create_task(thread.setup(creator=creator, category=category, initial_message=message))
+        self.bot.loop.create_task(
+            thread.setup(creator=creator, category=category, initial_message=message)
+        )
         return thread
 
     async def find_or_create(self, recipient) -> Thread:

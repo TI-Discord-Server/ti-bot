@@ -1,5 +1,4 @@
 from os import getenv
-import base64
 from typing import Final, Tuple, cast
 
 from dotenv import load_dotenv
@@ -36,7 +35,6 @@ if DISCORD_GUILD_ID_RAW.isdigit():
     DISCORD_GUILD_ID: Final[int] = int(DISCORD_GUILD_ID_RAW)
 else:
     DISCORD_GUILD_ID: Final[int] = 771394209419624489  # fallback
-
 
 
 __all__: Final[Tuple[str, ...]] = (

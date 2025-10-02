@@ -1,21 +1,24 @@
+import asyncio
+import datetime
+import re
+import time
+
 import discord
+import pymongo
 from discord import app_commands
 from discord.ext import commands
-import datetime
-import pymongo
-import time
-import asyncio
-import re
-from typing import Optional
-from utils.has_role import has_role
-from utils.has_admin import has_admin
-from utils.timezone import TIMEZONE, now_utc, format_local_time, to_local
-from .moderation_utils import send_dm_embed, log_infraction, create_dm_embed
-from .moderation_tasks import ModerationTasks
-from .timeout_system import TimeoutSystem
-from .mute_system import MuteSystem
 
-MAX_PURGE = 100 # Discord limit
+from utils.has_admin import has_admin
+from utils.has_role import has_role
+from utils.timezone import to_local
+
+from .moderation_tasks import ModerationTasks
+from .moderation_utils import create_dm_embed, log_infraction, send_dm_embed
+from .mute_system import MuteSystem
+from .timeout_system import TimeoutSystem
+
+MAX_PURGE = 100  # Discord limit
+
 
 class ModCommands(commands.Cog, name="ModCommands"):
     """
@@ -28,12 +31,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
         self.infractions_collection = self.bot.db["infractions"]
         self.settings_collection = self.bot.db["settings"]
         self.scheduled_unmutes_collection = self.bot.db["scheduled_unmutes"]
-        
+
         # Initialize subsystems
-        self.tasks = ModerationTasks(bot, self.scheduled_unmutes_collection, self.infractions_collection)
+        self.tasks = ModerationTasks(
+            bot, self.scheduled_unmutes_collection, self.infractions_collection
+        )
         self.mute_system = MuteSystem(bot, self.infractions_collection, self.tasks)
         self.timeout_system = TimeoutSystem(bot, self.infractions_collection, self.mute_system)
-        
+
         # Start background tasks
         self.tasks.start_unmute_checker()
 
@@ -52,35 +57,42 @@ class ModCommands(commands.Cog, name="ModCommands"):
         """Kickt een member van de server met een optionele reden."""
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         dm_embed = create_dm_embed(
-            "⚠️ | Je bent gekickt.",
-            f"Reden: {reason}",
-            discord.Color.orange(),
-            bot_icon_url
+            "⚠️ | Je bent gekickt.", f"Reden: {reason}", discord.Color.orange(), bot_icon_url
         )
 
-        dm_sent = await send_dm_embed(member, dm_embed)
+        await send_dm_embed(member, dm_embed)
 
         try:
             await member.kick(reason=reason)
-            self.bot.log.info(f"User {member.name} ({member.id}) kicked by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
-            
+            self.bot.log.info(
+                f"User {member.name} ({member.id}) kicked by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
+            )
+
             embed = discord.Embed(
                 title="Member gekickt",
                 description=f"{member.mention} is gekickt. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            
+
             try:
                 await log_infraction(
                     self.infractions_collection,
-                    interaction.guild.id, member.id, interaction.user.id, "kick", reason
+                    interaction.guild.id,
+                    member.id,
+                    interaction.user.id,
+                    "kick",
+                    reason,
                 )
             except Exception as e:
-                self.bot.log.error(f"Failed to log kick infraction for {member.name} ({member.id}): {e}")
+                self.bot.log.error(
+                    f"Failed to log kick infraction for {member.name} ({member.id}): {e}"
+                )
 
         except discord.errors.Forbidden as e:
-            self.bot.log.error(f"Permission denied when trying to kick {member.name} ({member.id}): {e}")
+            self.bot.log.error(
+                f"Permission denied when trying to kick {member.name} ({member.id}): {e}"
+            )
             embed = discord.Embed(
                 title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te kicken.",
@@ -96,7 +108,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except Exception as e:
-            self.bot.log.error(f"Unexpected error when trying to kick {member.name} ({member.id}): {e}", exc_info=True)
+            self.bot.log.error(
+                f"Unexpected error when trying to kick {member.name} ({member.id}): {e}",
+                exc_info=True,
+            )
             embed = discord.Embed(
                 title="Onverwachte Fout",
                 description=f"Er is een onverwachte fout opgetreden bij het kicken: {str(e)}",
@@ -112,14 +127,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
         member: discord.Member,
         reason: str = "Geen reden opgegeven.",
     ):
-        """Bant een member van de server met een optionele reden."""
-        bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-        dm_embed = create_dm_embed(
-            "⚠️ | Je bent gebanned.",
-            f"Reden: {reason}",
-            discord.Color.dark_red(),
-            bot_icon_url
-        )
 
         await interaction.response.defer(ephemeral=True)
 
@@ -130,7 +137,11 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 channel = await member.create_dm()
                 view = discord.ui.View()
                 settings = await self.settings_collection.find_one({"_id": "mod_settings"})
-                unban_request_url = settings.get("unban_request_url", "https://example.com/unban_request") if settings else "https://example.com/unban_request"
+                unban_request_url = (
+                    settings.get("unban_request_url", "https://example.com/unban_request")
+                    if settings
+                    else "https://example.com/unban_request"
+                )
                 button = discord.ui.Button(
                     label="Unban Aanvragen", style=discord.ButtonStyle.link, url=unban_request_url
                 )
@@ -145,9 +156,13 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     view=view,
                 )
                 dm_success = True
-                self.bot.log.debug(f"DM sent successfully to {member.name} ({member.id}) for ban notification")
+                self.bot.log.debug(
+                    f"DM sent successfully to {member.name} ({member.id}) for ban notification"
+                )
             except discord.errors.Forbidden:
-                self.bot.log.info(f"Could not send DM to {member.name} ({member.id}) - DMs disabled or blocked")
+                self.bot.log.info(
+                    f"Could not send DM to {member.name} ({member.id}) - DMs disabled or blocked"
+                )
                 dm_success = False
             except Exception as e:
                 self.bot.log.warning(f"Failed to send DM to {member.name} ({member.id}): {e}")
@@ -155,7 +170,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
             # Perform the ban
             await member.ban(reason=reason)
-            self.bot.log.info(f"User {member.name} ({member.id}) banned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
+            self.bot.log.info(
+                f"User {member.name} ({member.id}) banned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
+            )
 
             # Send success message
             embed = discord.Embed(
@@ -170,18 +187,26 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 embed.set_footer(text="Kon gebruiker niet via DM informeren.")
 
             await interaction.followup.send(embed=embed, ephemeral=False)
-            
+
             # Log the infraction
             try:
                 await log_infraction(
                     self.infractions_collection,
-                    interaction.guild.id, member.id, interaction.user.id, "ban", reason
+                    interaction.guild.id,
+                    member.id,
+                    interaction.user.id,
+                    "ban",
+                    reason,
                 )
             except Exception as e:
-                self.bot.log.error(f"Failed to log ban infraction for {member.name} ({member.id}): {e}")
+                self.bot.log.error(
+                    f"Failed to log ban infraction for {member.name} ({member.id}): {e}"
+                )
 
         except discord.errors.Forbidden as e:
-            self.bot.log.error(f"Permission denied when trying to ban {member.name} ({member.id}): {e}")
+            self.bot.log.error(
+                f"Permission denied when trying to ban {member.name} ({member.id}): {e}"
+            )
             embed = discord.Embed(
                 title="Permissie Fout",
                 description="Ik heb geen permissie om deze member te bannen.",
@@ -197,7 +222,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
-            self.bot.log.error(f"Unexpected error when trying to ban {member.name} ({member.id}): {e}", exc_info=True)
+            self.bot.log.error(
+                f"Unexpected error when trying to ban {member.name} ({member.id}): {e}",
+                exc_info=True,
+            )
             embed = discord.Embed(
                 title="Onverwachte Fout",
                 description=f"Er is een onverwachte fout opgetreden bij het bannen: {str(e)}",
@@ -209,7 +237,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @has_admin()
     @app_commands.describe(
         user_id="Het Discord ID van de gebruiker om te unbannen",
-        reason="De reden voor het unbannen"
+        reason="De reden voor het unbannen",
     )
     async def unban(
         self,
@@ -220,13 +248,13 @@ class ModCommands(commands.Cog, name="ModCommands"):
         try:
             # Convert string to int
             user_id_int = int(user_id)
-            
+
             # Try to get the user object
             user = await self.bot.fetch_user(user_id_int)
-            
+
             # Check if user is actually banned
             try:
-                ban_entry = await interaction.guild.fetch_ban(user)
+                await interaction.guild.fetch_ban(user)
             except discord.NotFound:
                 embed = discord.Embed(
                     title="Gebruiker Niet Gebanned",
@@ -235,29 +263,39 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
-            
+
             # Unban the user
             await interaction.guild.unban(user, reason=reason)
-            self.bot.log.info(f"User {user.name} ({user.id}) unbanned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}")
-            
+            self.bot.log.info(
+                f"User {user.name} ({user.id}) unbanned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
+            )
+
             embed = discord.Embed(
                 title="Gebruiker Ongebanned",
                 description=f"{user.mention} ({user_id}) is ongebanned. Reden: {reason}",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed)
-            
+
             # Log the infraction
             try:
                 await log_infraction(
                     self.infractions_collection,
-                    interaction.guild.id, user.id, interaction.user.id, "unban", reason
+                    interaction.guild.id,
+                    user.id,
+                    interaction.user.id,
+                    "unban",
+                    reason,
                 )
             except Exception as e:
-                self.bot.log.error(f"Failed to log unban infraction for {user.name} ({user.id}): {e}")
-            
-        except ValueError as e:
-            self.bot.log.warning(f"Invalid user ID provided for unban: {user_id} by {interaction.user.name} ({interaction.user.id})")
+                self.bot.log.error(
+                    f"Failed to log unban infraction for {user.name} ({user.id}): {e}"
+                )
+
+        except ValueError:
+            self.bot.log.warning(
+                f"Invalid user ID provided for unban: {user_id} by {interaction.user.name} ({interaction.user.id})"
+            )
             embed = discord.Embed(
                 title="Ongeldig ID",
                 description="Het opgegeven gebruikers-ID is niet geldig.",
@@ -265,7 +303,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.errors.NotFound as e:
-            self.bot.log.warning(f"User not found for unban: {user_id} by {interaction.user.name} ({interaction.user.id}): {e}")
+            self.bot.log.warning(
+                f"User not found for unban: {user_id} by {interaction.user.name} ({interaction.user.id}): {e}"
+            )
             embed = discord.Embed(
                 title="Gebruiker Niet Gevonden",
                 description=f"Geen gebruiker gevonden met ID: {user_id}",
@@ -289,7 +329,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except Exception as e:
-            self.bot.log.error(f"Unexpected error when trying to unban user {user_id}: {e}", exc_info=True)
+            self.bot.log.error(
+                f"Unexpected error when trying to unban user {user_id}: {e}", exc_info=True
+            )
             embed = discord.Embed(
                 title="Onverwachte Fout",
                 description=f"Er is een onverwachte fout opgetreden bij het unbannen: {str(e)}",
@@ -307,13 +349,10 @@ class ModCommands(commands.Cog, name="ModCommands"):
     ):
         bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
         dm_embed = create_dm_embed(
-            "⚠️ | Je bent gewaarschuwd.",
-            f"Reden: {reason}",
-            discord.Color.yellow(),
-            bot_icon_url
+            "⚠️ | Je bent gewaarschuwd.", f"Reden: {reason}", discord.Color.yellow(), bot_icon_url
         )
 
-        dm_sent = await send_dm_embed(member, dm_embed)
+        await send_dm_embed(member, dm_embed)
         embed = discord.Embed(
             title="Member gewaarschuwd",
             description=f"{member.mention} is gewaarschuwd. Reden: {reason}",
@@ -322,7 +361,11 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await interaction.response.send_message(embed=embed)
         await log_infraction(
             self.infractions_collection,
-            interaction.guild.id, member.id, interaction.user.id, "warn", reason
+            interaction.guild.id,
+            member.id,
+            interaction.user.id,
+            "warn",
+            reason,
         )
 
     # Timeout commands
@@ -377,58 +420,67 @@ class ModCommands(commands.Cog, name="ModCommands"):
     ):
         await self.mute_system.handle_unmute_command(interaction, member, reason)
 
-    @app_commands.command(name="history", description="Laat de recente straffen van een gebruiker zien.")
+    @app_commands.command(
+        name="history", description="Laat de recente straffen van een gebruiker zien."
+    )
     @has_role("The Council")
     @app_commands.describe(user="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, user: discord.User):
-        infractions = await self.infractions_collection.find(
-            {"guild_id": interaction.guild.id, "user_id": user.id}
-        ).sort("timestamp", pymongo.DESCENDING).limit(10).to_list(length=None)
-        
+        infractions = (
+            await self.infractions_collection.find(
+                {"guild_id": interaction.guild.id, "user_id": user.id}
+            )
+            .sort("timestamp", pymongo.DESCENDING)
+            .limit(10)
+            .to_list(length=None)
+        )
+
         # Dutch translations for infraction types
         infraction_translations = {
             "kick": "Kick",
             "ban": "Ban",
-            "unban": "Unban", 
+            "unban": "Unban",
             "warn": "Waarschuwing",
             "mute": "Mute",
             "unmute": "Unmute",
             "timeout": "Timeout",
             "untimeout": "Untimeout",
-            "auto_unmute": "Automatische Unmute"
+            "auto_unmute": "Automatische Unmute",
         }
-        
+
         infraction_list = ""
         for infraction in infractions:
             # Parse timestamp - handle both datetime objects and ISO strings
-            timestamp = infraction['timestamp']
+            timestamp = infraction["timestamp"]
             if isinstance(timestamp, str):
-                timestamp = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-            
+                timestamp = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
             localized_timestamp = to_local(timestamp)
-            infraction_type = infraction_translations.get(infraction['type'], infraction['type'].capitalize())
-            reason = infraction.get('reason', 'Geen reden opgegeven')
-            
+            infraction_type = infraction_translations.get(
+                infraction["type"], infraction["type"].capitalize()
+            )
+            reason = infraction.get("reason", "Geen reden opgegeven")
+
             # Extract duration information if present in reason
             duration_info = ""
             if "(duur:" in reason:
-                duration_match = re.search(r'\(duur: ([^)]+)\)', reason)
+                duration_match = re.search(r"\(duur: ([^)]+)\)", reason)
                 if duration_match:
                     duration_info = f" **({duration_match.group(1)})**"
-                    reason = re.sub(r'\s*\(duur: [^)]+\)', '', reason)
-            
+                    reason = re.sub(r"\s*\(duur: [^)]+\)", "", reason)
+
             # Get moderator info if available
             moderator_info = ""
-            if 'moderator_id' in infraction:
+            if "moderator_id" in infraction:
                 try:
-                    moderator = interaction.guild.get_member(infraction['moderator_id'])
+                    moderator = interaction.guild.get_member(infraction["moderator_id"])
                     if moderator:
                         moderator_info = f" door {moderator.mention}"
                     else:
                         moderator_info = f" door <@{infraction['moderator_id']}>"
-                except:
+                except Exception:
                     moderator_info = ""
-            
+
             infraction_list += (
                 f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> "
                 f"- **{infraction_type}**{duration_info}{moderator_info}\n"
@@ -488,11 +540,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 return not message.author.bot
 
         try:
-            deleted = await interaction.channel.purge(
-                limit=count,
-                check=check,
-                bulk=True
-            )
+            deleted = await interaction.channel.purge(limit=count, check=check, bulk=True)
             embed = discord.Embed(
                 title="Messages Purged",
                 description=f"✅ {len(deleted)} berichten verwijderd.",
@@ -507,13 +555,14 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
 
         except discord.HTTPException as e:
-            await interaction.followup.send(
-                f"❌ Purge mislukt: {e}", ephemeral=True
-            )
+            await interaction.followup.send(f"❌ Purge mislukt: {e}", ephemeral=True)
 
-
-    @app_commands.command(name="purge_below", description="Verwijder alle berichten onder een specifiek bericht.")
-    @app_commands.describe(message_link="De link of ID van het bericht waarboven niet verwijderd wordt")
+    @app_commands.command(
+        name="purge_below", description="Verwijder alle berichten onder een specifiek bericht."
+    )
+    @app_commands.describe(
+        message_link="De link of ID van het bericht waarboven niet verwijderd wordt"
+    )
     async def purge_below(self, interaction: discord.Interaction, message_link: str):
         await interaction.response.defer(ephemeral=True)
 
@@ -532,7 +581,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
             channel = interaction.guild.get_channel(channel_id)
             if not isinstance(channel, discord.TextChannel):
-                await interaction.followup.send("❌ Ongeldige channel of berichtlink.", ephemeral=True)
+                await interaction.followup.send(
+                    "❌ Ongeldige channel of berichtlink.", ephemeral=True
+                )
                 return
 
             # Haal het bericht op
@@ -546,7 +597,9 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 messages_to_delete.append(msg)
 
             if not messages_to_delete:
-                await interaction.followup.send("⚠️ Geen berichten gevonden om te verwijderen.", ephemeral=True)
+                await interaction.followup.send(
+                    "⚠️ Geen berichten gevonden om te verwijderen.", ephemeral=True
+                )
                 return
 
             # Chunk delete
@@ -560,7 +613,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
             await interaction.followup.send(
                 f"✅ {len(messages_to_delete)} berichten verwijderd onder het geselecteerde bericht.",
-                ephemeral=True
+                ephemeral=True,
             )
 
         except Exception as e:
@@ -571,9 +624,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         description="Prevent sending messages in a channel.",
     )
     @has_role("The Council")
-    @app_commands.describe(
-        channel="The channel to lockdown", reason="The reason for the lockdown"
-    )
+    @app_commands.describe(channel="The channel to lockdown", reason="The reason for the lockdown")
     async def lockdown(
         self,
         interaction: discord.Interaction,
@@ -581,9 +632,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         reason: str = "No reason provided.",
     ):
         try:
-            await channel.set_permissions(
-                interaction.guild.default_role, send_messages=False
-            )
+            await channel.set_permissions(interaction.guild.default_role, send_messages=False)
 
             embed = discord.Embed(
                 title="Channel Locked Down",
@@ -605,20 +654,16 @@ class ModCommands(commands.Cog, name="ModCommands"):
         description="Unlock a locked channel.",
     )
     @has_role("The Council")
-    @app_commands.describe(
-        channel="The channel to unlock", reason="The reason for the unlockdown"
-    )
+    @app_commands.describe(channel="The channel to unlock", reason="The reason for the unlockdown")
     async def unlockdown(
         self,
         interaction: discord.Interaction,
         channel: discord.TextChannel,
         reason: str = "No reason provided.",
     ):
-        
+
         try:
-            await channel.set_permissions(
-                interaction.guild.default_role, send_messages=True
-            )
+            await channel.set_permissions(interaction.guild.default_role, send_messages=True)
 
             embed = discord.Embed(
                 title="Channel Unlocked",
@@ -633,6 +678,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(ModCommands(bot))

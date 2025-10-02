@@ -1,6 +1,8 @@
 import discord
-from discord.ui import View, Button
+from discord.ui import Button, View
+
 from .confession_modal import ConfessionModal
+
 
 class RulesView(View):
     def __init__(self, bot):

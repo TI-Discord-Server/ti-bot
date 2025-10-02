@@ -1,19 +1,6 @@
-import json
-import logging
-import os
-import re
-import sys
 import _string
-
-from difflib import get_close_matches
-from enum import IntEnum
-from logging import FileHandler, StreamHandler, Handler
-from logging.handlers import RotatingFileHandler
 from string import Formatter
-from typing import Dict, Optional
 
-import discord
-from discord.ext import commands
 
 class DummyMessage:
     """
@@ -62,6 +49,7 @@ class DummyMessage:
 
     async def ack(self):
         return
+
 
 class SafeFormatter(Formatter):
     def get_field(self, field_name, args, kwargs):

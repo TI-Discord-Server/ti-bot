@@ -1,14 +1,18 @@
-import discord
-from discord import app_commands
-from discord.ext import commands
 import datetime
-import re
 from typing import List, Tuple
+
+import discord
+from discord.ext import commands
 
 
 class YearButton(discord.ui.Button):
     def __init__(self, bot, year: str, label: str, emoji: str, color: discord.Color):
-        super().__init__(label=label, style=discord.ButtonStyle.primary, emoji=emoji, custom_id=f"year_button_{year}")
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.primary,
+            emoji=emoji,
+            custom_id=f"year_button_{year}",
+        )
         self.bot = bot
         self.year = year
         self.color = color
@@ -20,8 +24,7 @@ class YearButton(discord.ui.Button):
 
         if not tracks:
             await interaction.followup.send(
-                f"❌ Geen afstudeerrichtingen gevonden voor jaar {self.year}.",
-                ephemeral=True
+                f"❌ Geen afstudeerrichtingen gevonden voor jaar {self.year}.", ephemeral=True
             )
             return
 
@@ -29,7 +32,7 @@ class YearButton(discord.ui.Button):
             title=f"📘 Jaar {self.year}",
             description="Selecteer je afstudeerrichting.",
             color=self.color,
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
 
@@ -41,24 +44,33 @@ class TrackSelect(discord.ui.Select):
         self.bot = bot
         self.year = year
         self.color = color
-        super().__init__(placeholder="Selecteer je afstudeerrichting...", min_values=1, max_values=1, options=options, custom_id=f"track_select_{year}")
+        super().__init__(
+            placeholder="Selecteer je afstudeerrichting...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id=f"track_select_{year}",
+        )
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         selected_track = self.values[0]
 
         channel_menu_cog = self.bot.get_cog("ChannelMenu")
-        roles = await channel_menu_cog.get_roles_for_track(interaction.guild, self.year, selected_track)
+        roles = await channel_menu_cog.get_roles_for_track(
+            interaction.guild, self.year, selected_track
+        )
 
         if not roles:
             await interaction.followup.send(
-                f"❌ Geen rollen gevonden voor {selected_track} ({self.year}).",
-                ephemeral=True
+                f"❌ Geen rollen gevonden voor {selected_track} ({self.year}).", ephemeral=True
             )
             return
 
         options = [
-            discord.SelectOption(label=role.name, value=str(role.id), default=role in interaction.user.roles)
+            discord.SelectOption(
+                label=role.name, value=str(role.id), default=role in interaction.user.roles
+            )
             for role in roles
         ]
 
@@ -66,7 +78,7 @@ class TrackSelect(discord.ui.Select):
             title=f"🎓 {selected_track} ({self.year})",
             description="Selecteer of deselecteer de rollen die je wilt hebben.",
             color=self.color,
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
         view = RoleSelectView(self.bot, self.year, selected_track, options, self.color)
 
@@ -78,7 +90,13 @@ class CourseSelect(discord.ui.Select):
         self.bot = bot
         self.year = year
         self.track = track
-        super().__init__(placeholder="Selecteer/deselecteer je vakrollen...", min_values=0, max_values=len(options), options=options, custom_id=f"course_select_{year}_{track}")
+        super().__init__(
+            placeholder="Selecteer/deselecteer je vakrollen...",
+            min_values=0,
+            max_values=len(options),
+            options=options,
+            custom_id=f"course_select_{year}_{track}",
+        )
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -122,15 +140,20 @@ class TrackSelectView(discord.ui.View):
     def __init__(self, bot, year: str, tracks: list[str], color: discord.Color):
         super().__init__(timeout=None)
         self.bot = bot
-        self.add_item(TrackSelect(bot, year, [discord.SelectOption(label=t, value=t) for t in tracks], color))
+        self.add_item(
+            TrackSelect(bot, year, [discord.SelectOption(label=t, value=t) for t in tracks], color)
+        )
 
 
 class RoleSelectView(discord.ui.View):
-    def __init__(self, bot, year: str, track: str, options: list[discord.SelectOption], color: discord.Color):
+    def __init__(
+        self, bot, year: str, track: str, options: list[discord.SelectOption], color: discord.Color
+    ):
         super().__init__(timeout=None)
         self.bot = bot
         self.add_item(CourseSelect(bot, year, track, options))
         self.add_item(BackToTracksButton(bot, year, color))
+
 
 class BackToTracksButton(discord.ui.Button):
     def __init__(self, bot, year: str, color: discord.Color):
@@ -148,12 +171,13 @@ class BackToTracksButton(discord.ui.Button):
             title=f"📘 Jaar {self.year}",
             description="Selecteer je afstudeerrichting.",
             color=self.color,
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
 
         view = TrackSelectView(self.bot, self.year, tracks, self.color)
 
         await interaction.edit_original_response(embed=embed, view=view)
+
 
 class ChannelMenu(commands.Cog):
     def __init__(self, bot):
@@ -167,7 +191,9 @@ class ChannelMenu(commands.Cog):
         tracks: List[str] = []
         if channel.topic:
             # Laatste niet-lege regel pakken
-            lines = [l.strip("• ").strip() for l in channel.topic.splitlines() if l.strip()]
+            lines = [
+                line.strip("• ").strip() for line in channel.topic.splitlines() if line.strip()
+            ]
             if lines:
                 track_line = lines[-1]
                 tracks = [t.strip() for t in track_line.split(",")]
@@ -187,7 +213,9 @@ class ChannelMenu(commands.Cog):
                                 tracks_set.add(t)
         return sorted(list(tracks_set))
 
-    async def get_roles_for_track(self, guild: discord.Guild, year: str, track: str) -> List[discord.Role]:
+    async def get_roles_for_track(
+        self, guild: discord.Guild, year: str, track: str
+    ) -> List[discord.Role]:
         """Geef alle rollen terug die gekoppeld zijn aan een bepaalde track in een jaar."""
         roles = []
 
@@ -209,14 +237,15 @@ class ChannelMenu(commands.Cog):
 
         return roles
 
-    async def ensure_role_for_channel(self, guild: discord.Guild, channel: discord.TextChannel, role_name: str) -> discord.Role:
+    async def ensure_role_for_channel(
+        self, guild: discord.Guild, channel: discord.TextChannel, role_name: str
+    ) -> discord.Role:
         """Maak rol aan als die nog niet bestaat en stel permissions in voor dit kanaal."""
         role = discord.utils.get(guild.roles, name=role_name)
 
         if not role:
             role = await guild.create_role(
-                name=role_name,
-                reason=f"Auto-created from channel topic in #{channel.name}"
+                name=role_name, reason=f"Auto-created from channel topic in #{channel.name}"
             )
             self.bot.log.info(f"✅ Rol '{role.name}' aangemaakt in guild '{guild.name}'")
 
@@ -235,11 +264,16 @@ class ChannelMenu(commands.Cog):
             return
 
         # Check of de category een jaar bevat
-        if channel.category and any(x in channel.category.name.upper() for x in ["1E JAAR", "2E JAAR", "3E JAAR"]):
+        if channel.category and any(
+            x in channel.category.name.upper() for x in ["1E JAAR", "2E JAAR", "3E JAAR"]
+        ):
             role_name, tracks = await self.parse_channel_topic(channel)
             if role_name:
                 await self.ensure_role_for_channel(channel.guild, channel, role_name)
-                self.bot.log.info(f"📘 Rol en permissions ingesteld voor #{channel.name} in {channel.category.name}")
+                self.bot.log.info(
+                    f"📘 Rol en permissions ingesteld voor #{channel.name} in {channel.category.name}"
+                )
+
 
 async def setup(bot):
     await bot.add_cog(ChannelMenu(bot))

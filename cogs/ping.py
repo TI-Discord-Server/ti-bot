@@ -14,9 +14,7 @@ class ping(commands.Cog, name="ping"):
         description="Krijg de latentie van de bot.",
     )
     async def ping(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            f"Pong! {round(self.bot.latency * 1000)}ms"
-        )
+        await interaction.response.send_message(f"Pong! {round(self.bot.latency * 1000)}ms")
 
 
 async def setup(bot):

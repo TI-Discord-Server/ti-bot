@@ -1,30 +1,33 @@
+import datetime
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-from typing import Optional, Dict, Any, List
-import datetime
-from .developer_management import DeveloperManagementView
-from utils.timezone import now_utc
-from utils.checks import developer
+
 from main import DEFAULT_GUILD_ID
+from utils.checks import developer
+
+from .developer_management import DeveloperManagementView
 
 
 class ConfigurationView(discord.ui.View):
     """Main configuration view with category selection."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool = True):
         super().__init__(timeout=300)
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Check if user has permission to use this view."""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True
+            )
             return False
         return True
-    
+
     @discord.ui.select(
         placeholder="Selecteer een configuratie categorie...",
         options=[
@@ -32,56 +35,56 @@ class ConfigurationView(discord.ui.View):
                 label="Server Instellingen",
                 value="server",
                 description="Basis server configuratie",
-                emoji="🏠"
+                emoji="🏠",
             ),
             discord.SelectOption(
                 label="Modmail",
-                value="modmail", 
+                value="modmail",
                 description="Modmail systeem instellingen",
-                emoji="📧"
+                emoji="📧",
             ),
             discord.SelectOption(
                 label="Confessions",
                 value="confessions",
-                description="Confession systeem instellingen", 
-                emoji="🤫"
+                description="Confession systeem instellingen",
+                emoji="🤫",
             ),
             discord.SelectOption(
                 label="Reports",
                 value="reports",
                 description="Report systeem instellingen",
-                emoji="🚨"
+                emoji="🚨",
             ),
             discord.SelectOption(
                 label="Verificatie",
                 value="verification",
                 description="Verificatie systeem instellingen",
-                emoji="✅"
+                emoji="✅",
             ),
             discord.SelectOption(
                 label="Rollen & Kanalen",
                 value="roles_channels",
                 description="Rol en kanaal menu instellingen",
-                emoji="🎭"
+                emoji="🎭",
             ),
             discord.SelectOption(
                 label="Unban Requests",
                 value="unban_requests",
                 description="Unban aanvraag systeem instellingen",
-                emoji="🔓"
+                emoji="🔓",
             ),
             discord.SelectOption(
                 label="Examenresultaten",
                 value="exam_results",
                 description="Examenresultaten datum instellingen",
-                emoji="📊"
-            )
-        ]
+                emoji="📊",
+            ),
+        ],
     )
     async def category_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         """Handle category selection."""
         category = select.values[0]
-        
+
         if category == "server":
             view = ServerConfigView(self.bot, self.user_id, self.visible)
         elif category == "modmail":
@@ -98,10 +101,10 @@ class ConfigurationView(discord.ui.View):
             view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
         elif category == "exam_results":
             view = ExamResultsConfigView(self.bot, self.user_id, self.visible)
-        
+
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     async def create_embed(self):
         """Create the main configuration embed."""
         try:
@@ -109,7 +112,7 @@ class ConfigurationView(discord.ui.View):
                 title="🔧 Bot Configuratie",
                 description="Selecteer een categorie om de instellingen te bekijken en aan te passen.",
                 color=discord.Color.blue(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
             embed.add_field(
                 name="📋 Beschikbare Categorieën",
@@ -123,7 +126,7 @@ class ConfigurationView(discord.ui.View):
                     "🔓 **Unban Requests** - Unban aanvraag systeem instellingen\n"
                     "📊 **Examenresultaten** - Examenresultaten datum instellingen"
                 ),
-                inline=False
+                inline=False,
             )
             embed.set_footer(text="Gebruik het dropdown menu om een categorie te selecteren")
             return embed
@@ -134,26 +137,28 @@ class ConfigurationView(discord.ui.View):
 
 class BaseConfigView(discord.ui.View):
     """Base class for configuration views."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool = True):
         super().__init__(timeout=300)
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Check if user has permission to use this view."""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True
+            )
             return False
         return True
-    
+
     @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary, row=4)
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go back to the appropriate config view."""
         try:
             self.bot.log.debug(f"Back button clicked for {self.settings_id}.")
-            
+
             # Determine which config view to return to based on settings_id and field_name
             if self.settings_id == "server_settings":
                 view = ServerConfigView(self.bot, self.user_id, True)
@@ -173,16 +178,16 @@ class BaseConfigView(discord.ui.View):
                 view = ExamResultsConfigView(self.bot, self.user_id, True)
             else:
                 view = ConfigurationView(self.bot, self.user_id, True)
-            
+
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error in back_button: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het teruggaan:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
@@ -192,49 +197,49 @@ class BaseConfigView(discord.ui.View):
 
 class ServerConfigView(BaseConfigView):
     """Server configuration view."""
-    
+
     async def create_embed(self):
         """Create server configuration embed."""
         try:
             self.settings_id = "baseconfig"
             settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
-            
+
             embed = discord.Embed(
                 title="🏠 Server Instellingen",
                 description="Basis server configuratie instellingen",
                 color=discord.Color.green(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
-            
+
             # Show current guild (auto-detected or configured)
             current_guild = self.bot.guild
             configured_guild_id = settings.get("guild_id", None)
-            
+
             if current_guild:
                 if configured_guild_id:
-                    guild_status = f"**Geconfigureerd:** {current_guild.name} (`{current_guild.id}`)"
+                    guild_status = (
+                        f"**Geconfigureerd:** {current_guild.name} (`{current_guild.id}`)"
+                    )
                 else:
-                    guild_status = f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
+                    guild_status = (
+                        f"**Auto-gedetecteerd:** {current_guild.name} (`{current_guild.id}`)"
+                    )
             else:
                 # Fallback: show the guild_id even if guild object not found
                 guild_id = self.bot.guild_id or DEFAULT_GUILD_ID
                 guild_status = f"**Standaard:** Server ID `{guild_id}` (server niet gevonden)"
                 self.bot.log.warning(f"Guild object not found, using fallback guild_id: {guild_id}")
-                
-            embed.add_field(
-                name="🏠 Huidige Server",
-                value=guild_status,
-                inline=False
-            )
-            
+
+            embed.add_field(name="🏠 Huidige Server", value=guild_status, inline=False)
+
             # Show multi-guild info if applicable
             if len(self.bot.guilds) > 1:
                 embed.add_field(
                     name="ℹ️ Multi-Server Info",
                     value=f"Bot is in {len(self.bot.guilds)} servers. Configureer een specifieke server ID als de auto-detectie niet correct is.",
-                    inline=False
+                    inline=False,
                 )
-            
+
             # Developer IDs
             dev_ids = settings.get("developer_ids", [])
             if dev_ids:
@@ -245,44 +250,48 @@ class ServerConfigView(BaseConfigView):
                         dev_mentions.append(f"<@{dev_id}> (`{dev_id}`)")
                     else:
                         dev_mentions.append(f"Onbekende gebruiker (`{dev_id}`)")
-                
+
                 dev_text = "\n".join(dev_mentions)
                 if len(dev_ids) > 5:
                     dev_text += f"\n... en {len(dev_ids) - 5} meer"
             else:
                 dev_text = "Geen ontwikkelaars ingesteld"
-                
-            embed.add_field(
-                name="👨‍💻 Ontwikkelaars",
-                value=dev_text,
-                inline=False
-            )
-            
+
+            embed.add_field(name="👨‍💻 Ontwikkelaars", value=dev_text, inline=False)
+
             # Webhook logging format
             webhook_format = settings.get("webhook_log_format", "embed")
             format_emoji = "📋" if webhook_format == "embed" else "📝"
-            format_description = "Rich embeds met kleuren en velden" if webhook_format == "embed" else "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format"
-            
+            format_description = (
+                "Rich embeds met kleuren en velden"
+                if webhook_format == "embed"
+                else "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format"
+            )
+
             embed.add_field(
                 name=f"{format_emoji} Webhook Logging Format",
                 value=f"**Huidige modus:** {webhook_format.title()}\n{format_description}",
-                inline=False
+                inline=False,
             )
-            
+
             embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
             return embed
-            
+
         except Exception as e:
             self.bot.log.error(f"Error creating server configuration embed: {e}", exc_info=True)
             raise
-    
-    @discord.ui.button(label="Server ID overschrijven", style=discord.ButtonStyle.secondary, emoji="🏠")
+
+    @discord.ui.button(
+        label="Server ID overschrijven", style=discord.ButtonStyle.secondary, emoji="🏠"
+    )
     async def set_guild_id(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Override auto-detected guild ID."""
         modal = GuildIdModal(self.bot, self.user_id, self.visible)
         await interaction.response.send_modal(modal)
-    
-    @discord.ui.button(label="Ontwikkelaars beheren", style=discord.ButtonStyle.primary, emoji="👨‍💻")
+
+    @discord.ui.button(
+        label="Ontwikkelaars beheren", style=discord.ButtonStyle.primary, emoji="👨‍💻"
+    )
     async def manage_developers(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage developer IDs."""
         try:
@@ -294,133 +303,143 @@ class ServerConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description="Er is een fout opgetreden bij het openen van het ontwikkelaars menu.",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
-    
-    @discord.ui.button(label="Webhook Logging", style=discord.ButtonStyle.secondary, emoji="📝", row=1)
-    async def toggle_webhook_format(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+    @discord.ui.button(
+        label="Webhook Logging", style=discord.ButtonStyle.secondary, emoji="📝", row=1
+    )
+    async def toggle_webhook_format(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Toggle webhook logging format between embed and plaintext."""
         try:
             # Get current settings
             settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
             current_format = settings.get("webhook_log_format", "embed")
-            
+
             # Toggle format
             new_format = "plaintext" if current_format == "embed" else "embed"
-            
+
             # Update database
             await self.bot.db.settings.update_one(
                 {"_id": "server_settings"},
                 {"$set": {"webhook_log_format": new_format}},
-                upsert=True
+                upsert=True,
             )
-            
+
             # Create confirmation embed
             format_emoji = "📝" if new_format == "plaintext" else "📋"
-            format_description = "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format" if new_format == "plaintext" else "Rich embeds met kleuren en velden"
-            
+            format_description = (
+                "Eenvoudige tekst met [LEVEL] [HH:MM:SS] format"
+                if new_format == "plaintext"
+                else "Rich embeds met kleuren en velden"
+            )
+
             embed = discord.Embed(
                 title=f"{format_emoji} Webhook Logging Format Gewijzigd",
                 description=f"**Nieuwe modus:** {new_format.title()}\n{format_description}",
                 color=discord.Color.green(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
-            
+
             if new_format == "plaintext":
                 embed.add_field(
                     name="📝 Plaintext Voorbeeld",
                     value="```\n[INFO] [14:30:25] Bot successfully started\n[WARNING] [14:30:26] Rate limit approaching\n[ERROR] [14:30:27] Database connection failed\n```",
-                    inline=False
+                    inline=False,
                 )
             else:
                 embed.add_field(
                     name="📋 Embed Voorbeeld",
                     value="Rich embeds met kleuren, timestamps en gestructureerde velden zoals je nu ziet!",
-                    inline=False
+                    inline=False,
                 )
-            
+
             embed.set_footer(text="De wijziging is direct actief voor nieuwe log berichten")
-            
+
             # Send confirmation and refresh the main view
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            
+
             # Refresh the main configuration view
             main_embed = await self.create_embed()
             await interaction.edit_original_response(embed=main_embed, view=self)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error toggling webhook format: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het wijzigen van de webhook logging format:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
-    
+
     @discord.ui.button(label="Test Webhook", style=discord.ButtonStyle.success, emoji="🧪", row=1)
-    async def test_webhook_logging(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def test_webhook_logging(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Send test messages to demonstrate current webhook logging format."""
         try:
             # Get current format
             settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
             current_format = settings.get("webhook_log_format", "embed")
-            
+
             # Send test log messages
             self.bot.log.info("🧪 Test INFO message - Webhook logging format test")
             self.bot.log.warning("🧪 Test WARNING message - Rate limit approaching")
             self.bot.log.error("🧪 Test ERROR message - Connection timeout")
-            
+
             # Create confirmation embed
             format_emoji = "📝" if current_format == "plaintext" else "📋"
             embed = discord.Embed(
                 title=f"{format_emoji} Webhook Test Berichten Verzonden",
                 description=f"**Huidige format:** {current_format.title()}\n\nEr zijn 3 test berichten verzonden naar de webhook:\n• INFO bericht\n• WARNING bericht\n• ERROR bericht",
                 color=discord.Color.blue(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
-            
+
             if current_format == "plaintext":
                 embed.add_field(
                     name="📝 Plaintext Format",
                     value="Berichten worden getoond als:\n```\n[INFO] [HH:MM:SS] 🧪 Test INFO message - Webhook logging format test\n```",
-                    inline=False
+                    inline=False,
                 )
             else:
                 embed.add_field(
-                    name="📋 Embed Format", 
+                    name="📋 Embed Format",
                     value="Berichten worden getoond als rich embeds met kleuren en velden (zoals deze!)",
-                    inline=False
+                    inline=False,
                 )
-            
+
             embed.set_footer(text="Controleer je webhook kanaal om de test berichten te zien")
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error testing webhook logging: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het testen van webhook logging:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
 
 
 class ModmailConfigView(BaseConfigView):
     """Modmail configuration view."""
-    
+
     async def create_embed(self):
         """Create modmail configuration embed."""
         self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "modmail_settings"}) or {}
-        
+
         embed = discord.Embed(
             title="📧 Modmail Instellingen",
             description="Configuratie voor het modmail systeem",
             color=discord.Color.blue(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Category
         category_id = settings.get("modmail_category_id", "Niet ingesteld")
         if category_id != "Niet ingesteld":
@@ -428,13 +447,13 @@ class ModmailConfigView(BaseConfigView):
             category_name = category.name if category else f"Onbekende categorie ({category_id})"
         else:
             category_name = "Niet ingesteld"
-            
+
         embed.add_field(
             name="📁 Modmail Categorie",
             value=f"`{category_id}`\n**Categorie:** {category_name}",
-            inline=True
+            inline=True,
         )
-        
+
         # Logs channel
         logs_id = settings.get("modmail_channel_id", "Niet ingesteld")
         if logs_id != "Niet ingesteld":
@@ -442,87 +461,89 @@ class ModmailConfigView(BaseConfigView):
             logs_name = logs_channel.mention if logs_channel else f"Onbekend kanaal ({logs_id})"
         else:
             logs_name = "Niet ingesteld"
-            
+
         embed.add_field(
-            name="📋 Logs Kanaal",
-            value=f"`{logs_id}`\n**Kanaal:** {logs_name}",
-            inline=True
+            name="📋 Logs Kanaal", value=f"`{logs_id}`\n**Kanaal:** {logs_name}", inline=True
         )
-        
+
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
-    
+
     @discord.ui.button(label="Categorie instellen", style=discord.ButtonStyle.primary, emoji="📁")
     async def set_category(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set modmail category."""
-        view = ChannelSelectView(self.bot, self.user_id, "modmail_settings", "modmail_category_id", "category")
+        view = ChannelSelectView(
+            self.bot, self.user_id, "modmail_settings", "modmail_category_id", "category"
+        )
         embed = discord.Embed(
             title="📁 Modmail Categorie Selecteren",
             description="Selecteer de categorie waar modmail threads worden aangemaakt.",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     @discord.ui.button(label="Logs Kanaal instellen", style=discord.ButtonStyle.primary, emoji="📋")
     async def set_logs_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set modmail logs channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "modmail_settings", "modmail_channel_id", "text")
+        view = ChannelSelectView(
+            self.bot, self.user_id, "modmail_settings", "modmail_channel_id", "text"
+        )
         embed = discord.Embed(
             title="📋 Modmail Logs Kanaal Selecteren",
             description="Selecteer het kanaal waar modmail logs worden opgeslagen.",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
 class ConfessionsConfigView(BaseConfigView):
     """Confessions configuration view."""
-    
+
     async def create_embed(self):
         """Create confessions configuration embed."""
         self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "confession_settings"}) or {}
-        
+
         embed = discord.Embed(
             title="🤫 Confessions Instellingen",
             description="Configuratie voor het confessions systeem",
             color=discord.Color.purple(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Review channel
         review_id = settings.get("review_channel_id", "Niet ingesteld")
         if review_id != "Niet ingesteld":
             review_channel = self.bot.get_channel(review_id)
-            review_name = review_channel.mention if review_channel else f"Onbekend kanaal ({review_id})"
+            review_name = (
+                review_channel.mention if review_channel else f"Onbekend kanaal ({review_id})"
+            )
         else:
             review_name = "Niet ingesteld"
-            
+
         embed.add_field(
-            name="🔍 Review Kanaal",
-            value=f"`{review_id}`\n**Kanaal:** {review_name}",
-            inline=True
+            name="🔍 Review Kanaal", value=f"`{review_id}`\n**Kanaal:** {review_name}", inline=True
         )
-        
+
         # Public channel
         public_id = settings.get("public_channel_id", "Niet ingesteld")
         if public_id != "Niet ingesteld":
             public_channel = self.bot.get_channel(public_id)
-            public_name = public_channel.mention if public_channel else f"Onbekend kanaal ({public_id})"
+            public_name = (
+                public_channel.mention if public_channel else f"Onbekend kanaal ({public_id})"
+            )
         else:
             public_name = "Niet ingesteld"
-            
+
         embed.add_field(
-            name="📢 Publiek Kanaal",
-            value=f"`{public_id}`\n**Kanaal:** {public_name}",
-            inline=True
+            name="📢 Publiek Kanaal", value=f"`{public_id}`\n**Kanaal:** {public_name}", inline=True
         )
-        
+
         # Timing settings
         review_time = settings.get("review_time", "17:00")
         post_times = settings.get("post_times", ["9:00", "12:00"])
         daily_limit = settings.get("daily_review_limit", len(post_times))
-        
+
         embed.add_field(
             name="⏰ Tijdsinstellingen",
             value=(
@@ -530,34 +551,38 @@ class ConfessionsConfigView(BaseConfigView):
                 f"**Post tijden:** {', '.join(post_times)} Brussels tijd\n"
                 f"**Dagelijkse limiet:** {daily_limit}"
             ),
-            inline=False
+            inline=False,
         )
-        
+
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
-    
+
     @discord.ui.button(label="Review Kanaal", style=discord.ButtonStyle.primary, emoji="🔍")
     async def set_review_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set review channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "confession_settings", "review_channel_id", "text")
+        view = ChannelSelectView(
+            self.bot, self.user_id, "confession_settings", "review_channel_id", "text"
+        )
         embed = discord.Embed(
             title="🔍 Review Kanaal Selecteren",
             description="Selecteer het kanaal waar confessions worden gereviewd.",
-            color=discord.Color.purple()
+            color=discord.Color.purple(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     @discord.ui.button(label="Publiek Kanaal", style=discord.ButtonStyle.primary, emoji="📢")
     async def set_public_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set public channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "confession_settings", "public_channel_id", "text")
+        view = ChannelSelectView(
+            self.bot, self.user_id, "confession_settings", "public_channel_id", "text"
+        )
         embed = discord.Embed(
-            title="📢 Publiek Kanaal Selecteren", 
+            title="📢 Publiek Kanaal Selecteren",
             description="Selecteer het kanaal waar goedgekeurde confessions worden gepost.",
-            color=discord.Color.purple()
+            color=discord.Color.purple(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     @discord.ui.button(label="Tijden instellen", style=discord.ButtonStyle.primary, emoji="⏰")
     async def set_times(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set confession times."""
@@ -567,33 +592,35 @@ class ConfessionsConfigView(BaseConfigView):
 
 class ReportsConfigView(BaseConfigView):
     """Reports configuration view."""
-    
+
     async def create_embed(self):
         """Create reports configuration embed."""
         self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "reports_settings"}) or {}
-        
+
         embed = discord.Embed(
             title="🚨 Reports Instellingen",
             description="Configuratie voor het reports systeem",
             color=discord.Color.red(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Reports channel
         reports_id = settings.get("reports_channel_id", "Niet ingesteld")
         if reports_id != "Niet ingesteld":
             reports_channel = self.bot.get_channel(reports_id)
-            reports_name = reports_channel.mention if reports_channel else f"Onbekend kanaal ({reports_id})"
+            reports_name = (
+                reports_channel.mention if reports_channel else f"Onbekend kanaal ({reports_id})"
+            )
         else:
             reports_name = "Niet ingesteld"
-            
+
         embed.add_field(
             name="📋 Reports Kanaal",
             value=f"`{reports_id}`\n**Kanaal:** {reports_name}",
-            inline=True
+            inline=True,
         )
-        
+
         # Moderator role
         mod_role_id = settings.get("moderator_role_id", "Niet ingesteld")
         if mod_role_id != "Niet ingesteld":
@@ -601,27 +628,29 @@ class ReportsConfigView(BaseConfigView):
             mod_role_name = f"<@&{mod_role_id}>"
         else:
             mod_role_name = "Niet ingesteld"
-            
+
         embed.add_field(
-            name="🛡️ Moderator Rol",
-            value=f"`{mod_role_id}`\n**Rol:** {mod_role_name}",
-            inline=True
+            name="🛡️ Moderator Rol", value=f"`{mod_role_id}`\n**Rol:** {mod_role_name}", inline=True
         )
-        
+
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
-    
+
     @discord.ui.button(label="Reports Kanaal", style=discord.ButtonStyle.primary, emoji="📋")
-    async def set_reports_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def set_reports_channel(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Set reports channel."""
-        view = ChannelSelectView(self.bot, self.user_id, "reports_settings", "reports_channel_id", "text")
+        view = ChannelSelectView(
+            self.bot, self.user_id, "reports_settings", "reports_channel_id", "text"
+        )
         embed = discord.Embed(
             title="📋 Reports Kanaal Selecteren",
             description="Selecteer het kanaal waar reports worden verzonden.",
-            color=discord.Color.red()
+            color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     @discord.ui.button(label="Moderator Rol", style=discord.ButtonStyle.primary, emoji="🛡️")
     async def set_moderator_role(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set moderator role."""
@@ -629,42 +658,42 @@ class ReportsConfigView(BaseConfigView):
         embed = discord.Embed(
             title="🛡️ Moderator Rol Selecteren",
             description="Selecteer de rol die reports kan beheren.",
-            color=discord.Color.red()
+            color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
 class VerificationConfigView(BaseConfigView):
     """Verification configuration view."""
-    
+
     async def create_embed(self):
         """Create verification configuration embed."""
         self.settings_id = "baseconfig"
         settings = await self.bot.db.settings.find_one({"_id": "verification_settings"}) or {}
-        
+
         embed = discord.Embed(
             title="✅ Verificatie Instellingen",
             description="Configuratie voor het verificatie systeem",
             color=discord.Color.green(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Verified role
         verified_role_id = settings.get("verified_role_id", "Niet ingesteld")
         if verified_role_id != "Niet ingesteld":
             verified_role_name = f"<@&{verified_role_id}>"
         else:
             verified_role_name = "Niet ingesteld"
-            
+
         embed.add_field(
             name="✅ Geverifieerde Rol",
             value=f"`{verified_role_id}`\n**Rol:** {verified_role_name}",
-            inline=True
+            inline=True,
         )
-        
+
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
-    
+
     @discord.ui.button(label="Geverifieerde Rol", style=discord.ButtonStyle.success, emoji="✅")
     async def set_verified_role(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set verified role."""
@@ -672,15 +701,14 @@ class VerificationConfigView(BaseConfigView):
         embed = discord.Embed(
             title="✅ Geverifieerde Rol Selecteren",
             description="Selecteer de rol die geverifieerde gebruikers krijgen.",
-            color=discord.Color.green()
+            color=discord.Color.green(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
-    
 
 
 class RolesChannelsConfigView(BaseConfigView):
     """Roles and channels configuration view."""
-    
+
     async def create_embed(self):
         """Create roles and channels configuration embed."""
         self.settings_id = "baseconfig"
@@ -688,13 +716,13 @@ class RolesChannelsConfigView(BaseConfigView):
             title="🎭 Rollen & Kanalen Instellingen",
             description="Configuratie voor rol en kanaal menu systemen",
             color=discord.Color.gold(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Get role selector configuration
         role_config = await self.bot.db.role_selector.find_one({"_id": "config"})
         categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
-        
+
         # Role menu status
         if role_config and role_config.get("message_id"):
             channel_id = role_config.get("channel_id")
@@ -702,15 +730,11 @@ class RolesChannelsConfigView(BaseConfigView):
             embed.add_field(
                 name="📋 Rol Menu Status",
                 value=f"**Actief in:** {channel_name}\n**Message ID:** `{role_config.get('message_id')}`",
-                inline=True
+                inline=True,
             )
         else:
-            embed.add_field(
-                name="📋 Rol Menu Status",
-                value="Niet ingesteld",
-                inline=True
-            )
-        
+            embed.add_field(name="📋 Rol Menu Status", value="Niet ingesteld", inline=True)
+
         # Categories count
         category_count = 0
         total_roles = 0
@@ -718,13 +742,13 @@ class RolesChannelsConfigView(BaseConfigView):
             categories = categories_doc.get("categories", [])
             category_count = len(categories)
             total_roles = sum(len(cat.get("roles", [])) for cat in categories)
-        
+
         embed.add_field(
             name="📊 Statistieken",
             value=f"**Categorieën:** {category_count}\n**Totaal rollen:** {total_roles}",
-            inline=True
+            inline=True,
         )
-        
+
         embed.add_field(
             name="🔧 Beheer Opties",
             value=(
@@ -732,19 +756,19 @@ class RolesChannelsConfigView(BaseConfigView):
                 "• Rol categorieën beheren\n"
                 "• Rollen toevoegen/verwijderen"
             ),
-            inline=False
+            inline=False,
         )
-        
+
         embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
         return embed
-    
+
     @discord.ui.button(label="Categorieën Beheren", style=discord.ButtonStyle.primary, emoji="📁")
     async def manage_categories(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage role categories."""
         view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
-    
+
     @discord.ui.button(label="Rollen Beheren", style=discord.ButtonStyle.secondary, emoji="🎭")
     async def manage_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Manage roles in categories."""
@@ -752,10 +776,11 @@ class RolesChannelsConfigView(BaseConfigView):
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
 
+
 # Channel and Role Selection Views
 class ChannelSelectView(BaseConfigView):
     """View for selecting channels."""
-    
+
     def __init__(self, bot, user_id: int, settings_id: str, field_name: str, channel_type: str):
         super().__init__(self, bot, user_id)
         self.bot = bot
@@ -763,56 +788,67 @@ class ChannelSelectView(BaseConfigView):
         self.settings_id = settings_id
         self.field_name = field_name
         self.channel_type = channel_type
-        
+
         # Add channel select
         if channel_type == "text":
             select = discord.ui.ChannelSelect(
-                placeholder="Selecteer een tekstkanaal...",
-                channel_types=[discord.ChannelType.text]
+                placeholder="Selecteer een tekstkanaal...", channel_types=[discord.ChannelType.text]
             )
         elif channel_type == "category":
             select = discord.ui.ChannelSelect(
                 placeholder="Selecteer een categorie...",
-                channel_types=[discord.ChannelType.category]
+                channel_types=[discord.ChannelType.category],
             )
-        
+
         select.callback = self.channel_select_callback
         self.add_item(select)
-    
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True
+            )
             return False
         return True
-    
+
     async def channel_select_callback(self, interaction: discord.Interaction):
         """Handle channel selection."""
         try:
-            channel = interaction.data['values'][0]
+            channel = interaction.data["values"][0]
             channel_id = int(channel)
-            
-            self.bot.log.info(f"Channel selected by {interaction.user} ({interaction.user.id}): {channel_id} for field {self.field_name} in {self.settings_id}")
-            
+
+            self.bot.log.info(
+                f"Channel selected by {interaction.user} ({interaction.user.id}): {channel_id} for field {self.field_name} in {self.settings_id}"
+            )
+
             # Validate the selected channel
             selected_channel = self.bot.get_channel(channel_id)
             if selected_channel:
-                self.bot.log.info(f"Selected channel: {selected_channel.name} ({channel_id}) in guild {selected_channel.guild.name if selected_channel.guild else 'Unknown'}")
-                
+                self.bot.log.info(
+                    f"Selected channel: {selected_channel.name} ({channel_id}) in guild {selected_channel.guild.name if selected_channel.guild else 'Unknown'}"
+                )
+
                 # Check if channel is in correct guild
-                if hasattr(selected_channel, 'guild') and selected_channel.guild and self.bot.guild_id:
+                if (
+                    hasattr(selected_channel, "guild")
+                    and selected_channel.guild
+                    and self.bot.guild_id
+                ):
                     if selected_channel.guild.id != self.bot.guild_id:
-                        self.bot.log.warning(f"Selected channel {channel_id} is in different guild: {selected_channel.guild.id} vs expected {self.bot.guild_id}")
+                        self.bot.log.warning(
+                            f"Selected channel {channel_id} is in different guild: {selected_channel.guild.id} vs expected {self.bot.guild_id}"
+                        )
             else:
                 self.bot.log.warning(f"Selected channel {channel_id} not found in bot cache")
-            
+
             await self.bot.db.settings.update_one(
-                {"_id": self.settings_id},
-                {"$set": {self.field_name: channel_id}},
-                upsert=True
+                {"_id": self.settings_id}, {"$set": {self.field_name: channel_id}}, upsert=True
             )
-            
-            self.bot.log.info(f"Successfully updated {self.settings_id}.{self.field_name} to {channel_id}")
-            
+
+            self.bot.log.info(
+                f"Successfully updated {self.settings_id}.{self.field_name} to {channel_id}"
+            )
+
             # Return to appropriate config view based on settings_id and field_name
             if self.settings_id == "modmail_settings":
                 config_view = ModmailConfigView(self.bot, self.user_id, True)
@@ -823,26 +859,30 @@ class ChannelSelectView(BaseConfigView):
             elif self.settings_id == "mod_settings":
                 # All mod_settings fields now go to UnbanRequestsConfigView
                 config_view = UnbanRequestsConfigView(self.bot, self.user_id, True)
-                self.bot.log.debug(f"Returning to UnbanRequestsConfigView for field {self.field_name}")
+                self.bot.log.debug(
+                    f"Returning to UnbanRequestsConfigView for field {self.field_name}"
+                )
             else:
                 config_view = ConfigurationView(self.bot, self.user_id, True)
-                self.bot.log.debug(f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}")
-            
+                self.bot.log.debug(
+                    f"Returning to main ConfigurationView for unknown settings_id {self.settings_id}"
+                )
+
             embed = await config_view.create_embed()
             await interaction.response.edit_message(embed=embed, view=config_view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error in channel_select_callback: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het instellen van het kanaal:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-  
+
     async def on_timeout(self):
         """Handle timeout."""
         for item in self.children:
@@ -851,38 +891,36 @@ class ChannelSelectView(BaseConfigView):
 
 class RoleSelectView(discord.ui.View):
     """View for selecting roles."""
-    
+
     def __init__(self, bot, user_id: int, settings_id: str, field_name: str):
         super().__init__(timeout=300)
         self.bot = bot
         self.user_id = user_id
         self.settings_id = settings_id
         self.field_name = field_name
-        
+
         # Add role select
-        select = discord.ui.RoleSelect(
-            placeholder="Selecteer een rol..."
-        )
+        select = discord.ui.RoleSelect(placeholder="Selecteer een rol...")
         select.callback = self.role_select_callback
         self.add_item(select)
-    
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True)
+            await interaction.response.send_message(
+                "Je hebt geen toestemming om deze configuratie te gebruiken.", ephemeral=True
+            )
             return False
         return True
-    
+
     async def role_select_callback(self, interaction: discord.Interaction):
         """Handle role selection."""
-        role = interaction.data['values'][0]
+        role = interaction.data["values"][0]
         role_id = int(role)
-        
+
         await self.bot.db.settings.update_one(
-            {"_id": self.settings_id},
-            {"$set": {self.field_name: role_id}},
-            upsert=True
+            {"_id": self.settings_id}, {"$set": {self.field_name: role_id}}, upsert=True
         )
-        
+
         # Return to appropriate config view
         if self.settings_id == "reports_settings":
             config_view = ReportsConfigView(self.bot, self.user_id, True)
@@ -890,10 +928,10 @@ class RoleSelectView(discord.ui.View):
             config_view = VerificationConfigView(self.bot, self.user_id, True)
         else:
             config_view = ConfigurationView(self.bot, self.user_id, True)
-        
+
         embed = await config_view.create_embed()
         await interaction.response.edit_message(embed=embed, view=config_view)
-    
+
     @discord.ui.button(label="← Terug", style=discord.ButtonStyle.secondary)
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Go back to the appropriate config view."""
@@ -904,7 +942,7 @@ class RoleSelectView(discord.ui.View):
             view = VerificationConfigView(self.bot, self.user_id, True)
         else:
             view = ConfigurationView(self.bot, self.user_id, True)
-        
+
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -912,66 +950,62 @@ class RoleSelectView(discord.ui.View):
 # Modal classes for text input
 class GuildIdModal(discord.ui.Modal):
     """Modal for setting guild ID."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Server ID Overschrijven")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.guild_id_input = discord.ui.TextInput(
             label="Server ID",
             placeholder="Alleen nodig bij meerdere servers...",
             required=True,
-            max_length=20
+            max_length=20,
         )
         self.add_item(self.guild_id_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             guild_id = int(self.guild_id_input.value)
-            
+
             await self.bot.db.settings.update_one(
-                {"_id": "server_settings"},
-                {"$set": {"guild_id": guild_id}},
-                upsert=True
+                {"_id": "server_settings"}, {"$set": {"guild_id": guild_id}}, upsert=True
             )
-            
+
             view = ServerConfigView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
-        except ValueError:
-            await interaction.response.send_message("❌ Ongeldige server ID. Voer een geldig nummer in.", ephemeral=True)
 
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Ongeldige server ID. Voer een geldig nummer in.", ephemeral=True
+            )
 
 
 class ConfessionTimesModal(discord.ui.Modal):
     """Modal for setting confession times."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Confession Tijden Instellen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.review_time_input = discord.ui.TextInput(
-            label="Review Tijd (HH:MM)",
-            placeholder="17:00",
-            required=True,
-            max_length=5
+            label="Review Tijd (HH:MM)", placeholder="17:00", required=True, max_length=5
         )
         self.add_item(self.review_time_input)
-        
+
         self.post_times_input = discord.ui.TextInput(
             label="Post Tijden (HH:MM, gescheiden door komma's)",
             placeholder="9:00, 12:00, 18:00",
             required=True,
             style=discord.TextStyle.paragraph,
-            max_length=200
+            max_length=200,
         )
         self.add_item(self.post_times_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             # Validate review time
@@ -980,101 +1014,97 @@ class ConfessionTimesModal(discord.ui.Modal):
             if not (0 <= hour < 24 and 0 <= minute < 60):
                 raise ValueError("Invalid review time")
             formatted_review_time = f"{hour:02}:{minute:02}"
-            
+
             # Validate post times
             post_times_list = [time.strip() for time in self.post_times_input.value.split(",")]
             formatted_post_times = []
-            
+
             for time_str in post_times_list:
                 if time_str:
                     hour, minute = map(int, time_str.split(":"))
                     if not (0 <= hour < 24 and 0 <= minute < 60):
                         raise ValueError("Invalid post time")
                     formatted_post_times.append(f"{hour:02}:{minute:02}")
-            
+
             if not formatted_post_times:
                 raise ValueError("At least one post time required")
-            
+
             # Update database
             await self.bot.db.settings.update_one(
                 {"_id": "confession_settings"},
-                {"$set": {
-                    "review_time": formatted_review_time,
-                    "post_times": formatted_post_times,
-                    "daily_review_limit": len(formatted_post_times)
-                }},
-                upsert=True
+                {
+                    "$set": {
+                        "review_time": formatted_review_time,
+                        "post_times": formatted_post_times,
+                        "daily_review_limit": len(formatted_post_times),
+                    }
+                },
+                upsert=True,
             )
-            
+
             # Update schedules if confession tasks exist
             try:
                 confession_cog = self.bot.get_cog("ConfessionCommands")
-                if confession_cog and hasattr(confession_cog, 'tasks'):
+                if confession_cog and hasattr(confession_cog, "tasks"):
                     await confession_cog.tasks.update_review_schedule()
                     await confession_cog.tasks.update_post_schedule()
             except Exception as e:
                 self.bot.log.warning(f"Could not update confession schedules: {e}")
-            
+
             view = ConfessionsConfigView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except ValueError:
-            await interaction.response.send_message("❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Ongeldige tijdsnotatie. Gebruik HH:MM formaat (24-uur).", ephemeral=True
+            )
 
 
 class ExamResultsConfigView(BaseConfigView):
     """Exam results configuration view."""
-    
+
     async def create_embed(self):
         """Create exam results configuration embed."""
-        self.settings_id = "baseconfig" 
+        self.settings_id = "baseconfig"
         try:
             self.bot.log.debug("Creating exam results configuration embed")
             settings = await self.bot.db.settings.find_one({"_id": "exam_results_settings"}) or {}
             self.bot.log.debug(f"Retrieved exam_results_settings: {settings}")
-            
+
             embed = discord.Embed(
                 title="📊 Examenresultaten Instellingen",
                 description="Configuratie voor de examenresultaten datum",
                 color=discord.Color.green(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
-            
+
             # Exam result date
             exam_result_date = settings.get("exam_result_date", "Niet ingesteld")
             embed.add_field(
-                name="📅 Examenresultaten Datum",
-                value=f"`{exam_result_date}`",
-                inline=False
+                name="📅 Examenresultaten Datum", value=f"`{exam_result_date}`", inline=False
             )
-            
+
             # Status
             if exam_result_date != "Niet ingesteld":
-                embed.add_field(
-                    name="🔧 Status",
-                    value="✅ Datum is ingesteld",
-                    inline=False
-                )
+                embed.add_field(name="🔧 Status", value="✅ Datum is ingesteld", inline=False)
             else:
-                embed.add_field(
-                    name="🔧 Status",
-                    value="❌ Datum niet ingesteld",
-                    inline=False
-                )
-            
+                embed.add_field(name="🔧 Status", value="❌ Datum niet ingesteld", inline=False)
+
             embed.set_footer(text="Gebruik de knop hieronder om de datum in te stellen")
             return embed
-            
+
         except Exception as e:
             self.bot.log.error(f"Error creating exam results embed: {e}", exc_info=True)
             raise
-    
+
     @discord.ui.button(label="Datum Instellen", style=discord.ButtonStyle.primary, emoji="📅")
     async def set_exam_date(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the exam results date."""
         try:
-            self.bot.log.info(f"Exam date button clicked by {interaction.user} ({interaction.user.id})")
+            self.bot.log.info(
+                f"Exam date button clicked by {interaction.user} ({interaction.user.id})"
+            )
             modal = ExamDateModal(self.bot, self.user_id, self.visible)
             await interaction.response.send_modal(modal)
             self.bot.log.debug("Exam date modal sent successfully")
@@ -1083,7 +1113,7 @@ class ExamResultsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van het datum menu:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
@@ -1093,36 +1123,36 @@ class ExamResultsConfigView(BaseConfigView):
 
 class ExamDateModal(discord.ui.Modal):
     """Modal for setting exam results date."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Examenresultaten Datum Instellen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.date_input = discord.ui.TextInput(
             label="Examenresultaten Datum",
             placeholder="Bijvoorbeeld: 15 januari 2024 om 14:00",
             required=False,
-            max_length=200
+            max_length=200,
         )
         self.add_item(self.date_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             date_value = self.date_input.value.strip()
-            
+
             if date_value:
                 await self.bot.db.settings.update_one(
                     {"_id": "exam_results_settings"},
                     {"$set": {"exam_result_date": date_value}},
-                    upsert=True
+                    upsert=True,
                 )
-                
+
                 success_embed = discord.Embed(
                     title="✅ Datum Ingesteld",
                     description=f"Examenresultaten datum is ingesteld op:\n`{date_value}`",
-                    color=discord.Color.green()
+                    color=discord.Color.green(),
                 )
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
             else:
@@ -1130,27 +1160,27 @@ class ExamDateModal(discord.ui.Modal):
                 await self.bot.db.settings.update_one(
                     {"_id": "exam_results_settings"},
                     {"$unset": {"exam_result_date": ""}},
-                    upsert=True
+                    upsert=True,
                 )
-                
+
                 success_embed = discord.Embed(
                     title="✅ Datum Verwijderd",
                     description="Examenresultaten datum is verwijderd.",
-                    color=discord.Color.green()
+                    color=discord.Color.green(),
                 )
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
-            
+
             # Refresh the exam results configuration view
             view = ExamResultsConfigView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.edit_original_response(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error in ExamDateModal.on_submit: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het instellen van de datum:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
@@ -1160,72 +1190,67 @@ class ExamDateModal(discord.ui.Modal):
 
 class UnbanUrlModal(discord.ui.Modal):
     """Modal for setting unban request URL."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Unban Request URL Instellen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.url_input = discord.ui.TextInput(
             label="Unban Request URL",
             placeholder="https://example.com/unban-request",
             required=False,
-            max_length=500
+            max_length=500,
         )
         self.add_item(self.url_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             url_value = self.url_input.value.strip()
-            
+
             if url_value:
                 # Basic URL validation
-                if not (url_value.startswith('http://') or url_value.startswith('https://')):
+                if not (url_value.startswith("http://") or url_value.startswith("https://")):
                     await interaction.response.send_message(
-                        "❌ URL moet beginnen met http:// of https://", 
-                        ephemeral=True
+                        "❌ URL moet beginnen met http:// of https://", ephemeral=True
                     )
                     return
-                
+
                 await self.bot.db.settings.update_one(
-                    {"_id": "mod_settings"},
-                    {"$set": {"unban_request_url": url_value}},
-                    upsert=True
+                    {"_id": "mod_settings"}, {"$set": {"unban_request_url": url_value}}, upsert=True
                 )
-                
+
                 success_embed = discord.Embed(
                     title="✅ URL Ingesteld",
                     description=f"Unban request URL is ingesteld op:\n`{url_value}`",
-                    color=discord.Color.green()
+                    color=discord.Color.green(),
                 )
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
             else:
                 # Remove URL if empty
                 await self.bot.db.settings.update_one(
-                    {"_id": "mod_settings"},
-                    {"$unset": {"unban_request_url": ""}},
-                    upsert=True
+                    {"_id": "mod_settings"}, {"$unset": {"unban_request_url": ""}}, upsert=True
                 )
-                
+
                 success_embed = discord.Embed(
                     title="✅ URL Verwijderd",
                     description="Unban request URL is verwijderd.",
-                    color=discord.Color.green()
+                    color=discord.Color.green(),
                 )
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
-            
+
             # Refresh the main configuration view
             view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.edit_original_response(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error in UnbanUrlModal.on_submit: {e}", exc_info=True)
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het instellen van de URL:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
@@ -1235,67 +1260,69 @@ class UnbanUrlModal(discord.ui.Modal):
 
 class Configure(commands.Cog):
     """Configuration management cog."""
-    
+
     def __init__(self, bot):
         self.bot = bot
-    
-    
+
     @app_commands.command(name="configure", description="Open de bot configuratie interface")
-    @app_commands.describe(visible="Of de configuratie zichtbaar moet zijn voor anderen (standaard: waar)")
+    @app_commands.describe(
+        visible="Of de configuratie zichtbaar moet zijn voor anderen (standaard: waar)"
+    )
     @developer()
     async def configure(self, interaction: discord.Interaction, visible: bool = True):
         """Open the configuration interface."""
         try:
-            self.bot.log.info(f"Configure command called by {interaction.user} ({interaction.user.id}) in guild {interaction.guild_id}")
-            
+            self.bot.log.info(
+                f"Configure command called by {interaction.user} ({interaction.user.id}) in guild {interaction.guild_id}"
+            )
+
             # Defer the response immediately to prevent timeout
             await interaction.response.defer(ephemeral=not visible)
-            
+
             view = ConfigurationView(self.bot, interaction.user.id, visible)
             embed = await view.create_embed()
             await interaction.followup.send(embed=embed, view=view, ephemeral=not visible)
             self.bot.log.info("Configure command completed successfully")
-            
+
         except Exception as e:
             self.bot.log.error(f"Error in configure command: {e}", exc_info=True)
             try:
                 # Since we always defer the response, use followup
                 await interaction.followup.send(
                     "❌ Er is een fout opgetreden bij het laden van de configuratie. Check de logs voor details.",
-                    ephemeral=True
+                    ephemeral=True,
                 )
             except Exception as followup_error:
                 self.bot.log.error(f"Failed to send error message: {followup_error}")
 
     @configure.error
-    async def configure_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    async def configure_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ):
         """Handle configure command errors."""
         if isinstance(error, app_commands.CheckFailure):
             await interaction.response.send_message(
                 "❌ Je hebt geen toestemming om de bot configuratie te gebruiken. Alleen developers en administrators kunnen dit commando gebruiken.",
-                ephemeral=True
+                ephemeral=True,
             )
         else:
             self.bot.log.error(f"Unexpected error in configure command: {error}", exc_info=True)
             try:
                 await interaction.response.send_message(
                     "❌ Er is een onverwachte fout opgetreden. Check de logs voor details.",
-                    ephemeral=True
+                    ephemeral=True,
                 )
             except discord.InteractionResponded:
                 await interaction.followup.send(
                     "❌ Er is een onverwachte fout opgetreden. Check de logs voor details.",
-                    ephemeral=True
+                    ephemeral=True,
                 )
-
-
-
 
 
 # Role Management Views
 class RoleCategoryManagementView(BaseConfigView):
     """View for managing role categories."""
-    
+
     async def create_embed(self):
         """Create category management embed."""
         self.settings_id = "channel_menu_settings"
@@ -1303,9 +1330,9 @@ class RoleCategoryManagementView(BaseConfigView):
             title="📁 Categorie Beheer",
             description="Beheer rol categorieën",
             color=discord.Color.blue(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Get categories
         categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
         if categories_doc:
@@ -1315,34 +1342,28 @@ class RoleCategoryManagementView(BaseConfigView):
                 for i, category in enumerate(categories, 1):
                     role_count = len(category.get("roles", []))
                     category_list.append(f"{i}. **{category['name']}** ({role_count} rollen)")
-                
+
                 embed.add_field(
-                    name="📋 Huidige Categorieën",
-                    value="\n".join(category_list),
-                    inline=False
+                    name="📋 Huidige Categorieën", value="\n".join(category_list), inline=False
                 )
             else:
                 embed.add_field(
-                    name="📋 Huidige Categorieën",
-                    value="Geen categorieën gevonden",
-                    inline=False
+                    name="📋 Huidige Categorieën", value="Geen categorieën gevonden", inline=False
                 )
         else:
             embed.add_field(
-                name="📋 Huidige Categorieën",
-                value="Geen categorieën gevonden",
-                inline=False
+                name="📋 Huidige Categorieën", value="Geen categorieën gevonden", inline=False
             )
-        
+
         embed.set_footer(text="Gebruik de knoppen om categorieën toe te voegen of te verwijderen")
         return embed
-    
+
     @discord.ui.button(label="Categorie Toevoegen", style=discord.ButtonStyle.success, emoji="➕")
     async def add_category(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Add a new category."""
         modal = AddCategoryModal(self.bot, self.user_id, self.visible)
         await interaction.response.send_modal(modal)
-    
+
     @discord.ui.button(label="Categorie Verwijderen", style=discord.ButtonStyle.danger, emoji="➖")
     async def remove_category(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Remove a category."""
@@ -1352,7 +1373,7 @@ class RoleCategoryManagementView(BaseConfigView):
 
 class RoleManagementView(BaseConfigView):
     """View for managing roles in categories."""
-    
+
     async def create_embed(self):
         """Create role management embed."""
         self.settings_id = "channel_menu_settings"
@@ -1360,9 +1381,9 @@ class RoleManagementView(BaseConfigView):
             title="🎭 Rol Beheer",
             description="Beheer rollen in categorieën",
             color=discord.Color.purple(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(),
         )
-        
+
         # Get categories and their roles
         categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
         if categories_doc:
@@ -1377,40 +1398,36 @@ class RoleManagementView(BaseConfigView):
                             name = role.get("name", "")
                             role_name = role.get("role_name", "")
                             role_list.append(f"{emoji} {name} → {role_name}")
-                        
+
                         embed.add_field(
-                            name=f"📁 {category['name']}",
-                            value="\n".join(role_list),
-                            inline=False
+                            name=f"📁 {category['name']}", value="\n".join(role_list), inline=False
                         )
                     else:
                         embed.add_field(
-                            name=f"📁 {category['name']}",
-                            value="Geen rollen",
-                            inline=False
+                            name=f"📁 {category['name']}", value="Geen rollen", inline=False
                         )
             else:
                 embed.add_field(
                     name="ℹ️ Geen Categorieën",
                     value="Voeg eerst categorieën toe voordat je rollen kunt beheren.",
-                    inline=False
+                    inline=False,
                 )
         else:
             embed.add_field(
                 name="ℹ️ Geen Categorieën",
                 value="Voeg eerst categorieën toe voordat je rollen kunt beheren.",
-                inline=False
+                inline=False,
             )
-        
+
         embed.set_footer(text="Gebruik de knoppen om rollen toe te voegen of te verwijderen")
         return embed
-    
+
     @discord.ui.button(label="Rol Toevoegen", style=discord.ButtonStyle.success, emoji="➕")
     async def add_role(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Add a role to a category."""
         modal = AddRoleModal(self.bot, self.user_id, self.visible)
         await interaction.response.send_modal(modal)
-    
+
     @discord.ui.button(label="Rol Verwijderen", style=discord.ButtonStyle.danger, emoji="➖")
     async def remove_role(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Remove a role from a category."""
@@ -1418,323 +1435,351 @@ class RoleManagementView(BaseConfigView):
         await interaction.response.send_modal(modal)
 
 
-
 # Role Management Modals
 class AddCategoryModal(discord.ui.Modal):
     """Modal for adding a new role category."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Categorie Toevoegen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.name_input = discord.ui.TextInput(
             label="Categorie Naam",
             placeholder="Bijv. Campussen, Studiejaren, etc.",
             required=True,
-            max_length=50
+            max_length=50,
         )
         self.add_item(self.name_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             category_name = self.name_input.value.strip()
-            
+
             # Get existing categories
             categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
             categories = categories_doc.get("categories", []) if categories_doc else []
-            
+
             # Check if category already exists
             if any(cat["name"].lower() == category_name.lower() for cat in categories):
-                await interaction.response.send_message(f"❌ Categorie '{category_name}' bestaat al.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Categorie '{category_name}' bestaat al.", ephemeral=True
+                )
                 return
-            
+
             # Add new category
             categories.append({"name": category_name, "roles": []})
-            
+
             # Save to database
             await self.bot.db.role_selector.update_one(
-                {"_id": "categories"},
-                {"$set": {"categories": categories}},
-                upsert=True
+                {"_id": "categories"}, {"$set": {"categories": categories}}, upsert=True
             )
-            
+
             # Update role menu if it exists
             role_selector_cog = self.bot.get_cog("RoleSelector")
-            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+            if (
+                role_selector_cog
+                and hasattr(role_selector_cog, "role_menu_channel_id")
+                and role_selector_cog.role_menu_channel_id
+            ):
                 await role_selector_cog.update_role_menu_message(
-                    role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_channel_id, role_selector_cog.role_menu_message_id
                 )
-            
+
             # Return to category management
             view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error adding category: {e}", exc_info=True)
-            await interaction.response.send_message("❌ Er is een fout opgetreden bij het toevoegen van de categorie.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het toevoegen van de categorie.", ephemeral=True
+            )
 
 
 class RemoveCategoryModal(discord.ui.Modal):
     """Modal for removing a role category."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Categorie Verwijderen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.name_input = discord.ui.TextInput(
             label="Categorie Naam",
             placeholder="Exacte naam van de categorie om te verwijderen",
             required=True,
-            max_length=50
+            max_length=50,
         )
         self.add_item(self.name_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             category_name = self.name_input.value.strip()
-            
+
             # Get existing categories
             categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
             if not categories_doc:
-                await interaction.response.send_message("❌ Geen categorieën gevonden.", ephemeral=True)
+                await interaction.response.send_message(
+                    "❌ Geen categorieën gevonden.", ephemeral=True
+                )
                 return
-            
+
             categories = categories_doc.get("categories", [])
-            
+
             # Find and remove category
             original_count = len(categories)
             categories = [cat for cat in categories if cat["name"].lower() != category_name.lower()]
-            
+
             if len(categories) == original_count:
-                await interaction.response.send_message(f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True
+                )
                 return
-            
+
             # Save to database
             await self.bot.db.role_selector.update_one(
-                {"_id": "categories"},
-                {"$set": {"categories": categories}},
-                upsert=True
+                {"_id": "categories"}, {"$set": {"categories": categories}}, upsert=True
             )
-            
+
             # Update role menu if it exists
             role_selector_cog = self.bot.get_cog("RoleSelector")
-            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+            if (
+                role_selector_cog
+                and hasattr(role_selector_cog, "role_menu_channel_id")
+                and role_selector_cog.role_menu_channel_id
+            ):
                 await role_selector_cog.update_role_menu_message(
-                    role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_channel_id, role_selector_cog.role_menu_message_id
                 )
-            
+
             # Return to category management
             view = RoleCategoryManagementView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error removing category: {e}", exc_info=True)
-            await interaction.response.send_message("❌ Er is een fout opgetreden bij het verwijderen van de categorie.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het verwijderen van de categorie.", ephemeral=True
+            )
 
 
 class AddRoleModal(discord.ui.Modal):
     """Modal for adding a role to a category."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Rol Toevoegen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.category_input = discord.ui.TextInput(
             label="Categorie Naam",
             placeholder="Naam van de categorie",
             required=True,
-            max_length=50
+            max_length=50,
         )
         self.add_item(self.category_input)
-        
+
         self.role_name_input = discord.ui.TextInput(
             label="Discord Rol Naam",
             placeholder="Exacte naam van de Discord rol",
             required=True,
-            max_length=100
+            max_length=100,
         )
         self.add_item(self.role_name_input)
-        
+
         self.display_name_input = discord.ui.TextInput(
             label="Weergave Naam",
             placeholder="Naam zoals getoond in het menu (optioneel)",
             required=False,
-            max_length=100
+            max_length=100,
         )
         self.add_item(self.display_name_input)
-        
+
         self.emoji_input = discord.ui.TextInput(
-            label="Emoji",
-            placeholder="Emoji voor de rol (bijv. 🎮)",
-            required=True,
-            max_length=10
+            label="Emoji", placeholder="Emoji voor de rol (bijv. 🎮)", required=True, max_length=10
         )
         self.add_item(self.emoji_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             category_name = self.category_input.value.strip()
             role_name = self.role_name_input.value.strip()
             display_name = self.display_name_input.value.strip() or role_name
             emoji = self.emoji_input.value.strip()
-            
+
             # Verify the role exists
             guild = interaction.guild
             role = discord.utils.get(guild.roles, name=role_name)
             if not role:
-                await interaction.response.send_message(f"❌ Rol '{role_name}' niet gevonden in deze server.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Rol '{role_name}' niet gevonden in deze server.", ephemeral=True
+                )
                 return
-            
+
             # Get existing categories
             categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
             if not categories_doc:
-                await interaction.response.send_message("❌ Geen categorieën gevonden. Voeg eerst een categorie toe.", ephemeral=True)
+                await interaction.response.send_message(
+                    "❌ Geen categorieën gevonden. Voeg eerst een categorie toe.", ephemeral=True
+                )
                 return
-            
+
             categories = categories_doc.get("categories", [])
-            
+
             # Find the category
             category_found = False
             for category in categories:
                 if category["name"].lower() == category_name.lower():
                     category_found = True
-                    
+
                     # Check if role already exists in this category
                     if any(r["role_name"] == role_name for r in category.get("roles", [])):
-                        await interaction.response.send_message(f"❌ Rol '{role_name}' bestaat al in categorie '{category_name}'.", ephemeral=True)
+                        await interaction.response.send_message(
+                            f"❌ Rol '{role_name}' bestaat al in categorie '{category_name}'.",
+                            ephemeral=True,
+                        )
                         return
-                    
+
                     # Add the role
                     if "roles" not in category:
                         category["roles"] = []
-                    
-                    category["roles"].append({
-                        "name": display_name,
-                        "role_name": role_name,
-                        "emoji": emoji
-                    })
+
+                    category["roles"].append(
+                        {"name": display_name, "role_name": role_name, "emoji": emoji}
+                    )
                     break
-            
+
             if not category_found:
-                await interaction.response.send_message(f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Categorie '{category_name}' niet gevonden.", ephemeral=True
+                )
                 return
-            
+
             # Save to database
             await self.bot.db.role_selector.update_one(
-                {"_id": "categories"},
-                {"$set": {"categories": categories}},
-                upsert=True
+                {"_id": "categories"}, {"$set": {"categories": categories}}, upsert=True
             )
-            
+
             # Update role menu if it exists
             role_selector_cog = self.bot.get_cog("RoleSelector")
-            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+            if (
+                role_selector_cog
+                and hasattr(role_selector_cog, "role_menu_channel_id")
+                and role_selector_cog.role_menu_channel_id
+            ):
                 await role_selector_cog.update_role_menu_message(
-                    role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_channel_id, role_selector_cog.role_menu_message_id
                 )
-            
+
             # Return to role management
             view = RoleManagementView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error adding role: {e}", exc_info=True)
-            await interaction.response.send_message("❌ Er is een fout opgetreden bij het toevoegen van de rol.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het toevoegen van de rol.", ephemeral=True
+            )
 
 
 class RemoveRoleModal(discord.ui.Modal):
     """Modal for removing a role from a category."""
-    
+
     def __init__(self, bot, user_id: int, visible: bool):
         super().__init__(title="Rol Verwijderen")
         self.bot = bot
         self.user_id = user_id
         self.visible = visible
-        
+
         self.category_input = discord.ui.TextInput(
             label="Categorie Naam",
             placeholder="Naam van de categorie",
             required=True,
-            max_length=50
+            max_length=50,
         )
         self.add_item(self.category_input)
-        
+
         self.role_name_input = discord.ui.TextInput(
             label="Rol Naam",
             placeholder="Exacte naam van de rol om te verwijderen",
             required=True,
-            max_length=100
+            max_length=100,
         )
         self.add_item(self.role_name_input)
-    
+
     async def on_submit(self, interaction: discord.Interaction):
         try:
             category_name = self.category_input.value.strip()
             role_name = self.role_name_input.value.strip()
-            
+
             # Get existing categories
             categories_doc = await self.bot.db.role_selector.find_one({"_id": "categories"})
             if not categories_doc:
-                await interaction.response.send_message("❌ Geen categorieën gevonden.", ephemeral=True)
+                await interaction.response.send_message(
+                    "❌ Geen categorieën gevonden.", ephemeral=True
+                )
                 return
-            
+
             categories = categories_doc.get("categories", [])
-            
+
             # Find the category and remove the role
             role_removed = False
             for category in categories:
                 if category["name"].lower() == category_name.lower():
                     original_count = len(category.get("roles", []))
-                    category["roles"] = [r for r in category.get("roles", []) if r["role_name"] != role_name]
-                    
+                    category["roles"] = [
+                        r for r in category.get("roles", []) if r["role_name"] != role_name
+                    ]
+
                     if len(category["roles"]) < original_count:
                         role_removed = True
                     break
-            
+
             if not role_removed:
-                await interaction.response.send_message(f"❌ Rol '{role_name}' niet gevonden in categorie '{category_name}'.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Rol '{role_name}' niet gevonden in categorie '{category_name}'.",
+                    ephemeral=True,
+                )
                 return
-            
+
             # Save to database
             await self.bot.db.role_selector.update_one(
-                {"_id": "categories"},
-                {"$set": {"categories": categories}},
-                upsert=True
+                {"_id": "categories"}, {"$set": {"categories": categories}}, upsert=True
             )
-            
+
             # Update role menu if it exists
             role_selector_cog = self.bot.get_cog("RoleSelector")
-            if role_selector_cog and hasattr(role_selector_cog, 'role_menu_channel_id') and role_selector_cog.role_menu_channel_id:
+            if (
+                role_selector_cog
+                and hasattr(role_selector_cog, "role_menu_channel_id")
+                and role_selector_cog.role_menu_channel_id
+            ):
                 await role_selector_cog.update_role_menu_message(
-                    role_selector_cog.role_menu_channel_id, 
-                    role_selector_cog.role_menu_message_id
+                    role_selector_cog.role_menu_channel_id, role_selector_cog.role_menu_message_id
                 )
-            
+
             # Return to role management
             view = RoleManagementView(self.bot, self.user_id, self.visible)
             embed = await view.create_embed()
             await interaction.response.edit_message(embed=embed, view=view)
-            
+
         except Exception as e:
             self.bot.log.error(f"Error removing role: {e}", exc_info=True)
-            await interaction.response.send_message("❌ Er is een fout opgetreden bij het verwijderen van de rol.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Er is een fout opgetreden bij het verwijderen van de rol.", ephemeral=True
+            )
 
 
 class UnbanRequestsConfigView(BaseConfigView):
     """Unban requests configuration view."""
-    
+
     async def create_embed(self):
         """Create unban requests configuration embed."""
         self.settings_id = "baseconfig"
@@ -1742,14 +1787,14 @@ class UnbanRequestsConfigView(BaseConfigView):
             self.bot.log.debug("Creating unban requests configuration embed")
             settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
             self.bot.log.debug(f"Retrieved mod_settings for unban requests: {settings}")
-            
+
             embed = discord.Embed(
                 title="🔓 Unban Requests Instellingen",
                 description="Configuratie voor het unban aanvraag systeem",
                 color=discord.Color.orange(),
-                timestamp=datetime.datetime.now()
+                timestamp=datetime.datetime.now(),
             )
-            
+
             # Unban request channel
             unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
             if unban_request_kanaal_id:
@@ -1759,38 +1804,40 @@ class UnbanRequestsConfigView(BaseConfigView):
                         embed.add_field(
                             name="📝 Unban Request Kanaal",
                             value=f"{channel.mention} (`{channel.id}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.debug(f"Found unban request channel: {channel.name} ({unban_request_kanaal_id})")
+                        self.bot.log.debug(
+                            f"Found unban request channel: {channel.name} ({unban_request_kanaal_id})"
+                        )
                     else:
                         embed.add_field(
                             name="📝 Unban Request Kanaal",
                             value=f"⚠️ Kanaal niet gevonden (`{unban_request_kanaal_id}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.warning(f"Unban request channel {unban_request_kanaal_id} not found or not accessible")
+                        self.bot.log.warning(
+                            f"Unban request channel {unban_request_kanaal_id} not found or not accessible"
+                        )
                 except Exception as e:
                     embed.add_field(
                         name="📝 Unban Request Kanaal",
                         value=f"❌ Fout bij ophalen kanaal (`{unban_request_kanaal_id}`)",
-                        inline=False
+                        inline=False,
                     )
-                    self.bot.log.error(f"Error getting unban request channel {unban_request_kanaal_id}: {e}")
+                    self.bot.log.error(
+                        f"Error getting unban request channel {unban_request_kanaal_id}: {e}"
+                    )
             else:
                 embed.add_field(
-                    name="📝 Unban Request Kanaal",
-                    value="❌ Niet ingesteld",
-                    inline=False
+                    name="📝 Unban Request Kanaal", value="❌ Niet ingesteld", inline=False
                 )
-            
+
             # Unban request URL
             unban_request_url = settings.get("unban_request_url", "Niet ingesteld")
             embed.add_field(
-                name="🔗 Unban Request URL",
-                value=f"`{unban_request_url}`",
-                inline=False
+                name="🔗 Unban Request URL", value=f"`{unban_request_url}`", inline=False
             )
-            
+
             # Log channel 1
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
             if aanvragen_log_kanaal_id_1:
@@ -1800,30 +1847,34 @@ class UnbanRequestsConfigView(BaseConfigView):
                         embed.add_field(
                             name="📋 Log Kanaal 1 (Staff)",
                             value=f"{channel.mention} (`{channel.id}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.debug(f"Found unban log channel 1: {channel.name} ({aanvragen_log_kanaal_id_1})")
+                        self.bot.log.debug(
+                            f"Found unban log channel 1: {channel.name} ({aanvragen_log_kanaal_id_1})"
+                        )
                     else:
                         embed.add_field(
                             name="📋 Log Kanaal 1 (Staff)",
                             value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_1}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.warning(f"Unban log channel 1 {aanvragen_log_kanaal_id_1} not found or not accessible")
+                        self.bot.log.warning(
+                            f"Unban log channel 1 {aanvragen_log_kanaal_id_1} not found or not accessible"
+                        )
                 except Exception as e:
                     embed.add_field(
                         name="📋 Log Kanaal 1 (Staff)",
                         value=f"❌ Fout bij ophalen kanaal (`{aanvragen_log_kanaal_id_1}`)",
-                        inline=False
+                        inline=False,
                     )
-                    self.bot.log.error(f"Error getting unban log channel 1 {aanvragen_log_kanaal_id_1}: {e}")
+                    self.bot.log.error(
+                        f"Error getting unban log channel 1 {aanvragen_log_kanaal_id_1}: {e}"
+                    )
             else:
                 embed.add_field(
-                    name="📋 Log Kanaal 1 (Staff)",
-                    value="❌ Niet ingesteld",
-                    inline=False
+                    name="📋 Log Kanaal 1 (Staff)", value="❌ Niet ingesteld", inline=False
                 )
-            
+
             # Log channel 2
             aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
             if aanvragen_log_kanaal_id_2:
@@ -1833,72 +1884,86 @@ class UnbanRequestsConfigView(BaseConfigView):
                         embed.add_field(
                             name="📋 Log Kanaal 2 (Archive)",
                             value=f"{channel.mention} (`{channel.id}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.debug(f"Found unban log channel 2: {channel.name} ({aanvragen_log_kanaal_id_2})")
+                        self.bot.log.debug(
+                            f"Found unban log channel 2: {channel.name} ({aanvragen_log_kanaal_id_2})"
+                        )
                     else:
                         embed.add_field(
                             name="📋 Log Kanaal 2 (Archive)",
                             value=f"⚠️ Kanaal niet gevonden (`{aanvragen_log_kanaal_id_2}`)",
-                            inline=False
+                            inline=False,
                         )
-                        self.bot.log.warning(f"Unban log channel 2 {aanvragen_log_kanaal_id_2} not found or not accessible")
+                        self.bot.log.warning(
+                            f"Unban log channel 2 {aanvragen_log_kanaal_id_2} not found or not accessible"
+                        )
                 except Exception as e:
                     embed.add_field(
                         name="📋 Log Kanaal 2 (Archive)",
                         value=f"❌ Fout bij ophalen kanaal (`{aanvragen_log_kanaal_id_2}`)",
-                        inline=False
+                        inline=False,
                     )
-                    self.bot.log.error(f"Error getting unban log channel 2 {aanvragen_log_kanaal_id_2}: {e}")
+                    self.bot.log.error(
+                        f"Error getting unban log channel 2 {aanvragen_log_kanaal_id_2}: {e}"
+                    )
             else:
                 embed.add_field(
                     name="📋 Log Kanaal 2 (Archive) - Optioneel",
                     value="⚪ Niet ingesteld (optioneel)",
-                    inline=False
+                    inline=False,
                 )
-            
+
             # System status (archive channel is optional)
             required_configured = all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1])
             status_emoji = "✅" if required_configured else "⚠️"
-            status_text = "Volledig geconfigureerd" if required_configured else "Configuratie incompleet"
-            
-            embed.add_field(
-                name="🔧 Systeem Status",
-                value=f"{status_emoji} {status_text}",
-                inline=False
+            status_text = (
+                "Volledig geconfigureerd" if required_configured else "Configuratie incompleet"
             )
-            
+
+            embed.add_field(
+                name="🔧 Systeem Status", value=f"{status_emoji} {status_text}", inline=False
+            )
+
             if required_configured:
                 if not aanvragen_log_kanaal_id_2:
                     embed.add_field(
                         name="💡 Optioneel",
                         value="Log Kanaal 2 (Archive) is optioneel en kan worden ingesteld voor extra archivering.",
-                        inline=False
+                        inline=False,
                     )
             else:
                 embed.add_field(
                     name="⚠️ Configuratie Vereist",
                     value="Stel het Request Kanaal en Log Kanaal 1 in om het systeem te kunnen gebruiken. Log Kanaal 2 is optioneel.",
-                    inline=False
+                    inline=False,
                 )
-            
+
             embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
             return embed
-            
+
         except Exception as e:
-            self.bot.log.error(f"Error creating unban requests configuration embed: {e}", exc_info=True)
+            self.bot.log.error(
+                f"Error creating unban requests configuration embed: {e}", exc_info=True
+            )
             raise
-    
+
     @discord.ui.button(label="Request Kanaal", style=discord.ButtonStyle.secondary, emoji="📝")
-    async def set_request_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def set_request_channel(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Set the unban request channel."""
         try:
-            self.bot.log.info(f"Unban request channel button clicked by {interaction.user} ({interaction.user.id})")
-            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "unban_request_kanaal_id", "text")
+            self.bot.log.info(
+                f"Unban request channel button clicked by {interaction.user} ({interaction.user.id})"
+            )
+            view = ChannelSelectView(
+                self.bot, self.user_id, "mod_settings", "unban_request_kanaal_id", "text"
+            )
             embed = discord.Embed(
                 title="📝 Unban Request Kanaal Selecteren",
                 description="Selecteer het kanaal waar gebruikers unban aanvragen kunnen indienen.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await interaction.response.edit_message(embed=embed, view=view)
             self.bot.log.debug("Unban request channel selection view sent successfully")
@@ -1907,18 +1972,20 @@ class UnbanRequestsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
+
     @discord.ui.button(label="Request URL", style=discord.ButtonStyle.secondary, emoji="🔗")
     async def set_request_url(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the unban request URL."""
         try:
-            self.bot.log.info(f"Unban request URL button clicked by {interaction.user} ({interaction.user.id})")
+            self.bot.log.info(
+                f"Unban request URL button clicked by {interaction.user} ({interaction.user.id})"
+            )
             modal = UnbanUrlModal(self.bot, self.user_id, self.visible)
             await interaction.response.send_modal(modal)
             self.bot.log.debug("Unban request URL modal sent successfully")
@@ -1927,23 +1994,27 @@ class UnbanRequestsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van het URL menu:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
+
     @discord.ui.button(label="Log Kanaal 1", style=discord.ButtonStyle.secondary, emoji="📋")
     async def set_log_channel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the first log channel."""
         try:
-            self.bot.log.info(f"Unban log channel 1 button clicked by {interaction.user} ({interaction.user.id})")
-            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_1", "text")
+            self.bot.log.info(
+                f"Unban log channel 1 button clicked by {interaction.user} ({interaction.user.id})"
+            )
+            view = ChannelSelectView(
+                self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_1", "text"
+            )
             embed = discord.Embed(
                 title="📋 Log Kanaal 1 (Staff) Selecteren",
                 description="Selecteer het kanaal waar staff unban aanvragen kan beoordelen. Dit kanaal krijgt reacties (✅/❌) voor goedkeuring/afwijzing.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await interaction.response.edit_message(embed=embed, view=view)
             self.bot.log.debug("Unban log channel 1 selection view sent successfully")
@@ -1952,23 +2023,29 @@ class UnbanRequestsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
-    @discord.ui.button(label="Log Kanaal 2 (Optioneel)", style=discord.ButtonStyle.secondary, emoji="📋")
+
+    @discord.ui.button(
+        label="Log Kanaal 2 (Optioneel)", style=discord.ButtonStyle.secondary, emoji="📋"
+    )
     async def set_log_channel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set the second log channel."""
         try:
-            self.bot.log.info(f"Unban log channel 2 button clicked by {interaction.user} ({interaction.user.id})")
-            view = ChannelSelectView(self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text")
+            self.bot.log.info(
+                f"Unban log channel 2 button clicked by {interaction.user} ({interaction.user.id})"
+            )
+            view = ChannelSelectView(
+                self.bot, self.user_id, "mod_settings", "aanvragen_log_kanaal_id_2", "text"
+            )
             embed = discord.Embed(
                 title="📋 Log Kanaal 2 (Archive) Selecteren",
                 description="Selecteer het kanaal voor archivering van unban aanvragen. Dit kanaal krijgt alleen een kopie van de aanvraag zonder reacties.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await interaction.response.edit_message(embed=embed, view=view)
             self.bot.log.debug("Unban log channel 2 selection view sent successfully")
@@ -1977,65 +2054,65 @@ class UnbanRequestsConfigView(BaseConfigView):
             error_embed = discord.Embed(
                 title="❌ Fout",
                 description=f"Er is een fout opgetreden bij het openen van de kanaal selectie:\n```{str(e)}```",
-                color=discord.Color.red()
+                color=discord.Color.red(),
             )
             try:
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
             except discord.InteractionResponded:
                 await interaction.followup.send(embed=error_embed, ephemeral=True)
-    
+
     @discord.ui.button(label="Setup Bericht", style=discord.ButtonStyle.success, emoji="🚀", row=1)
-    async def setup_unban_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def setup_unban_message(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         """Setup the unban request message."""
         try:
             settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
-            
+
             unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
-            aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
-            
+
             if not all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1]):
                 await interaction.response.send_message(
                     "❌ Request Kanaal en Log Kanaal 1 zijn vereist. Configureer deze eerst voordat je het bericht kunt verzenden.",
-                    ephemeral=True
+                    ephemeral=True,
                 )
                 return
-            
+
             # Get the unban cog and send the message
             unban_cog = self.bot.get_cog("UnbanRequest")
             if not unban_cog:
                 await interaction.response.send_message(
-                    "❌ Unban request systeem is niet geladen.",
-                    ephemeral=True
+                    "❌ Unban request systeem is niet geladen.", ephemeral=True
                 )
                 return
-            
+
             channel = self.bot.get_channel(unban_request_kanaal_id)
             if not channel:
                 await interaction.response.send_message(
                     f"❌ Unban request kanaal niet gevonden (ID: {unban_request_kanaal_id}).",
-                    ephemeral=True
+                    ephemeral=True,
                 )
                 return
-            
+
             embed = discord.Embed(
                 title="Unban Aanvragen",
                 description="Klik op de knop hieronder om een unban aan te vragen.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
-            
+
             await channel.send(embed=embed, view=unban_cog.unban_view)
             await interaction.response.send_message(
-                f"✅ Unban request bericht verzonden naar {channel.mention}!",
-                ephemeral=True
+                f"✅ Unban request bericht verzonden naar {channel.mention}!", ephemeral=True
             )
-            
+
         except Exception as e:
             self.bot.log.error(f"Error setting up unban message: {e}", exc_info=True)
             await interaction.response.send_message(
                 "❌ Er is een fout opgetreden bij het verzenden van het unban request bericht.",
-                ephemeral=True
+                ephemeral=True,
             )
+
 
 async def setup(bot):
     await bot.add_cog(Configure(bot))

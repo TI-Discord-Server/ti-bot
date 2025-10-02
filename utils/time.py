@@ -3,18 +3,21 @@ UserFriendlyTime by Rapptz
 Source:
 https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/utils/time.py
 """
+
 from __future__ import annotations
 
 import datetime
-import discord
+import re
 from typing import TYPE_CHECKING, Any, Optional, Union
+
+import discord
 import parsedatetime as pdt
 from dateutil.relativedelta import relativedelta
-from .utils import human_join
-from .timezone import LOCAL_TIMEZONE
-from discord.ext import commands
 from discord import app_commands
-import re
+from discord.ext import commands
+
+from .timezone import LOCAL_TIMEZONE
+from .utils import human_join
 
 # Monkey patch mins and secs into the units
 units = pdt.pdtLocales["en_US"].units
@@ -64,7 +67,9 @@ class ShortTime:
         if match is None or not match.group(0):
             match = self.discord_fmt.fullmatch(argument)
             if match is not None:
-                self.dt = datetime.datetime.utcfromtimestamp(int(match.group("ts")), tz=datetime.timezone.utc)
+                self.dt = datetime.datetime.utcfromtimestamp(
+                    int(match.group("ts")), tz=datetime.timezone.utc
+                )
                 return
             else:
                 raise commands.BadArgument("ongeldige tijd opgegeven")
@@ -85,11 +90,15 @@ class HumanTime:
         now = now or datetime.datetime.now(LOCAL_TIMEZONE)
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
-            raise commands.BadArgument('ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days"')
+            raise commands.BadArgument(
+                'ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days"'
+            )
 
         if not status.hasTime:
             # replace it with the current time
-            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
+            dt = dt.replace(
+                hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond
+            )
 
         self.now = now
         self.dt: datetime.datetime = dt
@@ -212,7 +221,9 @@ class UserFriendlyTime(commands.Converter):
             match = ShortTime.discord_fmt.match(argument)
             if match is not None:
                 result = FriendlyTimeResult(
-                    datetime.datetime.utcfromtimestamp(int(match.group("ts")), now, tz=datetime.timezone.utc)
+                    datetime.datetime.utcfromtimestamp(
+                        int(match.group("ts")), now, tz=datetime.timezone.utc
+                    )
                 )
                 remaining = argument[match.end() :].strip()
                 await result.ensure_constraints(ctx, self, now, remaining)
@@ -244,7 +255,9 @@ class UserFriendlyTime(commands.Converter):
         dt, status, begin, end, dt_string = elements[0]
 
         if not status.hasDateOrTime:
-            raise commands.BadArgument('Ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days".')
+            raise commands.BadArgument(
+                'Ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days".'
+            )
 
         if begin not in (0, 1) and end != len(argument):
             raise commands.BadArgument(
@@ -255,7 +268,9 @@ class UserFriendlyTime(commands.Converter):
 
         if not status.hasTime:
             # replace it with the current time
-            dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond)
+            dt = dt.replace(
+                hour=now.hour, minute=now.minute, second=now.second, microsecond=now.microsecond
+            )
 
         # if midnight is provided, just default to next day
         if status.accuracy == pdt.pdtContext.ACU_HALFDAY:
@@ -271,7 +286,9 @@ class UserFriendlyTime(commands.Converter):
                     raise commands.BadArgument("Verwachtte aanhalingsteken voor tijd invoer...")
 
                 if not (end < len(argument) and argument[end] == '"'):
-                    raise commands.BadArgument("Als de tijd tussen aanhalingstekens staat, moet je deze verwijderen.")
+                    raise commands.BadArgument(
+                        "Als de tijd tussen aanhalingstekens staat, moet je deze verwijderen."
+                    )
 
                 remaining = argument[end + 1 :].lstrip(" ,.!")
             else:

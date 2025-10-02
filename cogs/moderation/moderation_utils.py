@@ -1,8 +1,10 @@
 import datetime
 import re
 from typing import Optional
+
 import discord
-from utils.timezone import now_utc, format_local_time
+
+from utils.timezone import format_local_time, now_utc
 
 
 async def send_dm_embed(member: discord.Member, embed: discord.Embed) -> bool:
@@ -19,15 +21,8 @@ async def send_dm_embed(member: discord.Member, embed: discord.Embed) -> bool:
 
 def parse_duration(duration_str: str) -> Optional[datetime.timedelta]:
     """Parse duration string and return timedelta. Supports m, h, d, w, mo, y units."""
-    units = {
-        "m": "minutes", 
-        "h": "hours", 
-        "d": "days",
-        "w": "weeks",
-        "mo": "months",
-        "y": "years"
-    }
-    
+    units = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks", "mo": "months", "y": "years"}
+
     # Match pattern like 1m, 5h, 1d, 2w, 1mo, 1y
     match = re.match(r"(\d+)(m|h|d|w|mo|y)$", duration_str.lower())
     if not match:
@@ -35,7 +30,7 @@ def parse_duration(duration_str: str) -> Optional[datetime.timedelta]:
 
     amount, unit = match.groups()
     amount = int(amount)
-    
+
     # Handle months and years separately since timedelta doesn't support them directly
     if unit == "mo":
         # Approximate 1 month = 30 days
@@ -48,8 +43,14 @@ def parse_duration(duration_str: str) -> Optional[datetime.timedelta]:
         return datetime.timedelta(**{unit_name: amount})
 
 
-async def log_infraction(infractions_collection, guild_id: int, user_id: int, 
-                        moderator_id: int, infraction_type: str, reason: str):
+async def log_infraction(
+    infractions_collection,
+    guild_id: int,
+    user_id: int,
+    moderator_id: int,
+    infraction_type: str,
+    reason: str,
+):
     """Log an infraction to the database."""
     infraction_data = {
         "guild_id": guild_id,
@@ -62,8 +63,9 @@ async def log_infraction(infractions_collection, guild_id: int, user_id: int,
     await infractions_collection.insert_one(infraction_data)
 
 
-def create_dm_embed(title: str, description: str, color: discord.Color, 
-                   bot_icon_url: str = None) -> discord.Embed:
+def create_dm_embed(
+    title: str, description: str, color: discord.Color, bot_icon_url: str = None
+) -> discord.Embed:
     """Create a standardized DM embed."""
     timestamp = now_utc()
     embed = discord.Embed(
@@ -82,7 +84,7 @@ def format_duration(duration: datetime.timedelta) -> str:
     days = duration.days
     hours, remainder = divmod(duration.seconds, 3600)
     minutes, _ = divmod(remainder, 60)
-    
+
     time_parts = []
     if days > 0:
         time_parts.append(f"{days} dag{'en' if days != 1 else ''}")
@@ -90,5 +92,5 @@ def format_duration(duration: datetime.timedelta) -> str:
         time_parts.append(f"{hours} uur")
     if minutes > 0:
         time_parts.append(f"{minutes} minuten")
-    
+
     return ", ".join(time_parts) if time_parts else "minder dan een minuut"

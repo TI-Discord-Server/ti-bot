@@ -5,6 +5,7 @@ try:
 except ImportError:
     print("Installing required package: cryptography")
     import subprocess
+
     subprocess.check_call(["pip", "install", "cryptography"])
     from cryptography.fernet import Fernet
 

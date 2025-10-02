@@ -1,6 +1,6 @@
 from discord.app_commands import check
-from discord.interactions import Interaction
 from discord.ext import commands
+from discord.interactions import Interaction
 
 
 def developer():
@@ -8,15 +8,15 @@ def developer():
         # Get developer IDs from database
         settings = await ctx.client.db.settings.find_one({"_id": "server_settings"})
         developer_ids = settings.get("developer_ids", []) if settings else []
-        
+
         # If developers are configured, check if user is in the list
         if developer_ids:
             return ctx.user.id in developer_ids
-        
+
         # If no developers are configured, fallback to server admins
         # Get the main guild (either from database or fallback)
         guild_id = None
-        if hasattr(ctx.client, 'guild_id') and ctx.client.guild_id:
+        if hasattr(ctx.client, "guild_id") and ctx.client.guild_id:
             guild_id = ctx.client.guild_id
         else:
             # Try to get from database
@@ -26,8 +26,9 @@ def developer():
             else:
                 # Use fallback from main.py
                 from main import DEFAULT_GUILD_ID
+
                 guild_id = DEFAULT_GUILD_ID
-        
+
         # Get the guild and check if user is admin
         if guild_id:
             guild = ctx.client.get_guild(guild_id)
@@ -35,8 +36,9 @@ def developer():
                 member = guild.get_member(ctx.user.id)
                 if member and member.guild_permissions.administrator:
                     return True
-        
+
         return False
+
     return check(predicate)
 
 

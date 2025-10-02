@@ -1,5 +1,4 @@
 import functools
-import discord
 
 
 def has_role(role, error_message=None):
@@ -17,11 +16,11 @@ def has_role(role, error_message=None):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             # Handle both regular commands (self, interaction, ...) and context menu commands (interaction, target, ...)
-            if len(args) >= 2 and hasattr(args[0], '__class__') and hasattr(args[1], 'response'):
+            if len(args) >= 2 and hasattr(args[0], "__class__") and hasattr(args[1], "response"):
                 # Regular command: (self, interaction, ...)
                 self, interaction = args[0], args[1]
                 remaining_args = args[2:]
-            elif len(args) >= 1 and hasattr(args[0], 'response'):
+            elif len(args) >= 1 and hasattr(args[0], "response"):
                 # Context menu command: (interaction, target, ...)
                 interaction = args[0]
                 remaining_args = args[1:]
@@ -36,7 +35,7 @@ def has_role(role, error_message=None):
                 return None
 
             has_required_role = False
-            
+
             # Always allow users with administrator permissions
             if any(r.permissions.administrator for r in interaction.user.roles):
                 has_required_role = True
@@ -48,30 +47,34 @@ def has_role(role, error_message=None):
                 else:
                     # For role name checks, we need to find the highest role with that name in the server
                     # and check if the user has it
-                    
+
                     # First, find all roles in the server with the given name
                     server_roles_with_name = [r for r in interaction.guild.roles if r.name == role]
-                    
+
                     if server_roles_with_name:
                         # Sort roles by position (higher position = higher in hierarchy)
                         server_roles_with_name.sort(key=lambda r: r.position, reverse=True)
-                        
+
                         # Get the highest role with the given name
                         highest_role = server_roles_with_name[0]
-                        
+
                         # Check if the user has this specific role
-                        has_required_role = any(r.id == highest_role.id for r in interaction.user.roles)
+                        has_required_role = any(
+                            r.id == highest_role.id for r in interaction.user.roles
+                        )
 
             if not has_required_role:
                 # Use custom error message or default
                 message = error_message or "You don't have permission to use this command."
                 await interaction.response.send_message(message, ephemeral=True)
                 # Log permission denied attempt
-                if hasattr(interaction, 'command') and interaction.command:
+                if hasattr(interaction, "command") and interaction.command:
                     command_name = interaction.command.name
                 else:
                     command_name = func.__name__
-                print(f"Permission denied: User {interaction.user.name} ({interaction.user.id}) tried to use {command_name} without required role '{role}'")
+                print(
+                    f"Permission denied: User {interaction.user.name} ({interaction.user.id}) tried to use {command_name} without required role '{role}'"
+                )
                 return None
 
             # Call the original function with the correct arguments

@@ -6,8 +6,6 @@ from urllib import parse
 import discord
 
 
-
-
 def truncate(text: str, max: int = 50) -> str:  # pylint: disable=redefined-builtin
     """
     Reduces the string to `max` length, by trimming the message into "...".
@@ -27,6 +25,7 @@ def truncate(text: str, max: int = 50) -> str:  # pylint: disable=redefined-buil
     """
     text = text.strip()
     return text[: max - 3].strip() + "..." if len(text) > max else text
+
 
 def is_image_url(url: str, **kwargs) -> Literal[b""] | str:
     """
@@ -81,6 +80,7 @@ def parse_image_url(url: str, *, convert_size=True) -> Literal[b""] | str:
             return parse.urlunsplit(url)
     return ""
 
+
 def human_join(seq: typing.Sequence[str], delim: str = ", ", final: str = "or") -> str:
     """https://github.com/Rapptz/RoboDanny/blob/bf7d4226350dff26df4981dd53134eeb2aceeb87/cogs/utils/formats.py#L21-L32"""
     size = len(seq)
@@ -95,9 +95,9 @@ def human_join(seq: typing.Sequence[str], delim: str = ", ", final: str = "or") 
 
     return delim.join(seq[:-1]) + f" {final} {seq[-1]}"
 
+
 TOPIC_REGEX = re.compile(
-    r"(?:\bTitle:\s*(?P<title>.*)\n)?"
-    r"\bUser ID:\s*(?P<user_id>\d{17,21})\b",
+    r"(?:\bTitle:\s*(?P<title>.*)\n)?" r"\bUser ID:\s*(?P<user_id>\d{17,21})\b",
     flags=re.IGNORECASE | re.DOTALL,
 )
 UID_REGEX = re.compile(r"\bUser ID:\s*(\d{17,21})\b", flags=re.IGNORECASE)
@@ -179,6 +179,7 @@ def match_user_id(text: str, any_string: bool = False) -> int:
 
     return user_id
 
+
 def get_top_role(member: discord.Member, hoisted=True):
     roles = sorted(member.roles, key=lambda r: r.position, reverse=True)
     for role in roles:
@@ -190,7 +191,9 @@ def get_top_role(member: discord.Member, hoisted=True):
     return None
 
 
-async def create_thread_channel(bot, recipient, category, overwrites, *, name=None, errors_raised=None):
+async def create_thread_channel(
+    bot, recipient, category, overwrites, *, name=None, errors_raised=None
+):
     name = name or recipient.name
     errors_raised = errors_raised or []
 
@@ -241,6 +244,7 @@ async def create_thread_channel(bot, recipient, category, overwrites, *, name=No
 
     return channel
 
+
 def get_joint_id(message: discord.Message) -> typing.Optional[int]:
     """
     Get the joint ID from `discord.Embed().author.url`.
@@ -262,6 +266,7 @@ def get_joint_id(message: discord.Message) -> typing.Optional[int]:
             raise ValueError
     return None
 
+
 class AcceptButton(discord.ui.Button):
     def __init__(self, emoji):
         super().__init__(style=discord.ButtonStyle.gray, emoji=emoji)
@@ -270,6 +275,7 @@ class AcceptButton(discord.ui.Button):
         self.view.value = True
         await interaction.response.edit_message(view=None)
         self.view.stop()
+
 
 class DenyButton(discord.ui.Button):
     def __init__(self, emoji):
@@ -280,10 +286,12 @@ class DenyButton(discord.ui.Button):
         await interaction.response.edit_message(view=None)
         self.view.stop()
 
+
 class ConfirmThreadCreationView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=20)
         self.value = None
+
 
 class DummyParam:
     """

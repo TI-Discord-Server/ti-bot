@@ -1,11 +1,12 @@
 # Don't remove unused imports as they can be used in the py command.
 
 import os
+
 import discord
 from discord.ext import commands
 
-from utils.checks import developer
 from main import Bot
+from utils.checks import developer
 
 
 class owner(commands.Cog, name="owner"):
@@ -44,18 +45,14 @@ class owner(commands.Cog, name="owner"):
     async def cogs(self, ctx: commands.Context[commands.AutoShardedBot]) -> None:
         """Shows all parts of the bot."""
         cogs = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
-        loaded = [
-            "`{}`".format(c.__module__.split(".")[-1]) for c in self.bot.cogs.values()
-        ]
+        loaded = ["`{}`".format(c.__module__.split(".")[-1]) for c in self.bot.cogs.values()]
         unloaded = [
             "`{}`".format(c.split(".")[-1])
             for c in cogs
             if "`{}`".format(c.split(".")[-1]) not in loaded
         ]
         total_cogs = len(cogs)
-        embed = discord.Embed(
-            title=f"TI dashboard | Cogs ({total_cogs})", color=self.bot.color
-        )
+        embed = discord.Embed(title=f"TI dashboard | Cogs ({total_cogs})", color=self.bot.color)
         embed.add_field(
             name=f"✅ **Loaded** ({len(loaded)})",
             value=", ".join(loaded) if loaded != [] else "`None`",
@@ -73,9 +70,7 @@ class owner(commands.Cog, name="owner"):
 
     @commands.command(hidden=True, brief="Load a cog.")
     @developer()
-    async def load(
-        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
-    ) -> None:
+    async def load(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Load a cog."""
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
@@ -91,9 +86,7 @@ class owner(commands.Cog, name="owner"):
                         i += 1
                         failed_to_load.append(m)
             if i == 0:
-                em = discord.Embed(
-                    title="All Cogs Have Been Loaded", color=self.bot.color
-                )
+                em = discord.Embed(title="All Cogs Have Been Loaded", color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -149,9 +142,7 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(
-                    title="Error", description=str(e), color=self.bot.color
-                )
+                em = discord.Embed(title="Error", description=str(e), color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -159,9 +150,7 @@ class owner(commands.Cog, name="owner"):
 
     @commands.command(hidden=True, brief="Unloads a cog.")
     @developer()
-    async def unload(
-        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
-    ) -> None:
+    async def unload(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Unloads a cog."""
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
@@ -179,9 +168,7 @@ class owner(commands.Cog, name="owner"):
                         i += 1
                         failed_to_load.append(m)
             if i == 0:
-                em = discord.Embed(
-                    title="All Cogs Have Been Unloaded", color=self.bot.color
-                )
+                em = discord.Embed(title="All Cogs Have Been Unloaded", color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -192,9 +179,7 @@ class owner(commands.Cog, name="owner"):
                 )
 
             if failed_to_load:
-                msg_to_send += "``{}`` were already unloaded.".format(
-                    ", ".join(failed_to_load)
-                )
+                msg_to_send += "``{}`` were already unloaded.".format(", ".join(failed_to_load))
 
             if msg_to_send != "":
                 try:
@@ -265,9 +250,7 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(
-                    title="Error", description=str(e), color=self.bot.color
-                )
+                em = discord.Embed(title="Error", description=str(e), color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -275,9 +258,7 @@ class owner(commands.Cog, name="owner"):
 
     @commands.command(hidden=True, brief="Reloads a cog.")
     @developer()
-    async def reload(
-        self, ctx: commands.Context[commands.AutoShardedBot], *, module: str
-    ) -> None:
+    async def reload(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Reloads a cog."""
         modules = [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]
         loaded_modules = [c.__module__.split(".")[-1] for c in self.bot.cogs.values()]
@@ -297,9 +278,7 @@ class owner(commands.Cog, name="owner"):
                     i += 1
                     failed_to_load.append(module)
             if i == 0:
-                em = discord.Embed(
-                    title="All Cogs Have Been Reloaded", color=self.bot.color
-                )
+                em = discord.Embed(title="All Cogs Have Been Reloaded", color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:
@@ -311,9 +290,7 @@ class owner(commands.Cog, name="owner"):
                 )
 
             if failed_to_load:
-                msg_to_send += "Failed to reload ``{}``".format(
-                    ", ".join(failed_to_load)
-                )
+                msg_to_send += "Failed to reload ``{}``".format(", ".join(failed_to_load))
 
             if msg_to_send != "":
                 try:
@@ -352,9 +329,7 @@ class owner(commands.Cog, name="owner"):
                         return
                     return
             except Exception as e:
-                em = discord.Embed(
-                    title="Error", description=str(e), color=self.bot.color
-                )
+                em = discord.Embed(title="Error", description=str(e), color=self.bot.color)
                 try:
                     await ctx.send(embed=em)
                 except Exception:

@@ -1,5 +1,5 @@
-import asyncio
 import argparse
+import asyncio
 import contextlib
 import datetime
 import logging
@@ -8,32 +8,32 @@ import signal
 import sys
 import traceback
 import typing
-from logging.handlers import RotatingFileHandler
-from typing import Awaitable, Final, Protocol
 import urllib.parse
+from logging.handlers import RotatingFileHandler
+from typing import Awaitable, Protocol
+
+# ===== Begin ENV-compat helpers (compatible with your .env.example) =====
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
-from aiohttp import web
 import discord
+from aiohttp import web
 from discord import app_commands
 from discord.ext import commands
 from discord.interactions import Interaction
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from utils.thread import ThreadManager
-
 from env import (
     BOT_TOKEN,
-    MONGODB_PASSWORD,
+    DISCORD_GUILD_ID,
+    MONGODB_DB,
     MONGODB_IP_ADDRESS,
+    MONGODB_PASSWORD,
     MONGODB_PORT,
     MONGODB_USERNAME,
-    MONGODB_DB,
-    DISCORD_GUILD_ID,
-    WEBHOOK_URL,
-
     POD_UID,
+    WEBHOOK_URL,
 )
 from utils.errors import (
     ForbiddenAction,
@@ -44,9 +44,8 @@ from utils.errors import (
     UnknownRole,
     UnknownUser,
 )
+from utils.thread import ThreadManager
 
-# ===== Begin ENV-compat helpers (compatible with your .env.example) =====
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 def _ensure_query_params(uri: str, extra: dict[str, str]) -> str:
     """Merge query params into a MongoDB URI correctly."""
@@ -55,9 +54,11 @@ def _ensure_query_params(uri: str, extra: dict[str, str]) -> str:
     q.update({k: str(v) for k, v in extra.items() if v is not None})
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(q), parts.fragment))
 
+
 def _pick(name: str, default: str | None = None) -> str | None:
     """Pick base env var; if not set, return default. (No per-ENV suffixes required)"""
     return os.getenv(name) or default
+
 
 def _resolve_db_name() -> str:
     """
@@ -67,6 +68,7 @@ def _resolve_db_name() -> str:
     if not MONGODB_DB:
         raise RuntimeError("MONGODB_DB must be set in your .env")
     return MONGODB_DB
+
 
 def _build_uri_from_example_env() -> tuple[str, str]:
     """
@@ -82,32 +84,46 @@ def _build_uri_from_example_env() -> tuple[str, str]:
     if user and pwd:
         # user/pwd zijn hierboven al URL-encoded
         uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{host}:{port}/{db_name}"
-        uri = _ensure_query_params(uri, {
-        "authMechanism": "SCRAM-SHA-256",
-        "authSource": db_name,
-    })
+        uri = _ensure_query_params(
+            uri,
+            {
+                "authMechanism": "SCRAM-SHA-256",
+                "authSource": db_name,
+            },
+        )
     else:
         uri = f"mongodb://{host}:{port}/{db_name}"
 
     return uri, db_name
+
+
 # ===== End ENV-compat helpers =====
 
 DEFAULT_GUILD_ID = int(DISCORD_GUILD_ID) if DISCORD_GUILD_ID else 771394209419624489
+
+
 # Parse command line arguments
 def str_to_bool(v):
     """Convert string to boolean for argument parsing."""
     if isinstance(v, bool):
         return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
 
-parser = argparse.ArgumentParser(description='TI Discord Bot')
-parser.add_argument('--tls', type=str_to_bool, nargs='?', const=True, default=False, 
-                   help='Enable TLS for MongoDB connection. Use --tls, --tls=true, or --tls=false')
+
+parser = argparse.ArgumentParser(description="TI Discord Bot")
+parser.add_argument(
+    "--tls",
+    type=str_to_bool,
+    nargs="?",
+    const=True,
+    default=False,
+    help="Enable TLS for MongoDB connection. Use --tls, --tls=true, or --tls=false",
+)
 args = parser.parse_args()
 
 MONGODB_PASSWORD = urllib.parse.quote_plus(MONGODB_PASSWORD) if MONGODB_PASSWORD else ""
@@ -119,16 +135,16 @@ load_dotenv()
 
 class PodUidFormatter(logging.Formatter):
     """Custom formatter that adds POD_UID prefix to log messages when available."""
-    
+
     def format(self, record):
         # Get the original formatted message
         original_message = super().format(record)
-        
+
         # Add POD_UID prefix if available (first 5 characters only)
         if POD_UID:
             pod_prefix = f"[{POD_UID[:5]}] "
             return pod_prefix + original_message
-        
+
         return original_message
 
 
@@ -150,9 +166,8 @@ class DiscordWebhookHandler(logging.Handler):
         self.failed_attempts = 0
         self.last_failure_time = 0
 
-        
         # Create a file-only logger for webhook status messages
-        self._file_logger = logging.getLogger('webhook_status')
+        self._file_logger = logging.getLogger("webhook_status")
         self._file_logger.setLevel(logging.INFO)
         # Only add file handler if it doesn't already exist
         if not self._file_logger.handlers:
@@ -163,7 +178,9 @@ class DiscordWebhookHandler(logging.Handler):
                 maxBytes=1024 * 1024,
                 backupCount=1,
             )
-            file_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s'))
+            file_handler.setFormatter(
+                logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s")
+            )
             self._file_logger.addHandler(file_handler)
             # Prevent propagation to avoid webhook loops
             self._file_logger.propagate = False
@@ -201,7 +218,7 @@ class DiscordWebhookHandler(logging.Handler):
 
     async def _async_emit(self, record):
         import time
-        
+
         # Check if we should skip due to too many recent failures
         current_time = time.time()
         start_time = current_time
@@ -209,31 +226,37 @@ class DiscordWebhookHandler(logging.Handler):
             # If it's been more than max_delay since last failure, reset counter
             if current_time - self.last_failure_time > self.max_delay:
                 self.failed_attempts = 0
-                self._file_logger.info(f"WEBHOOK Failure counter reset after {current_time - self.last_failure_time:.2f}s cooldown")
+                self._file_logger.info(
+                    f"WEBHOOK Failure counter reset after {current_time - self.last_failure_time:.2f}s cooldown"
+                )
             else:
                 # Skip this log message to prevent infinite loops
-                self._file_logger.debug(f"WEBHOOK Skipping log message due to recent failures (failed_attempts: {self.failed_attempts})")
+                self._file_logger.debug(
+                    f"WEBHOOK Skipping log message due to recent failures (failed_attempts: {self.failed_attempts})"
+                )
                 return
-        
+
         await self._ensure_session()
-        
+
         # Log start of webhook operation if we expect potential retries
         if self.failed_attempts > 0:
-            self._file_logger.info(f"WEBHOOK Starting log transmission (previous failures: {self.failed_attempts}, max_retries: {self.max_retries})")
-        
+            self._file_logger.info(
+                f"WEBHOOK Starting log transmission (previous failures: {self.failed_attempts}, max_retries: {self.max_retries})"
+            )
+
         for attempt in range(self.max_retries + 1):
             try:
                 webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
                 msg = self.format(record)
-                
+
                 # Add POD_UID prefix if available (first 5 characters only)
                 if POD_UID:
                     pod_prefix = f"[{POD_UID[:5]}] "
                     msg = pod_prefix + msg
-                
+
                 # Get the current webhook format setting
                 format_type = await self._get_webhook_format()
-                
+
                 if format_type == "plaintext":
                     # Plaintext format with square brackets
                     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
@@ -250,41 +273,55 @@ class DiscordWebhookHandler(logging.Handler):
                     embed.add_field(name="Level", value=record.levelname, inline=True)
                     embed.add_field(name="Logger", value=record.name, inline=True)
                     await webhook.send(embed=embed)
-                
+
                 # Success! Reset failure counter and log success
                 total_time = time.time() - start_time
                 if attempt > 0:
-                    self._file_logger.info(f"WEBHOOK Log transmission successful after {attempt} retries in {total_time:.2f}s total")
+                    self._file_logger.info(
+                        f"WEBHOOK Log transmission successful after {attempt} retries in {total_time:.2f}s total"
+                    )
                 elif self.failed_attempts > 0:
-                    self._file_logger.info(f"WEBHOOK Log transmission successful on first attempt after previous failures (total time: {total_time:.2f}s)")
-                
+                    self._file_logger.info(
+                        f"WEBHOOK Log transmission successful on first attempt after previous failures (total time: {total_time:.2f}s)"
+                    )
+
                 self.failed_attempts = 0
                 return
-                
+
             except discord.HTTPException as e:
                 if e.status == 429:  # Rate limited
                     self.failed_attempts += 1
                     self.last_failure_time = current_time
-                    
+
                     if attempt < self.max_retries:
                         # Calculate exponential backoff delay
-                        delay = min(self.base_delay * (2 ** attempt), self.max_delay)
-                        retry_after = getattr(e.response, 'headers', {}).get('Retry-After') if hasattr(e, 'response') else None
-                        
+                        delay = min(self.base_delay * (2**attempt), self.max_delay)
+                        retry_after = (
+                            getattr(e.response, "headers", {}).get("Retry-After")
+                            if hasattr(e, "response")
+                            else None
+                        )
+
                         # Use file-only logger to avoid webhook loops
-                        self._file_logger.warning(f"WEBHOOK Rate limited (HTTP 429) on attempt {attempt + 1}/{self.max_retries + 1}. "
-                                                f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s")
-                        
+                        self._file_logger.warning(
+                            f"WEBHOOK Rate limited (HTTP 429) on attempt {attempt + 1}/{self.max_retries + 1}. "
+                            f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s"
+                        )
+
                         await asyncio.sleep(delay)
-                        
+
                         elapsed_time = time.time() - start_time
-                        self._file_logger.info(f"WEBHOOK Resuming transmission attempt {attempt + 2}/{self.max_retries + 1} "
-                                             f"after {elapsed_time:.2f}s total elapsed")
+                        self._file_logger.info(
+                            f"WEBHOOK Resuming transmission attempt {attempt + 2}/{self.max_retries + 1} "
+                            f"after {elapsed_time:.2f}s total elapsed"
+                        )
                         continue
                     else:
                         total_time = time.time() - start_time
-                        self._file_logger.error(f"WEBHOOK Max retries ({self.max_retries}) exceeded after {total_time:.2f}s. "
-                                              f"Rate limiting prevented completion. Dropping log message. HTTP status: {e.status}")
+                        self._file_logger.error(
+                            f"WEBHOOK Max retries ({self.max_retries}) exceeded after {total_time:.2f}s. "
+                            f"Rate limiting prevented completion. Dropping log message. HTTP status: {e.status}"
+                        )
                         return
                 else:
                     # Other HTTP error, don't retry
@@ -292,7 +329,7 @@ class DiscordWebhookHandler(logging.Handler):
                     self.last_failure_time = current_time
                     self._file_logger.error(f"WEBHOOK HTTP error {e.status}: {e.text}")
                     return
-                    
+
             except Exception as e:
                 # Other error, don't retry
                 self.failed_attempts += 1
@@ -333,7 +370,7 @@ class DiscordWebhookHandler(logging.Handler):
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-                # ===== MongoDB init (compatible with your .env.example) =====
+        # ===== MongoDB init (compatible with your .env.example) =====
         uri, db_name = _build_uri_from_example_env()
 
         # Voeg TLS toe indien CLI-flag gebruikt
@@ -393,10 +430,11 @@ class Bot(commands.Bot):
         self.status = discord.Status.online
 
         self.threads = ThreadManager(self)
-        
+
         # Initialize persistent view manager
         try:
             from utils.persistent_views import PersistentViewManager
+
             self.persistent_view_manager = PersistentViewManager(self)
         except Exception as e:
             print(f"Warning: Failed to initialize PersistentViewManager: {e}")
@@ -405,7 +443,7 @@ class Bot(commands.Bot):
         # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
         bot_log = logging.getLogger("bot")
         bot_log.setLevel(logging.INFO)
-        
+
         # Create file handler with custom formatter
         file_handler = RotatingFileHandler(
             "bot.log",
@@ -421,12 +459,12 @@ class Bot(commands.Bot):
 
         discord_log = logging.getLogger("discord")
         discord_log.setLevel(logging.WARNING)
-        
+
         # Suppress discord.py webhook rate limit messages specifically
         discord_webhook_log = logging.getLogger("discord.webhook")
         discord_webhook_log.setLevel(logging.ERROR)  # Only show errors, not warnings
         discord_webhook_log.propagate = False  # Don't propagate to parent discord logger
-        
+
         # Create file handler with custom formatter for discord logs
         discord_file_handler = RotatingFileHandler(
             "bot.log",
@@ -451,9 +489,7 @@ class Bot(commands.Bot):
             bot_log.addHandler(discord_webhook_handler)
             discord_log.addHandler(discord_webhook_handler)
         else:
-            self.log.warning(
-                "No webhook URL provided; logging to Discord webhook disabled."
-            )
+            self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
 
         self.__started = False
         self.owner_ids: frozenset[int] = frozenset()  # Will be loaded from database
@@ -465,22 +501,24 @@ class Bot(commands.Bot):
         # fix: we don't use self.run() as it uses asyncio.run, which replaces our event loop created above.
         #      as a result, we can't make aiohttp requests with self.session because requests are technically made
         #      between two different event loops, and it doesn't like that :(
-        
+
         # Set up signal handlers for graceful shutdown
         def signal_handler():
             self.log.info("Received SIGTERM, initiating graceful shutdown...")
             loop.create_task(self.graceful_shutdown())
-        
+
         # Register signal handlers (SIGTERM for Kubernetes, SIGINT for Ctrl+C)
         try:
-            if hasattr(signal, 'SIGTERM'):
+            if hasattr(signal, "SIGTERM"):
                 loop.add_signal_handler(signal.SIGTERM, signal_handler)
-            if hasattr(signal, 'SIGINT'):
+            if hasattr(signal, "SIGINT"):
                 loop.add_signal_handler(signal.SIGINT, signal_handler)
         except NotImplementedError:
             # Signal handlers are not implemented on Windows for subprocesses
-            self.log.warning("Signal handlers not implemented in this environment; graceful shutdown may not work as expected.")
-        
+            self.log.warning(
+                "Signal handlers not implemented in this environment; graceful shutdown may not work as expected."
+            )
+
         loop.run_until_complete(self.__init())
 
     async def __init(self):
@@ -513,7 +551,7 @@ class Bot(commands.Bot):
         await self.check_db_connection()
         await self.load_developer_ids()
         await self.setup_health_check()
-        
+
         # Add global check to restrict all prefix commands to developers only
         self.add_check(self.global_developer_check)
 
@@ -528,18 +566,18 @@ class Bot(commands.Bot):
         if not self.__started:
             self.__started = True
             self.log.debug(f"Logged in as {self.user}")
-            
+
             # Load guild ID and developer IDs from database
             await self.load_guild_id()
             await self.load_developer_ids()
-            
+
             # Populate thread cache on startup
             try:
                 await self.threads.populate_cache()
                 self.log.info("Thread cache populated successfully")
             except Exception as e:
                 self.log.error(f"Failed to populate thread cache: {e}")
-            
+
             # Restore persistent views
             if self.persistent_view_manager:
                 try:
@@ -570,7 +608,7 @@ class Bot(commands.Bot):
         """Auto-detect guild ID from the guilds the bot is in."""
         # First try to get from database (for backward compatibility)
         db_guild_id = await self.get_guild_id()
-        
+
         if db_guild_id:
             self._guild_id = db_guild_id
             self.log.info(f"Using configured guild ID {self._guild_id} from database")
@@ -581,7 +619,9 @@ class Bot(commands.Bot):
         elif len(self.guilds) > 1:
             # Bot is in multiple guilds - use default as fallback
             self._guild_id = DEFAULT_GUILD_ID
-            self.log.warning(f"Bot is in {len(self.guilds)} guilds, using default guild ID {self._guild_id}. Use /configure to change if needed.")
+            self.log.warning(
+                f"Bot is in {len(self.guilds)} guilds, using default guild ID {self._guild_id}. Use /configure to change if needed."
+            )
         else:
             # Bot is in no guilds - use default as fallback
             self._guild_id = DEFAULT_GUILD_ID
@@ -601,10 +641,10 @@ class Bot(commands.Bot):
         # First check if developer IDs are configured in database
         settings = await self.db.settings.find_one({"_id": "server_settings"})
         developer_ids = settings.get("developer_ids", []) if settings else []
-        
+
         if developer_ids:
             return user.id in developer_ids
-        
+
         # If no developers configured, fallback to server admins
         guild_id = await self.get_guild_id()
         if guild_id:
@@ -613,7 +653,7 @@ class Bot(commands.Bot):
                 member = guild.get_member(user.id)
                 if member and member.guild_permissions.administrator:
                     return True
-        
+
         return False
 
     async def global_developer_check(self, ctx: commands.Context) -> bool:
@@ -621,15 +661,15 @@ class Bot(commands.Bot):
         # Only apply this check to prefix commands, not slash commands
         if not ctx.prefix or ctx.prefix == "/":
             return True
-        
+
         # Use the same logic as the developer() decorator
         settings = await self.db.settings.find_one({"_id": "server_settings"})
         developer_ids = settings.get("developer_ids", []) if settings else []
-        
+
         # If developers are configured, check if user is in the list
         if developer_ids:
             return ctx.author.id in developer_ids
-        
+
         # If no developers are configured, fallback to server admins
         guild_id = await self.get_guild_id()
         if guild_id:
@@ -638,7 +678,7 @@ class Bot(commands.Bot):
                 member = guild.get_member(ctx.author.id)
                 if member and member.guild_permissions.administrator:
                     return True
-        
+
         return False
 
     @property
@@ -647,7 +687,7 @@ class Bot(commands.Bot):
         return self._guild_id
 
     def get_guild_icon(
-            self, guild: typing.Optional[discord.Guild], *, size: typing.Optional[int] = None
+        self, guild: typing.Optional[discord.Guild], *, size: typing.Optional[int] = None
     ) -> str:
         if guild is None:
             guild = self.guild
@@ -673,14 +713,16 @@ class Bot(commands.Bot):
                 self.dispatch("command_error", ctx, exc)
 
     @staticmethod
-    async def add_reaction(self,
-            msg, reaction: typing.Union[discord.Emoji, discord.Reaction, discord.PartialEmoji, str]
+    async def add_reaction(
+        self,
+        msg,
+        reaction: typing.Union[discord.Emoji, discord.Reaction, discord.PartialEmoji, str],
     ) -> bool:
         if reaction != "disable":
             try:
                 await msg.add_reaction(reaction)
             except (discord.HTTPException, TypeError) as e:
-                self.bot.log.warning(f"Failed to add reaction to {reaction}: {e}") #TODO
+                self.bot.log.warning(f"Failed to add reaction to {reaction}: {e}")  # TODO
                 return False
         return True
 
@@ -697,7 +739,10 @@ class Bot(commands.Bot):
             try:
                 await thread.send(message)
             except Exception as e:
-                self.log.info(f"Failed to send message ({message.content}) to thread ({thread.channel}): {e}", exc_info=True)
+                self.log.info(
+                    f"Failed to send message ({message.content}) to thread ({thread.channel}): {e}",
+                    exc_info=True,
+                )
                 # logger.error("Failed to send message:", exc_info=True)
                 await self.add_reaction(self, message, "❌")
             else:
@@ -781,11 +826,11 @@ class Bot(commands.Bot):
             except ValueError:
                 await self.add_reaction(self, after, "❌")
             else:
-                embed = discord.Embed(description="Successfully Edited Message", color=discord.Color.blurple())
+                embed = discord.Embed(
+                    description="Successfully Edited Message", color=discord.Color.blurple()
+                )
                 embed.set_footer(text=f"Message ID: {after.id}")
                 await after.channel.send(embed=embed)
-
-
 
     def _format_cooldown(self, retry_after: float) -> str:
         m, s = divmod(retry_after, 60)
@@ -808,10 +853,7 @@ class Bot(commands.Bot):
 
         if isinstance(error, app_commands.CommandInvokeError):
             original = error.original
-        elif (
-            isinstance(error, app_commands.TransformerError)
-            and error.__cause__ is not None
-        ):
+        elif isinstance(error, app_commands.TransformerError) and error.__cause__ is not None:
             original = error.__cause__
         else:
             return False
@@ -859,18 +901,14 @@ class Bot(commands.Bot):
             return
         elif isinstance(error, app_commands.BotMissingPermissions):
             with contextlib.suppress(Exception):
-                await respond(
-                    ":x: | I don't have the required permissions!", ephemeral=True
-                )
+                await respond(":x: | I don't have the required permissions!", ephemeral=True)
 
             return
         elif isinstance(error, app_commands.CommandOnCooldown):
             time = self._format_cooldown(error.retry_after)
 
             with contextlib.suppress(Exception):
-                await respond(
-                    ":hourglass: **| Cooldown:** {}".format(time), ephemeral=True
-                )
+                await respond(":hourglass: **| Cooldown:** {}".format(time), ephemeral=True)
 
             return
         elif isinstance(error, app_commands.CheckFailure) or (
@@ -928,14 +966,16 @@ class Bot(commands.Bot):
             else:
                 self.log.error(
                     "Unhandled application command error",
-                    exc_info=(type(error), error, error.__traceback__)
+                    exc_info=(type(error), error, error.__traceback__),
                 )
                 em = discord.Embed(
                     title=interaction.command.qualified_name,  # type: ignore
                     description=interaction.command.qualified_name,  # type: ignore
                     colour=discord.Colour(0xFFFFFF),
                 )
-                avatar_url = interaction.user.display_avatar.url if interaction.user.display_avatar else None
+                avatar_url = (
+                    interaction.user.display_avatar.url if interaction.user.display_avatar else None
+                )
                 em.set_author(
                     name="Critical Error",
                     icon_url=avatar_url,
@@ -947,9 +987,7 @@ class Bot(commands.Bot):
                 except Exception:
                     pass
 
-    async def on_command_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ):
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         command: commands.Command = ctx.command  # type: ignore
 
         if isinstance(error, commands.CommandNotFound):
@@ -1006,12 +1044,9 @@ class Bot(commands.Bot):
             return
         elif isinstance(error, commands.CommandInvokeError):
             self.log.error(
-                "Command invoke error",
-                exc_info=(type(error), error, error.__traceback__)
+                "Command invoke error", exc_info=(type(error), error, error.__traceback__)
             )
-            e = discord.Embed(
-                description=ctx.message.content, colour=discord.Colour(0xFFFFFF)
-            )
+            e = discord.Embed(description=ctx.message.content, colour=discord.Colour(0xFFFFFF))
             avatar_url = ctx.author.display_avatar.url if ctx.author.display_avatar else None
             e.set_author(
                 name="Critical Error",
@@ -1039,40 +1074,40 @@ class Bot(commands.Bot):
     async def graceful_shutdown(self):
         """Gracefully shutdown the bot and close all connections."""
         self.log.info("Received shutdown signal, starting graceful shutdown...")
-        
+
         try:
             # Step 1: Set shutdown event to mark health check as unhealthy
             # This signals Kubernetes to stop routing traffic to this pod
             self._shutdown_event.set()
             self.log.info("Health check marked as unhealthy - Kubernetes will stop routing traffic")
-            
+
             # Give Kubernetes a moment to detect unhealthy status and stop routing traffic
             await asyncio.sleep(2.0)
-            
+
             # Step 2: Close Discord connection to stop accepting new requests
             await asyncio.wait_for(self.close(), timeout=10.0)
             self.log.info("Discord connection closed - no new requests will be processed")
-            
+
             # Step 3: Send shutdown progress logs (webhook logging still available)
             self.log.info("Beginning final service cleanup...")
-            
+
             # Step 4: Close other services (but keep webhook logging available)
             # Close database connection
-            if hasattr(self, 'db') and self.db is not None:
+            if hasattr(self, "db") and self.db is not None:
                 self.db.client.close()
                 self.log.info("Database connection closed")
-            
+
             # Close bot's main aiohttp session (webhook handler has its own session)
-            if hasattr(self, 'session') and self.session is not None and not self.session.closed:
+            if hasattr(self, "session") and self.session is not None and not self.session.closed:
                 await asyncio.wait_for(self.session.close(), timeout=5.0)
                 self.log.info("Bot HTTP session closed")
-            
+
             # Send final log message before closing webhook sessions
             self.log.info("All services closed - shutting down webhook logging...")
-            
+
             # Give time for final webhook logs to be sent
             await asyncio.sleep(2.0)
-            
+
             # Close webhook handler sessions
             for handler in self.log.handlers:
                 if isinstance(handler, DiscordWebhookHandler):
@@ -1080,18 +1115,20 @@ class Bot(commands.Bot):
                         await handler.async_close()
                         self.log.info("Webhook handler session closed")
                     except Exception as e:
-                        print(f"Error closing webhook handler: {e}")  # Use print since logging might not work
-            
+                        print(
+                            f"Error closing webhook handler: {e}"
+                        )  # Use print since logging might not work
+
             # Step 6: Finally close health check server completely
-            if hasattr(self, 'site') and self.site is not None:
+            if hasattr(self, "site") and self.site is not None:
                 await asyncio.wait_for(self.site.stop(), timeout=5.0)
                 self.log.info("Health check server stopped completely")
-            
+
         except asyncio.TimeoutError:
             self.log.warning("Graceful shutdown timed out, forcing exit")
         except Exception as e:
             self.log.error(f"Error during graceful shutdown: {e}")
-        
+
         self.log.info("Graceful shutdown completed")
 
     async def setup_health_check(self):
@@ -1100,19 +1137,21 @@ class Bot(commands.Bot):
             data = {
                 "status": "healthy" if is_ready else "starting",
                 "discord_connection": "connected" if is_ready else "disconnected",
-                "discord_heartbeat_latency": f"{round(self.latency * 1000)} ms" if is_ready else "N/A",
-                "uptime": str(datetime.datetime.now() - self.uptime)
+                "discord_heartbeat_latency": (
+                    f"{round(self.latency * 1000)} ms" if is_ready else "N/A"
+                ),
+                "uptime": str(datetime.datetime.now() - self.uptime),
             }
             # Return 200 for healthy, 503 for starting (Kubernetes will wait for 200)
             status_code = 200 if is_ready else 503
             return web.json_response(data, status=status_code)
 
         app = web.Application()
-        app.router.add_get('/health', health_handler)
+        app.router.add_get("/health", health_handler)
 
         runner = web.AppRunner(app)
         await runner.setup()
-        self.site = web.TCPSite(runner, '0.0.0.0', 3000)
+        self.site = web.TCPSite(runner, "0.0.0.0", 3000)
 
         await self.site.start()
         self.log.info("Health check endpoint started on http://0.0.0.0:3000/health")
@@ -1121,13 +1160,14 @@ class Bot(commands.Bot):
 def main():
     """Main entry point for the bot."""
     try:
-        bot = Bot()
+        Bot()
     except KeyboardInterrupt:
         print("Bot startup interrupted by user")
         sys.exit(0)
     except Exception as e:
         print(f"Failed to start bot: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
-from cogs.confessions.confession_view import ConfessionView
+from discord.ext import commands
+
 from cogs.confessions.confession_tasks import ConfessionTasks
 
 
@@ -15,40 +15,38 @@ class ConfessionCommands(commands.Cog):
         settings = await self.bot.db.settings.find_one({"_id": "reports_settings"})
         if not settings or "moderator_role_id" not in settings:
             return interaction.user.guild_permissions.manage_guild
-        
+
         moderator_role_id = settings["moderator_role_id"]
         return any(role.id == moderator_role_id for role in interaction.user.roles)
 
-    @app_commands.command(
-        name="force_review", description="Forceer de review van confessions."
-    )
+    @app_commands.command(name="force_review", description="Forceer de review van confessions.")
     async def force_review(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use force_review without moderator role")
+            self.bot.log.warning(
+                f"User {interaction.user.name} ({interaction.user.id}) tried to use force_review without moderator role"
+            )
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
             return
-            
+
         await self.tasks.daily_review()
         await interaction.response.send_message(
             "Confession beoordeling is geforceerd.", ephemeral=True
         )
-        self.bot.log.info(
-            f"{interaction.user} heeft handmatig een confession review getriggerd."
-        )
+        self.bot.log.info(f"{interaction.user} heeft handmatig een confession review getriggerd.")
 
-    @app_commands.command(
-        name="force_post", description="Forceer het posten van confessions."
-    )
+    @app_commands.command(name="force_post", description="Forceer het posten van confessions.")
     async def force_post(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use force_post without moderator role")
+            self.bot.log.warning(
+                f"User {interaction.user.name} ({interaction.user.id}) tried to use force_post without moderator role"
+            )
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
             return
-            
+
         await interaction.response.send_message(
             "Forceren van confession posting...", ephemeral=True
         )
@@ -56,59 +54,62 @@ class ConfessionCommands(commands.Cog):
         await interaction.followup.send(
             "Beoordeling en posting van confessions is geforceerd.", ephemeral=True
         )
-        self.bot.log.info(
-            f"{interaction.user} heeft handmatig een confession post getriggerd."
-        )
+        self.bot.log.info(f"{interaction.user} heeft handmatig een confession post getriggerd.")
 
     @app_commands.command(
-        name="setup_submit_message", description="Post het submit confession bericht in het publieke kanaal."
+        name="setup_submit_message",
+        description="Post het submit confession bericht in het publieke kanaal.",
     )
     async def setup_submit_message(self, interaction: discord.Interaction):
         if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(f"User {interaction.user.name} ({interaction.user.id}) tried to use setup_submit_message without moderator role")
+            self.bot.log.warning(
+                f"User {interaction.user.name} ({interaction.user.id}) tried to use setup_submit_message without moderator role"
+            )
             await interaction.response.send_message(
                 "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
             )
             return
-        
+
         # Get public channel
         public_channel_id = await self.tasks.get_public_channel_id()
         if not public_channel_id:
-            self.bot.log.warning(f"Public channel not configured when {interaction.user.name} ({interaction.user.id}) tried to setup submit message")
+            self.bot.log.warning(
+                f"Public channel not configured when {interaction.user.name} ({interaction.user.id}) tried to setup submit message"
+            )
             await interaction.response.send_message(
-                "❌ Publiek kanaal niet geconfigureerd. Gebruik `/configure` om het in te stellen.", 
-                ephemeral=True
+                "❌ Publiek kanaal niet geconfigureerd. Gebruik `/configure` om het in te stellen.",
+                ephemeral=True,
             )
             return
-        
+
         public_channel = self.bot.get_channel(public_channel_id)
         if not public_channel:
-            self.bot.log.error(f"Public channel {public_channel_id} not found when {interaction.user.name} ({interaction.user.id}) tried to setup submit message")
+            self.bot.log.error(
+                f"Public channel {public_channel_id} not found when {interaction.user.name} ({interaction.user.id}) tried to setup submit message"
+            )
             await interaction.response.send_message(
                 "❌ Publiek kanaal niet gevonden.", ephemeral=True
             )
             return
-        
-        await interaction.response.send_message(
-            "Submit bericht wordt geplaatst...", ephemeral=True
-        )
-        
+
+        await interaction.response.send_message("Submit bericht wordt geplaatst...", ephemeral=True)
+
         try:
             await self.tasks._post_submit_message(public_channel)
-            
+
             await interaction.followup.send(
-                f"✅ Submit bericht succesvol geplaatst in {public_channel.mention}!", 
-                ephemeral=True
+                f"✅ Submit bericht succesvol geplaatst in {public_channel.mention}!",
+                ephemeral=True,
             )
             self.bot.log.info(
                 f"{interaction.user} heeft handmatig een submit bericht geplaatst in {public_channel.name}."
             )
-            
+
         except Exception as e:
             self.bot.log.error(f"Error setting up submit message: {e}")
             await interaction.followup.send(
-                f"❌ Er is een fout opgetreden bij het plaatsen van het submit bericht: {str(e)}", 
-                ephemeral=True
+                f"❌ Er is een fout opgetreden bij het plaatsen van het submit bericht: {str(e)}",
+                ephemeral=True,
             )
 
 

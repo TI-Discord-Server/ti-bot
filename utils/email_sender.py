@@ -1,9 +1,10 @@
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import List, Optional
 
-from env import (SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT)
+from env import SMTP_EMAIL, SMTP_PASSWORD, SMTP_PORT, SMTP_SERVER
+
 
 def send_email(
     to_addresses: List[str],
@@ -49,4 +50,3 @@ def send_email(
     except Exception as e:
         # You can add logging here if desired
         raise Exception(f"Failed to send email: {e}")
-

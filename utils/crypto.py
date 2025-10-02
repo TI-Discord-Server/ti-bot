@@ -1,5 +1,9 @@
-import hmac, hashlib, base64
+import base64
+import hashlib
+import hmac
+
 from env import EMAIL_INDEX_KEY
+
 
 def make_email_index(email: str) -> str:
     """Maak een HMAC blind index voor deterministische lookups."""
