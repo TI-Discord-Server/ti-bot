@@ -1,4 +1,4 @@
-# TI Discord Bot
+# TI Discord Bot (Python versie 3.13)
 
 ## 🔧 Voor Ontwikkelaars: Tibot-v3 Uitvoeren
 
