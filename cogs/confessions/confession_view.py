@@ -12,7 +12,7 @@ class ConfessionView(View):
     async def submit_confession(self, interaction: discord.Interaction, button: Button):
         embed = discord.Embed(
                 title="📝 Submit a Confession",
-                description="Klik op de knop hieronder om een anonieme confession in te zenden..",
+                description="Klik op de knop hieronder om een anonieme confession in te zenden.",
                 color=discord.Color.blue()
             )
         embed.add_field(
