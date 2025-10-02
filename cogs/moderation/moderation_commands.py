@@ -15,6 +15,7 @@ from .moderation_tasks import ModerationTasks
 from .timeout_system import TimeoutSystem
 from .mute_system import MuteSystem
 
+MAX_PURGE = 100 # Discord limit
 
 class ModCommands(commands.Cog, name="ModCommands"):
     """
@@ -456,6 +457,182 @@ class ModCommands(commands.Cog, name="ModCommands"):
         embed.set_thumbnail(url=user.avatar.url if user.avatar else user.default_avatar.url)
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="purge", description="Purge messages from the channel.")
+    @app_commands.describe(
+        count="Number of messages to purge (max 100)",
+        bots="Include messages from bots",
+        bot_only="Purge only messages from bots",
+    )
+    async def purge(
+        self,
+        interaction: discord.Interaction,
+        count: int,
+        bots: bool = False,
+        bot_only: bool = False,
+    ):
+        await interaction.response.defer(ephemeral=True)
+
+        if count > MAX_PURGE:
+            await interaction.followup.send(
+                f"⚠️ Maximaal {MAX_PURGE} berichten per purge toegestaan door Discord.",
+                ephemeral=True,
+            )
+            return
+
+        def check(message: discord.Message):
+            if bot_only:
+                return message.author.bot
+            elif bots:
+                return True
+            else:
+                return not message.author.bot
+
+        try:
+            deleted = await interaction.channel.purge(
+                limit=count,
+                check=check,
+                bulk=True
+            )
+            embed = discord.Embed(
+                title="Messages Purged",
+                description=f"✅ {len(deleted)} berichten verwijderd.",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "❌ Ik heb geen permissies om berichten te verwijderen.",
+                ephemeral=True,
+            )
+
+        except discord.HTTPException as e:
+            await interaction.followup.send(
+                f"❌ Purge mislukt: {e}", ephemeral=True
+            )
+
+
+    @app_commands.command(name="purge_below", description="Verwijder alle berichten onder een specifiek bericht.")
+    @app_commands.describe(message_link="De link of ID van het bericht waarboven niet verwijderd wordt")
+    async def purge_below(self, interaction: discord.Interaction, message_link: str):
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            message_id = None
+            channel_id = interaction.channel.id
+
+            # Kijk of het een bericht-link is
+            match = re.search(r"channels/\d+/(\d+)/(\d+)", message_link)
+            if match:
+                channel_id = int(match.group(1))
+                message_id = int(match.group(2))
+            else:
+                # Probeer gewoon een ID
+                message_id = int(message_link)
+
+            channel = interaction.guild.get_channel(channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                await interaction.followup.send("❌ Ongeldige channel of berichtlink.", ephemeral=True)
+                return
+
+            # Haal het bericht op
+            target_message = await channel.fetch_message(message_id)
+
+            # Verzamel alle berichten onder het doelbericht
+            messages_to_delete = []
+            async for msg in channel.history(limit=None, oldest_first=False):
+                if msg.id == target_message.id:
+                    break
+                messages_to_delete.append(msg)
+
+            if not messages_to_delete:
+                await interaction.followup.send("⚠️ Geen berichten gevonden om te verwijderen.", ephemeral=True)
+                return
+
+            # Chunk delete
+            MAX_PURGE = 100
+            while messages_to_delete:
+                chunk = messages_to_delete[:MAX_PURGE]
+                del messages_to_delete[:MAX_PURGE]
+
+                await channel.delete_messages(chunk)
+                await asyncio.sleep(1)  # rate limit bescherming
+
+            await interaction.followup.send(
+                f"✅ {len(messages_to_delete)} berichten verwijderd onder het geselecteerde bericht.",
+                ephemeral=True
+            )
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Fout bij verwijderen: {e}", ephemeral=True)
+
+    @app_commands.command(
+        name="lockdown",
+        description="Prevent sending messages in a channel.",
+    )
+    @has_role("The Council")
+    @app_commands.describe(
+        channel="The channel to lockdown", reason="The reason for the lockdown"
+    )
+    async def lockdown(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        reason: str = "No reason provided.",
+    ):
+        try:
+            await channel.set_permissions(
+                interaction.guild.default_role, send_messages=False
+            )
+
+            embed = discord.Embed(
+                title="Channel Locked Down",
+                description=f"{channel.mention} has been locked down. Reason: {reason}",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed)
+
+        except discord.errors.Forbidden:
+            embed = discord.Embed(
+                title="Permission Error",
+                description="I do not have permission to lockdown this channel.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="unlockdown",
+        description="Unlock a locked channel.",
+    )
+    @has_role("The Council")
+    @app_commands.describe(
+        channel="The channel to unlock", reason="The reason for the unlockdown"
+    )
+    async def unlockdown(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        reason: str = "No reason provided.",
+    ):
+        
+        try:
+            await channel.set_permissions(
+                interaction.guild.default_role, send_messages=True
+            )
+
+            embed = discord.Embed(
+                title="Channel Unlocked",
+                description=f"{channel.mention} has been unlocked. Reason: {reason}",
+                color=discord.Color.green(),
+            )
+            await interaction.response.send_message(embed=embed)
+        except discord.errors.Forbidden:
+            embed = discord.Embed(
+                title="Permission Error",
+                description="I do not have permission to unlock this channel.",
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(ModCommands(bot))
