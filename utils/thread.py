@@ -25,8 +25,9 @@ from discord.ext.commands import MissingRequiredArgument, CommandError
 from lottie.importers import importers as l_importers
 from lottie.exporters import exporters as l_exporters
 
-from utils.models import DummyMessage
-from utils.utils import (
+from .timezone import LOCAL_TIMEZONE
+from .models import DummyMessage
+from .utils import (
     is_image_url,
     parse_channel_topic,
     match_user_id,
@@ -463,7 +464,7 @@ class Thread:
             "recipient_id": recipient_id,
             "ticket_id": channel.id,
             "closed_by": closer.id,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(LOCAL_TIMEZONE),
             "log_html": log_html
         }
         await self.bot.db.modmail_logs.insert_one(log_entry)

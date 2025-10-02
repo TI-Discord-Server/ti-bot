@@ -30,6 +30,7 @@ import os
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 import urllib.parse
+from utils.timezone import LOCAL_TIMEZONE
 
 # Add the DiscordTI-bot directory to the path to import env
 sys.path.append('/workspace/DiscordTI-bot')
@@ -118,7 +119,7 @@ class DatabaseMigrator:
                     new_record = {
                         "user_id": record["_id"],  # Discord user ID
                         "email_hash": record["emailHash"],  # Original email hash
-                        "migrated_at": datetime.utcnow()
+                        "migrated_at": datetime.now(LOCAL_TIMEZONE)
                     }
                     
                     if not dry_run:
@@ -179,7 +180,7 @@ class DatabaseMigrator:
                         "reason": record["reason"],
                         "timestamp": record["timestamp"],
                         "old_warn_id": record["_id"],  # Keep reference to old warn ID
-                        "migrated_at": datetime.utcnow()
+                        "migrated_at": datetime.now(LOCAL_TIMEZONE)
                     }
                     
                     if not dry_run:

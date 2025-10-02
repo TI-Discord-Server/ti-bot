@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import discord
 from .moderation_utils import log_infraction
+from utils.timezone import LOCAL_TIMEZONE
 
 
 class ModerationTasks:
@@ -27,7 +28,7 @@ class ModerationTasks:
         """Background task to check and process scheduled unmutes."""
         while True:
             try:
-                current_time = datetime.datetime.utcnow()
+                current_time = datetime.datetime.now(LOCAL_TIMEZONE)
                 
                 # Find all unmutes that should be processed
                 expired_unmutes = await self.scheduled_unmutes_collection.find({
@@ -98,7 +99,7 @@ class ModerationTasks:
             "unmute_at": unmute_at,
             "original_duration": original_duration,
             "reason": reason,
-            "created_at": datetime.datetime.utcnow()
+            "created_at": datetime.datetime.now(LOCAL_TIMEZONE)
         }
         
         # Remove any existing scheduled unmute for this user in this guild

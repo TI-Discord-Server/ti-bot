@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 import parsedatetime as pdt
 from dateutil.relativedelta import relativedelta
 from .utils import human_join
+from .timezone import LOCAL_TIMEZONE
 from discord.ext import commands
 from discord import app_commands
 import re
@@ -81,7 +82,7 @@ class HumanTime:
     calendar = pdt.Calendar(version=pdt.VERSION_CONTEXT_STYLE)
 
     def __init__(self, argument: str, *, now: Optional[datetime.datetime] = None):
-        now = now or datetime.datetime.utcnow()
+        now = now or datetime.datetime.now(LOCAL_TIMEZONE)
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
         if not status.hasDateOrTime:
             raise commands.BadArgument('ongeldige tijd opgegeven, probeer bijv. "tomorrow" of "3 days"')
