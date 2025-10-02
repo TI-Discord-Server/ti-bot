@@ -279,7 +279,7 @@ class ConfessionTasks(commands.Cog):
                 self.bot.log.error(f"Fout bij verwijderen oude losse knop {last_button_id}: {e}")
 
         message = await public_channel.send(
-            content="Klik hieronder voor een confession te maken ⬇️", view=ConfessionView(self.bot)
+            content="Klik hieronder om een confession te maken ⬇️", view=ConfessionView(self.bot)
         )
 
         if self.bot.persistent_view_manager:
