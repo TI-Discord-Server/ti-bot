@@ -746,7 +746,6 @@ class Bot(commands.Bot):
                 # logger.error("Failed to send message:", exc_info=True)
                 await self.add_reaction(self, message, "❌")
             else:
-
                 # send to all other recipients
                 if thread.recipient != message.author:
                     try:
@@ -912,8 +911,7 @@ class Bot(commands.Bot):
 
             return
         elif isinstance(error, app_commands.CheckFailure) or (
-            hasattr(error, "original")
-            and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
+            hasattr(error, "original") and isinstance(error.original, app_commands.CheckFailure)  # type: ignore
         ):
             message = str(getattr(error, "original", error))
 
