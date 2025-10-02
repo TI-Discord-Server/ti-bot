@@ -12,15 +12,15 @@ class ConfessionView(View):
     async def submit_confession(self, interaction: discord.Interaction, button: Button):
         embed = discord.Embed(
                 title="📝 Submit a Confession",
-                description="Click the button below to submit an anonymous confession.",
+                description="Klik op de knop hieronder om een anonieme confession in te zenden..",
                 color=discord.Color.blue()
             )
         embed.add_field(
-            name="ℹ️ How it works",
+            name="ℹ️ Hoe werkt het?",
             value=(
-                "• Your confession will be reviewed by moderators\n"
-                "• If approved, it will be posted anonymously\n"
-                "• All submissions are completely anonymous"
+                "• Je confession wordt nagekeken door moderators\n"
+                "• Indien goedgekeurd, wordt deze anoniem geplaatst\n"
+                "• Alle inzendingen zijn volledig anoniem"
             ),
             inline=False
         )
