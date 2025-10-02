@@ -40,7 +40,7 @@ Volg onderstaande regels om de kwaliteit en stabiliteit van de bot te waarborgen
 
 ## Testing en Codekwaliteit
 
-- Voeg indien mogelijk **unit tests** toe voor nieuwe functies.  
+- Test altijd je code lokaal voor je een PR indient.  
 - Zorg dat de code **linting en formatting checks** doorstaat.  
 - Vermijd duplicatie en hou de code **consistent met bestaande conventies**.  
 
