@@ -191,11 +191,8 @@ docker compose up webapp -d
   Deze worden automatisch uitgevoerd via [pre-commit](https://pre-commit.com/).  
   - **Lokaal**: installeer pre-commit en run `pre-commit install` (tussen drie backticks) om te zorgen dat elke commit automatisch gecheckt en gefixt wordt.  
   - **CI/CD**: in GitHub Actions draait pre-commit automatisch op alle bestanden bij elke push en pull request, maar dan enkel in **check-modus** (zonder fix).  
-
 - Maak een Discord bot aan via de [Discord Developer Portal](https://discord.com/developers/applications) om te testen.  
-
 - Gebruik `./cogs` voor interactiecommando’s en `./utils` voor herbruikbare backend-logica.  
-
 - Upload emoji’s naar de Discord Developer Portal om permissieproblemen te vermijden.  
 
 
