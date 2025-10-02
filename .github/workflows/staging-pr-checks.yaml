@@ -5,7 +5,7 @@ on:
     branches: [ "staging-v3" ]
 
 jobs:
-  lint:
+  pre-commit-check:
     runs-on: ubuntu-latest
 
     steps:
