@@ -8,8 +8,8 @@ class ConfessionModal(Modal, title="Submit Confession"):
         super().__init__()
         self.bot = bot
         self.confession_input = TextInput(
-            label="Your Confession",
-            placeholder="Type your confession here...",
+            label="Jouw confession",
+            placeholder="Type je bekentenis hier...",
             style=discord.TextStyle.long,
             required=True,
             max_length=4000,
