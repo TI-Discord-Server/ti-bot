@@ -17,8 +17,3 @@ repos:
         args: [--fix]
         ci:
           args: [--exit-non-zero-on-fix]
-      - id: ruff-format
-        # lokaal: format automatisch
-        args: []
-        ci:
-          args: [--check]
