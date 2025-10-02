@@ -127,7 +127,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
         member: discord.Member,
         reason: str = "Geen reden opgegeven.",
     ):
-
         await interaction.response.defer(ephemeral=True)
 
         try:
@@ -661,7 +660,6 @@ class ModCommands(commands.Cog, name="ModCommands"):
         channel: discord.TextChannel,
         reason: str = "No reason provided.",
     ):
-
         try:
             await channel.set_permissions(interaction.guild.default_role, send_messages=True)
 

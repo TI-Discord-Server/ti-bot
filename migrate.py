@@ -12,7 +12,7 @@ Prerequisites:
 3. Ensure new database connection details are correct
 4. Install required dependencies: pip install motor pymongo python-dotenv
 
-Usage: 
+Usage:
     python migrate.py              # Run full migration
     python migrate.py --test       # Test connections only
     python migrate.py --dry-run    # Show what would be migrated without doing it

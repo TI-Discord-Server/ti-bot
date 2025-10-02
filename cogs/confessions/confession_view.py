@@ -28,5 +28,7 @@ class ConfessionView(View):
             inline=False,
         )
         await interaction.response.send_message(
-            embed=embed, view=RulesView(self.bot), ephemeral=True  # enkel zichtbaar voor de user
+            embed=embed,
+            view=RulesView(self.bot),
+            ephemeral=True,  # enkel zichtbaar voor de user
         )

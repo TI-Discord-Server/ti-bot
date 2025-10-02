@@ -314,7 +314,6 @@ class Thread:
     async def store_and_send_log(
         self, closer: typing.Union[discord.Member, discord.User], log_channel: discord.TextChannel
     ):
-
         def format_discord_timestamp(text):
             """Convert Discord timestamps (<t:1234567890:R>) into human-readable format."""
             matches = re.findall(r"<t:(\d+):R>", text)
@@ -702,7 +701,6 @@ class Thread:
         await asyncio.gather(*tasks)
 
     async def delete_message(self, message=None, note: bool = True) -> None:
-
         message1, *message2 = await self.find_linked_messages(message_id=message, note=note)
         tasks = []
 
@@ -1262,7 +1260,7 @@ class ThreadManager:
                 destination = message.channel
             view = ConfirmThreadCreationView()
             view.add_item(AcceptButton("\u2705"))
-            view.add_item(DenyButton("\uD83D\uDEAB"))
+            view.add_item(DenyButton("\ud83d\udeab"))
             confirm = await destination.send(
                 embed=discord.Embed(
                     title="Bevestig modmail aanmaak",
