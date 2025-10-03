@@ -2,8 +2,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.has_role import has_role
-
 
 class SettingsCommands(commands.Cog, name="SettingsCommands"):
     """
@@ -16,7 +14,8 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
         self.settings_collection = self.bot.db["settings"]
 
     @app_commands.command(name="setup", description="Stel verschillende bot componenten in.")
-    @has_role("860195356493742100")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role("860195356493742100")
     @app_commands.describe(
         component="Het component om in te stellen",
         channel="Het kanaal waar het component moet worden ingesteld (optioneel, gebruikt huidige kanaal als niet opgegeven)",

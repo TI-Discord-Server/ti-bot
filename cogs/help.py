@@ -1,8 +1,6 @@
 import discord
-from discord.app_commands import command
+from discord import app_commands
 from discord.ext import commands
-
-from utils.has_admin import has_admin
 
 
 class Help(commands.Cog, name="help"):
@@ -11,7 +9,9 @@ class Help(commands.Cog, name="help"):
         # Note: remove_command only affects prefix commands, not slash commands
         # self.bot.remove_command("help")  # Removes the built-in help command
 
-    @command(name="help", description="Krijg een lijst van alle beschikbare commando's.")
+    @app_commands.command(
+        name="help", description="Krijg een lijst van alle beschikbare commando's."
+    )
     async def help_command(self, interaction: discord.Interaction):
         """Displays a help menu with all available slash commands."""
 
@@ -159,10 +159,10 @@ class Help(commands.Cog, name="help"):
                 except Exception:
                     pass  # Give up if everything fails
 
-    @command(
+    @app_commands.command(
         name="debug_commands", description="Debug commando om geregistreerde commando's te bekijken"
     )
-    @has_admin()
+    @app_commands.default_permissions(administrator=True)
     async def debug_commands(self, interaction: discord.Interaction):
         """Debug command to see what commands are registered."""
         try:

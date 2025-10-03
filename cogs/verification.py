@@ -31,8 +31,6 @@ from env import (
 )
 from utils.crypto import make_email_index
 from utils.email_sender import send_email
-from utils.has_admin import has_admin
-from utils.has_role import has_role
 from utils.verification_check import ensure_verified_role
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%]+@student\.hogent\.be$")
@@ -1031,7 +1029,7 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="migrate_email_index", description="Voeg email_index toe aan alle oude verificaties"
     )
-    @has_admin()
+    @app_commands.default_permissions(administrator=True)
     async def migrate_email_index(self, interaction: Interaction):
         await interaction.response.send_message(
             "🔄 Start migratie van email_index...", ephemeral=True
@@ -1065,7 +1063,7 @@ class Verification(commands.Cog):
         name="cleanup_unverified",
         description="Verwijder alle rollen van leden die niet verified zijn.",
     )
-    @has_admin()
+    @app_commands.default_permissions(administrator=True)
     async def cleanup_unverified(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
@@ -1118,7 +1116,8 @@ class Verification(commands.Cog):
     @app_commands.describe(
         user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres"
     )
-    @has_role("777987142236241941")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role("777987142236241941")
     async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
         await interaction.response.defer(ephemeral=True)
 
