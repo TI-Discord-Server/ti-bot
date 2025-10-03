@@ -4,9 +4,6 @@ from typing import Literal, Optional
 
 import discord
 from discord import app_commands
-from discord.app_commands import (
-    command,
-)
 from discord.ext import commands
 
 from utils import checks
@@ -30,8 +27,7 @@ class Modmail(commands.Cog, name="modmail"):
             return settings["modmail_channel_id"]
         return None
 
-    # @commands.command(usage="[after] [close message]")
-    @command(name="close", description="Sluit het ticket")
+    @app_commands.command(name="close", description="Sluit het ticket")
     @app_commands.checks.has_permissions(manage_messages=True)
     @checks.thread_only()
     async def close(
@@ -126,7 +122,7 @@ class Modmail(commands.Cog, name="modmail"):
             await interaction.followup.send(error_msg, ephemeral=True)
             return
 
-    @command(
+    @app_commands.command(
         name="generate_transcript",
         description="Maakt een transcript en stuurt het naar het log kanaal",
     )
@@ -158,7 +154,9 @@ class Modmail(commands.Cog, name="modmail"):
                 f"❌ Fout bij genereren transcript: {str(e)}", ephemeral=True
             )
 
-    @command(name="transcripts", description="Geeft transcripts van een bepaalde persoon")
+    @app_commands.command(
+        name="transcripts", description="Geeft transcripts van een bepaalde persoon"
+    )
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -228,7 +226,7 @@ class Modmail(commands.Cog, name="modmail"):
             mention = "@" + user_or_role.lstrip("@")
         return mention
 
-    @command(name="nsfw", description="Verandert Modmail-ticket naar NSFW status")
+    @app_commands.command(name="nsfw", description="Verandert Modmail-ticket naar NSFW status")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -237,7 +235,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.channel.edit(nsfw=True)
         await interaction.response.send_message("🔞 Kanaal ingesteld op NSFW")
 
-    @command(name="sfw", description="Verandert Modmail-ticket naar SFW status")
+    @app_commands.command(name="sfw", description="Verandert Modmail-ticket naar SFW status")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -246,7 +244,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.channel.edit(nsfw=False)
         await interaction.response.send_message("⚠️ Kanaal ingesteld op SFW")
 
-    @command(name="reply", description="Antwoordt op een Modmail-bericht")
+    @app_commands.command(name="reply", description="Antwoordt op een Modmail-bericht")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("777987142236241941")
     @checks.thread_only()
@@ -278,7 +276,7 @@ class Modmail(commands.Cog, name="modmail"):
         await asyncio.sleep(3)
         await confirmation.delete()
 
-    @command(name="areply", description="Antwoordt anoniem op een Modmail-bericht")
+    @app_commands.command(name="areply", description="Antwoordt anoniem op een Modmail-bericht")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -308,8 +306,8 @@ class Modmail(commands.Cog, name="modmail"):
         await asyncio.sleep(3)
         await confirmation.delete()
 
-    # @commands.group(invoke_without_command=True)
-    @command(name="note", description="Verduidelijking van modmail")
+    # @app_commands.commands.group(invoke_without_command=True)
+    @app_commands.command(name="note", description="Verduidelijking van modmail")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -340,7 +338,7 @@ class Modmail(commands.Cog, name="modmail"):
         await asyncio.sleep(3)
         await confirmation.delete()
 
-    @command(name="edit", description="Bewerkt een Modmail-bericht")
+    @app_commands.command(name="edit", description="Bewerkt een Modmail-bericht")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()
@@ -381,8 +379,8 @@ class Modmail(commands.Cog, name="modmail"):
         # await asyncio.sleep(5)
         # await interaction.delete_original_response()
 
-    # @commands.command(usage="<user> [category] [options]")
-    @command(name="contact", description="Opent een modmail ticket")
+    # @app_commands.commands.command(usage="<user> [category] [options]")
+    @app_commands.command(name="contact", description="Opent een modmail ticket")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     async def contact(self, interaction: discord.Interaction, user: discord.Member | discord.User):
@@ -465,7 +463,7 @@ class Modmail(commands.Cog, name="modmail"):
             await asyncio.sleep(5)
             await interaction.delete_original_response()
 
-    @command(name="delete", description="Verwijdert een modmail bericht.")
+    @app_commands.command(name="delete", description="Verwijdert een modmail bericht.")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role("860195356493742100")
     @checks.thread_only()

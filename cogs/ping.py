@@ -1,7 +1,5 @@
 import discord
-from discord.app_commands import (
-    command,
-)
+from discord import app_commands
 from discord.ext import commands
 
 
@@ -9,7 +7,7 @@ class ping(commands.Cog, name="ping"):
     def __init__(self, bot):
         self.bot = bot
 
-    @command(
+    @app_commands.command(
         name="ping",
         description="Krijg de latentie van de bot.",
     )

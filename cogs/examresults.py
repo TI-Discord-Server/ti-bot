@@ -1,7 +1,5 @@
 import discord
-from discord.app_commands import (
-    command,
-)
+from discord import app_commands
 from discord.ext import commands
 
 
@@ -11,7 +9,7 @@ class examresults(commands.Cog, name="when_exam_results"):
         self.db = bot.db
         self.settings_id = "exam_results_settings"
 
-    @command(
+    @app_commands.command(
         name="when_exam_results",
         description="When are the exam results published?",
     )
