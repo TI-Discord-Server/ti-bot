@@ -10,10 +10,10 @@ from discord.ext import commands
 
 from utils.has_admin import has_admin
 from utils.has_role import has_role
-from utils.timezone import to_local
+from utils.timezone import LOCAL_TIMEZONE, to_local
 
 from .moderation_tasks import ModerationTasks
-from .moderation_utils import create_dm_embed, log_infraction, send_dm_embed
+from .moderation_utils import create_dm_embed, log_infraction, parse_duration, send_dm_embed
 from .mute_system import MuteSystem
 from .timeout_system import TimeoutSystem
 
@@ -121,16 +121,32 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     @app_commands.command(name="ban", description="Ban een member van de server.")
     @has_admin()
+    @app_commands.describe(
+        member="Het lid dat je wilt bannen",
+        duration="Optioneel: de duur van de ban (bijv. 1h, 1d, 1w). Laat leeg voor permanent.",
+        reason="De reden voor de ban",
+    )
     async def ban(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
+        duration: str = None,
         reason: str = "Geen reden opgegeven.",
     ):
         await interaction.response.defer(ephemeral=True)
 
+        # 1️⃣ Duration valideren (indien meegegeven)
+        td = None
+        if duration:
+            td = parse_duration(duration)
+            if not td:
+                await interaction.followup.send(
+                    "❌ Ongeldige duur opgegeven. Gebruik bijv. `1d`, `2w`, `3mo`.", ephemeral=True
+                )
+                return
+
         try:
-            # Try to send DM with unban request link
+            # 2️⃣ DM sturen voor ban
             dm_success = False
             try:
                 channel = await member.create_dm()
@@ -149,45 +165,54 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 await channel.send(
                     embed=discord.Embed(
                         title="⚠️ | Je bent gebanned.",
-                        description=f"Je bent gebanned van {interaction.guild.name} met reden: {reason} \n\n Als je een unban wilt aanvragen, klik dan op de link hieronder.",
+                        description=f"Je bent gebanned van **{interaction.guild.name}**.\n"
+                        f"Reden: {reason}\n"
+                        + (f"⏳ Duur: {duration}" if duration else "🛑 Dit is een permanente ban."),
                         color=discord.Color.gold(),
                     ),
                     view=view,
                 )
                 dm_success = True
-                self.bot.log.debug(
-                    f"DM sent successfully to {member.name} ({member.id}) for ban notification"
-                )
-            except discord.errors.Forbidden:
-                self.bot.log.info(
-                    f"Could not send DM to {member.name} ({member.id}) - DMs disabled or blocked"
-                )
-                dm_success = False
             except Exception as e:
-                self.bot.log.warning(f"Failed to send DM to {member.name} ({member.id}): {e}")
-                dm_success = False
+                self.bot.log.info(f"Kon geen DM sturen naar {member} ({member.id}): {e}")
 
-            # Perform the ban
+            # 3️⃣ Ban uitvoeren
             await member.ban(reason=reason)
             self.bot.log.info(
                 f"User {member.name} ({member.id}) banned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
             )
 
-            # Send success message
+            # 4️⃣ Unban inplannen (indien tijdelijk)
+            if td:
+                unban_at = datetime.datetime.now(LOCAL_TIMEZONE) + td
+                self.bot.log.info(
+                    f"Planning unban van {member.name} ({member.id}) op {unban_at.isoformat()}"
+                )
+                await self.tasks.schedule_unban(
+                    guild_id=interaction.guild.id,
+                    user_id=member.id,
+                    unban_at=unban_at,
+                    original_duration=duration,
+                    reason=f"Automatisch einde tijdelijke ban ({duration})",
+                )
+
+            # 5️⃣ Embed terug naar moderator
             embed = discord.Embed(
-                title="Member gebanned",
-                description=f"{member.mention} is gebanned. Reden: {reason}",
+                title="✅ Member gebanned",
+                description=f"{member.mention} is gebanned. Reden: {reason}\n"
+                + (f"⏳ Duur: {duration}" if duration else "🛑 Permanent"),
                 color=discord.Color.green(),
             )
-
-            if dm_success:
-                embed.set_footer(text="Gebruiker is via DM geïnformeerd.")
-            else:
-                embed.set_footer(text="Kon gebruiker niet via DM informeren.")
-
+            embed.set_footer(
+                text=(
+                    "Gebruiker is via DM geïnformeerd."
+                    if dm_success
+                    else "Kon gebruiker niet via DM informeren."
+                )
+            )
             await interaction.followup.send(embed=embed, ephemeral=False)
 
-            # Log the infraction
+            # 6️⃣ Infraction loggen
             try:
                 await log_infraction(
                     self.infractions_collection,
@@ -195,42 +220,32 @@ class ModCommands(commands.Cog, name="ModCommands"):
                     member.id,
                     interaction.user.id,
                     "ban",
-                    reason,
+                    reason + (f" (duur: {duration})" if duration else " (permanent)"),
                 )
             except Exception as e:
                 self.bot.log.error(
                     f"Failed to log ban infraction for {member.name} ({member.id}): {e}"
                 )
 
-        except discord.errors.Forbidden as e:
-            self.bot.log.error(
-                f"Permission denied when trying to ban {member.name} ({member.id}): {e}"
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "❌ Ik heb geen permissie om deze member te bannen.",
+                ephemeral=True,
             )
-            embed = discord.Embed(
-                title="Permissie Fout",
-                description="Ik heb geen permissie om deze member te bannen.",
-                color=discord.Color.red(),
+        except discord.HTTPException as e:
+            await interaction.followup.send(
+                f"❌ Bannen mislukt door Discord API fout: {str(e)}",
+                ephemeral=True,
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except discord.errors.HTTPException as e:
-            self.bot.log.error(f"HTTP error when trying to ban {member.name} ({member.id}): {e}")
-            embed = discord.Embed(
-                title="Discord API Fout",
-                description=f"Bannen mislukt door Discord API fout: {str(e)}",
-                color=discord.Color.red(),
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             self.bot.log.error(
                 f"Unexpected error when trying to ban {member.name} ({member.id}): {e}",
                 exc_info=True,
             )
-            embed = discord.Embed(
-                title="Onverwachte Fout",
-                description=f"Er is een onverwachte fout opgetreden bij het bannen: {str(e)}",
-                color=discord.Color.red(),
+            await interaction.followup.send(
+                f"❌ Er is een onverwachte fout opgetreden bij het bannen: {str(e)}",
+                ephemeral=True,
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="unban", description="Unban een gebruiker van de server.")
     @has_admin()

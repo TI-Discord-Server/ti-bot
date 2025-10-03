@@ -11,11 +11,15 @@ from .moderation_utils import log_infraction
 class ModerationTasks:
     """Handles background tasks for moderation operations."""
 
-    def __init__(self, bot, scheduled_unmutes_collection, infractions_collection):
+    def __init__(
+        self, bot, scheduled_unmutes_collection, scheduled_bans_collection, infractions_collection
+    ):
         self.bot = bot
         self.scheduled_unmutes_collection = scheduled_unmutes_collection
+        self.scheduled_bans_collection = scheduled_bans_collection
         self.infractions_collection = infractions_collection
         self.unmute_task = None
+        self.unban_task = None
 
     def start_unmute_checker(self):
         """Start the background task to check for scheduled unmutes."""
@@ -133,6 +137,115 @@ class ModerationTasks:
     async def cancel_scheduled_unmute(self, guild_id: int, user_id: int):
         """Cancel a scheduled unmute for a user."""
         result = await self.scheduled_unmutes_collection.delete_many(
+            {"guild_id": guild_id, "user_id": user_id}
+        )
+        return result.deleted_count > 0
+
+    def start_unban_checker(self):
+        """Start the background task to check for scheduled unbans."""
+        if self.unban_task is None or self.unban_task.done():
+            self.unban_task = asyncio.create_task(self.check_scheduled_unbans())
+
+    def stop_unban_checker(self):
+        """Stop the background task."""
+        if self.unban_task and not self.unban_task.done():
+            self.unban_task.cancel()
+
+    async def check_scheduled_unbans(self):
+        """Background task to check and process scheduled unbans."""
+        while True:
+            try:
+                current_time = datetime.datetime.now(LOCAL_TIMEZONE)
+
+                expired_unbans = await self.scheduled_unbans_collection.find(
+                    {"unban_at": {"$lte": current_time}}
+                ).to_list(length=None)
+
+                for unban_data in expired_unbans:
+                    try:
+                        guild = self.bot.get_guild(unban_data["guild_id"])
+                        if not guild:
+                            await self.scheduled_unbans_collection.delete_one(
+                                {"_id": unban_data["_id"]}
+                            )
+                            continue
+
+                        user = await self.bot.fetch_user(unban_data["user_id"])
+                        if not user:
+                            await self.scheduled_unbans_collection.delete_one(
+                                {"_id": unban_data["_id"]}
+                            )
+                            continue
+
+                        try:
+                            await guild.unban(user, reason="Automatische unban na tijdelijke ban")
+                            self.bot.log.info(
+                                f"Auto-unban uitgevoerd voor {user} ({user.id}) in {guild.name}"
+                            )
+                        except discord.NotFound:
+                            self.bot.log.debug(f"User {user.id} is al unbanned in {guild.name}")
+                        except discord.Forbidden:
+                            self.bot.log.error(
+                                f"Geen permissie om {user.id} te unbannen in {guild.name}"
+                            )
+
+                        # Log de auto-unban
+                        try:
+                            await log_infraction(
+                                self.infractions_collection,
+                                guild.id,
+                                user.id,
+                                self.bot.user.id,
+                                "auto_unban",
+                                f"Geplande unban na {unban_data.get('original_duration', 'onbekende duur')}",
+                            )
+                        except Exception as e:
+                            self.bot.log.error(f"Failed to log auto unban infraction: {e}")
+
+                        # Verwijder uit DB
+                        await self.scheduled_unbans_collection.delete_one(
+                            {"_id": unban_data["_id"]}
+                        )
+
+                    except Exception as e:
+                        self.bot.log.error(
+                            f"Error processing scheduled unban for {unban_data.get('user_id')}: {e}"
+                        )
+
+                await asyncio.sleep(60)
+
+            except Exception as e:
+                self.bot.log.error(f"Error in scheduled unban checker: {e}")
+                await asyncio.sleep(60)
+
+    async def schedule_unban(
+        self,
+        guild_id: int,
+        user_id: int,
+        unban_at: datetime.datetime,
+        original_duration: str,
+        reason: str,
+    ):
+        """Schedule an unban for a specific time."""
+        unban_data = {
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "unban_at": unban_at,
+            "original_duration": original_duration,
+            "reason": reason,
+            "created_at": datetime.datetime.now(LOCAL_TIMEZONE),
+        }
+
+        # Verwijder bestaande geplande unbans
+        await self.scheduled_unbans_collection.delete_many(
+            {"guild_id": guild_id, "user_id": user_id}
+        )
+
+        await self.scheduled_unbans_collection.insert_one(unban_data)
+
+    async def cancel_scheduled_unban(self, guild_id: int, user_id: int):
+        """Cancel a scheduled unban for a user."""
+        result = await self.scheduled_unbans_collection.delete_many(
             {"guild_id": guild_id, "user_id": user_id}
         )
         return result.deleted_count > 0
