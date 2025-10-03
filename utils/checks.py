@@ -1,41 +1,43 @@
 from discord.app_commands import check
 from discord.ext import commands
-from discord.interactions import Interaction
 
 
 def developer():
-    async def predicate(ctx: Interaction):
-        # Get developer IDs from database
-        settings = await ctx.client.db.settings.find_one({"_id": "server_settings"})
+    async def predicate(ctx):
+        # Detecteer of dit een Interaction (slash) of Context (prefix) is
+        client = getattr(ctx, "client", None) or getattr(ctx, "bot", None)
+        user = getattr(ctx, "user", None) or getattr(ctx, "author", None)
+
+        if not client or not user:
+            return False
+
+        # Haal developer IDs op uit DB
+        settings = await client.db.settings.find_one({"_id": "server_settings"})
         developer_ids = settings.get("developer_ids", []) if settings else []
 
-        # If developers are configured, check if user is in the list
-        if developer_ids:
-            return ctx.user.id in developer_ids
+        # Als er expliciet developer IDs zijn ingesteld
+        if developer_ids and user.id in developer_ids:
+            return True
 
-        # If no developers are configured, fallback to server admins
-        # Get the main guild (either from database or fallback)
+        # Anders: fallback naar admin permissies
         guild_id = None
-        if hasattr(ctx.client, "guild_id") and ctx.client.guild_id:
-            guild_id = ctx.client.guild_id
+
+        if hasattr(client, "guild_id") and client.guild_id:
+            guild_id = client.guild_id
         else:
-            # Try to get from database
-            guild_settings = await ctx.client.db.settings.find_one({"_id": "guild_settings"})
+            guild_settings = await client.db.settings.find_one({"_id": "guild_settings"})
             if guild_settings and "guild_id" in guild_settings:
                 guild_id = guild_settings["guild_id"]
             else:
-                # Use fallback from main.py
                 from main import DEFAULT_GUILD_ID
 
                 guild_id = DEFAULT_GUILD_ID
 
-        # Get the guild and check if user is admin
-        if guild_id:
-            guild = ctx.client.get_guild(guild_id)
-            if guild:
-                member = guild.get_member(ctx.user.id)
-                if member and member.guild_permissions.administrator:
-                    return True
+        guild = client.get_guild(guild_id)
+        if guild:
+            member = guild.get_member(user.id)
+            if member and member.guild_permissions.administrator:
+                return True
 
         return False
 

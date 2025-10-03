@@ -1280,7 +1280,7 @@ class Configure(commands.Cog):
         visible="Of de configuratie zichtbaar moet zijn voor anderen (standaard: waar)"
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("The Council")
+    @app_commands.checks.has_role(860195356493742100)
     async def configure(self, interaction: discord.Interaction, visible: bool = True):
         """Open the configuration interface."""
         try:

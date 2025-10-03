@@ -15,7 +15,7 @@ class SettingsCommands(commands.Cog, name="SettingsCommands"):
 
     @app_commands.command(name="setup", description="Stel verschillende bot componenten in.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         component="Het component om in te stellen",
         channel="Het kanaal waar het component moet worden ingesteld (optioneel, gebruikt huidige kanaal als niet opgegeven)",

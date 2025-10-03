@@ -55,7 +55,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     @app_commands.command(name="kick", description="Kick een member van de server.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     async def kick(
         self,
         interaction: discord.Interaction,
@@ -194,7 +194,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     @app_commands.command(name="warn", description="Waarschuw een user")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     async def warn(
         self,
         interaction: discord.Interaction,
@@ -226,7 +226,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="removewarn", description="Verwijder een waarschuwing van een gebruiker."
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         member="De gebruiker waarvan je een waarschuwing wilt verwijderen",
         warn_id="Het ID van de waarschuwing (te vinden via /history)",
@@ -280,7 +280,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     # Timeout commands
     @app_commands.command(name="timeout", description="Timeout een member in de server")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         member="De member om te timeouten",
         duration="De duration van de timeout (bijv. 1m, 5h, 1d, 1w, 1mo, 1y). Max 28 dagen voor timeout, longer durations use muted role.",
@@ -297,7 +297,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     @app_commands.command(name="untimeout", description="Verwijdert timeout van een member")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         member="De member om de timeout van te verwijderen",
         reason="De reden voor het verwijderen van de timeout",
@@ -313,7 +313,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     # Mute commands
     @app_commands.command(name="mute", description="Mute een member in de server")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     async def mute(
         self,
         interaction: discord.Interaction,
@@ -324,7 +324,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     @app_commands.command(name="unmute", description="Unmute een member in de server.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     async def unmute(
         self,
         interaction: discord.Interaction,
@@ -337,7 +337,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="history", description="Laat de recente straffen van een gebruiker zien."
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(user="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, user: discord.User):
         infractions = (
@@ -425,6 +425,8 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="purge", description="Purge messages from the channel.")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         count="Number of messages to purge (max 100)",
         bots="Include messages from bots",
@@ -475,6 +477,8 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="purge_below", description="Verwijder alle berichten onder een specifiek bericht."
     )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         message_link="De link of ID van het bericht waarboven niet verwijderd wordt"
     )
@@ -539,7 +543,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         description="Prevent sending messages in a channel.",
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(channel="The channel to lockdown", reason="The reason for the lockdown")
     async def lockdown(
         self,
@@ -570,7 +574,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         description="Unlock a locked channel.",
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("860195356493742100")
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(channel="The channel to unlock", reason="The reason for the unlockdown")
     async def unlockdown(
         self,

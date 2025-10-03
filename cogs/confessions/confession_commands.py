@@ -20,16 +20,9 @@ class ConfessionCommands(commands.Cog):
         return any(role.id == moderator_role_id for role in interaction.user.roles)
 
     @app_commands.command(name="force_review", description="Forceer de review van confessions.")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(760195356493742100)
     async def force_review(self, interaction: discord.Interaction):
-        if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(
-                f"User {interaction.user.name} ({interaction.user.id}) tried to use force_review without moderator role"
-            )
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-            return
-
         await self.tasks.daily_review()
         await interaction.response.send_message(
             "Confession beoordeling is geforceerd.", ephemeral=True
@@ -37,16 +30,9 @@ class ConfessionCommands(commands.Cog):
         self.bot.log.info(f"{interaction.user} heeft handmatig een confession review getriggerd.")
 
     @app_commands.command(name="force_post", description="Forceer het posten van confessions.")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(760195356493742100)
     async def force_post(self, interaction: discord.Interaction):
-        if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(
-                f"User {interaction.user.name} ({interaction.user.id}) tried to use force_post without moderator role"
-            )
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-            return
-
         await interaction.response.send_message(
             "Forceren van confession posting...", ephemeral=True
         )
@@ -60,17 +46,9 @@ class ConfessionCommands(commands.Cog):
         name="setup_submit_message",
         description="Post het submit confession bericht in het publieke kanaal.",
     )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(760195356493742100)
     async def setup_submit_message(self, interaction: discord.Interaction):
-        if not await self.has_moderator_role(interaction):
-            self.bot.log.warning(
-                f"User {interaction.user.name} ({interaction.user.id}) tried to use setup_submit_message without moderator role"
-            )
-            await interaction.response.send_message(
-                "Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-            return
-
-        # Get public channel
         public_channel_id = await self.tasks.get_public_channel_id()
         if not public_channel_id:
             self.bot.log.warning(

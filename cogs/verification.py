@@ -668,31 +668,10 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)"
     )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
     async def get_email(self, interaction: Interaction, user: discord.Member):
-        # Check for moderator permissions
-        has_permission = False
-
-        # Always allow administrators
-        if any(r.permissions.administrator for r in interaction.user.roles):
-            has_permission = True
-        else:
-            # Check for configured moderator role
-            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
-            if settings and "moderator_role_id" in settings:
-                moderator_role_id = settings["moderator_role_id"]
-                if any(r.id == moderator_role_id for r in interaction.user.roles):
-                    has_permission = True
-
-        if not has_permission:
-            self.bot.log.warning(
-                f"User {interaction.user.name} ({interaction.user.id}) tried to use get_email without permission"
-            )
-            await interaction.response.send_message(
-                "❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-            return
-
         record = await self.bot.db.verifications.find_one({"user_id": user.id})
         if not record:
             self.bot.log.info(
@@ -731,6 +710,8 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="unverify", description="Verwijder een verificatie en kick de gebruiker"
     )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         email="Het e-mailadres om te verwijderen (optioneel)",
         user="De gebruiker om te unverifiëren (optioneel)",
@@ -738,29 +719,6 @@ class Verification(commands.Cog):
     async def unverify(
         self, interaction: Interaction, email: str = None, user: discord.Member = None
     ):
-        # Check for moderator permissions
-        has_permission = False
-
-        # Always allow administrators
-        if any(r.permissions.administrator for r in interaction.user.roles):
-            has_permission = True
-        else:
-            # Check for configured moderator role
-            settings = await self.bot.db.settings.find_one({"_id": "mod_settings"})
-            if settings and "moderator_role_id" in settings:
-                moderator_role_id = settings["moderator_role_id"]
-                if any(r.id == moderator_role_id for r in interaction.user.roles):
-                    has_permission = True
-
-        if not has_permission:
-            self.bot.log.warning(
-                f"User {interaction.user.name} ({interaction.user.id}) tried to use unverify without permission"
-            )
-            await interaction.response.send_message(
-                "❌ Je hebt geen toestemming om dit commando te gebruiken.", ephemeral=True
-            )
-            return
-
         # Must provide either email or user
         if not email and not user:
             self.bot.log.warning(
@@ -1117,7 +1075,7 @@ class Verification(commands.Cog):
         user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres"
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role("777987142236241941")
+    @app_commands.checks.has_role(777987142236241941)
     async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
         await interaction.response.defer(ephemeral=True)
 
