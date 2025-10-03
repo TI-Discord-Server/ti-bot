@@ -389,15 +389,11 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 except Exception:
                     moderator_info = ""
 
-            # Voeg ID toe bij waarschuwingen
-            warn_id_info = ""
-            if infraction["type"] == "warn":
-                warn_id_info = f"\n**Warn ID:** `{str(infraction['_id'])[:8]}...`"
-
             infraction_list += (
+                f"ID: `{str(infraction['_id'])}`\n"
                 f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> "
                 f"- **{infraction_type}**{duration_info}{moderator_info}\n"
-                f"**Reden:** {reason}{warn_id_info}\n\n"
+                f"**Reden:** {reason}\n\n"
             )
 
         if not infraction_list:
