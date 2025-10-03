@@ -12,6 +12,7 @@ from utils.has_admin import has_admin
 from utils.has_role import has_role
 from utils.timezone import LOCAL_TIMEZONE, to_local
 
+from .ban_system import BanSystem
 from .moderation_tasks import ModerationTasks
 from .moderation_utils import create_dm_embed, log_infraction, parse_duration, send_dm_embed
 from .mute_system import MuteSystem
@@ -31,20 +32,27 @@ class ModCommands(commands.Cog, name="ModCommands"):
         self.infractions_collection = self.bot.db["infractions"]
         self.settings_collection = self.bot.db["settings"]
         self.scheduled_unmutes_collection = self.bot.db["scheduled_unmutes"]
+        self.scheduled_bans_collection = self.bot.db["scheduled_bans"]
 
         # Initialize subsystems
         self.tasks = ModerationTasks(
-            bot, self.scheduled_unmutes_collection, self.infractions_collection
+            bot,
+            self.scheduled_unmutes_collection,
+            self.scheduled_bans_collection,
+            self.infractions_collection,
         )
         self.mute_system = MuteSystem(bot, self.infractions_collection, self.tasks)
+        self.ban_system = BanSystem(bot, self.infractions_collection, self.tasks)
         self.timeout_system = TimeoutSystem(bot, self.infractions_collection, self.mute_system)
 
         # Start background tasks
         self.tasks.start_unmute_checker()
+        self.tasks.start_unban_checker()
 
     def cog_unload(self):
         """Clean up when the cog is unloaded."""
         self.tasks.stop_unmute_checker()
+        self.tasks.stop_unban_checker()
 
     @app_commands.command(name="kick", description="Kick een member van de server.")
     @has_role("The Council")
@@ -145,106 +153,21 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 )
                 return
 
-        try:
-            # 2️⃣ DM sturen voor ban
-            dm_success = False
-            try:
-                channel = await member.create_dm()
-                view = discord.ui.View()
-                settings = await self.settings_collection.find_one({"_id": "mod_settings"})
-                unban_request_url = (
-                    settings.get("unban_request_url", "https://example.com/unban_request")
-                    if settings
-                    else "https://example.com/unban_request"
-                )
-                button = discord.ui.Button(
-                    label="Unban Aanvragen", style=discord.ButtonStyle.link, url=unban_request_url
-                )
-                view.add_item(button)
+        # 3️⃣ Ban uitvoeren
+        await self.ban_system.execute_ban(interaction, member, reason, duration)
 
-                await channel.send(
-                    embed=discord.Embed(
-                        title="⚠️ | Je bent gebanned.",
-                        description=f"Je bent gebanned van **{interaction.guild.name}**.\n"
-                        f"Reden: {reason}\n"
-                        + (f"⏳ Duur: {duration}" if duration else "🛑 Dit is een permanente ban."),
-                        color=discord.Color.gold(),
-                    ),
-                    view=view,
-                )
-                dm_success = True
-            except Exception as e:
-                self.bot.log.info(f"Kon geen DM sturen naar {member} ({member.id}): {e}")
-
-            # 3️⃣ Ban uitvoeren
-            await member.ban(reason=reason)
+        # 4️⃣ Unban inplannen (indien tijdelijk)
+        if td:
+            unban_at = datetime.datetime.now(LOCAL_TIMEZONE) + td
             self.bot.log.info(
-                f"User {member.name} ({member.id}) banned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
+                f"Planning unban van {member.name} ({member.id}) op {unban_at.isoformat()}"
             )
-
-            # 4️⃣ Unban inplannen (indien tijdelijk)
-            if td:
-                unban_at = datetime.datetime.now(LOCAL_TIMEZONE) + td
-                self.bot.log.info(
-                    f"Planning unban van {member.name} ({member.id}) op {unban_at.isoformat()}"
-                )
-                await self.tasks.schedule_unban(
-                    guild_id=interaction.guild.id,
-                    user_id=member.id,
-                    unban_at=unban_at,
-                    original_duration=duration,
-                    reason=f"Automatisch einde tijdelijke ban ({duration})",
-                )
-
-            # 5️⃣ Embed terug naar moderator
-            embed = discord.Embed(
-                title="✅ Member gebanned",
-                description=f"{member.mention} is gebanned. Reden: {reason}\n"
-                + (f"⏳ Duur: {duration}" if duration else "🛑 Permanent"),
-                color=discord.Color.green(),
-            )
-            embed.set_footer(
-                text=(
-                    "Gebruiker is via DM geïnformeerd."
-                    if dm_success
-                    else "Kon gebruiker niet via DM informeren."
-                )
-            )
-            await interaction.followup.send(embed=embed, ephemeral=False)
-
-            # 6️⃣ Infraction loggen
-            try:
-                await log_infraction(
-                    self.infractions_collection,
-                    interaction.guild.id,
-                    member.id,
-                    interaction.user.id,
-                    "ban",
-                    reason + (f" (duur: {duration})" if duration else " (permanent)"),
-                )
-            except Exception as e:
-                self.bot.log.error(
-                    f"Failed to log ban infraction for {member.name} ({member.id}): {e}"
-                )
-
-        except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ Ik heb geen permissie om deze member te bannen.",
-                ephemeral=True,
-            )
-        except discord.HTTPException as e:
-            await interaction.followup.send(
-                f"❌ Bannen mislukt door Discord API fout: {str(e)}",
-                ephemeral=True,
-            )
-        except Exception as e:
-            self.bot.log.error(
-                f"Unexpected error when trying to ban {member.name} ({member.id}): {e}",
-                exc_info=True,
-            )
-            await interaction.followup.send(
-                f"❌ Er is een onverwachte fout opgetreden bij het bannen: {str(e)}",
-                ephemeral=True,
+            await self.tasks.schedule_unban(
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                unban_at=unban_at,
+                original_duration=duration,
+                reason=f"Automatisch einde tijdelijke ban ({duration})",
             )
 
     @app_commands.command(name="unban", description="Unban een gebruiker van de server.")
@@ -259,99 +182,15 @@ class ModCommands(commands.Cog, name="ModCommands"):
         user_id: str,
         reason: str = "Geen reden opgegeven",
     ):
-        try:
-            # Convert string to int
-            user_id_int = int(user_id)
+        await interaction.response.defer(ephemeral=True)
 
-            # Try to get the user object
-            user = await self.bot.fetch_user(user_id_int)
+        # Convert string to int
+        user_id_int = int(user_id)
 
-            # Check if user is actually banned
-            try:
-                await interaction.guild.fetch_ban(user)
-            except discord.NotFound:
-                embed = discord.Embed(
-                    title="Gebruiker Niet Gebanned",
-                    description=f"Gebruiker {user.mention} ({user_id}) is niet gebanned.",
-                    color=discord.Color.orange(),
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-                return
+        # Try to get the user object
+        user = await self.bot.fetch_user(user_id_int)
 
-            # Unban the user
-            await interaction.guild.unban(user, reason=reason)
-            self.bot.log.info(
-                f"User {user.name} ({user.id}) unbanned by {interaction.user.name} ({interaction.user.id}). Reason: {reason}"
-            )
-
-            embed = discord.Embed(
-                title="Gebruiker Ongebanned",
-                description=f"{user.mention} ({user_id}) is ongebanned. Reden: {reason}",
-                color=discord.Color.green(),
-            )
-            await interaction.response.send_message(embed=embed)
-
-            # Log the infraction
-            try:
-                await log_infraction(
-                    self.infractions_collection,
-                    interaction.guild.id,
-                    user.id,
-                    interaction.user.id,
-                    "unban",
-                    reason,
-                )
-            except Exception as e:
-                self.bot.log.error(
-                    f"Failed to log unban infraction for {user.name} ({user.id}): {e}"
-                )
-
-        except ValueError:
-            self.bot.log.warning(
-                f"Invalid user ID provided for unban: {user_id} by {interaction.user.name} ({interaction.user.id})"
-            )
-            embed = discord.Embed(
-                title="Ongeldig ID",
-                description="Het opgegeven gebruikers-ID is niet geldig.",
-                color=discord.Color.red(),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.NotFound as e:
-            self.bot.log.warning(
-                f"User not found for unban: {user_id} by {interaction.user.name} ({interaction.user.id}): {e}"
-            )
-            embed = discord.Embed(
-                title="Gebruiker Niet Gevonden",
-                description=f"Geen gebruiker gevonden met ID: {user_id}",
-                color=discord.Color.red(),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.Forbidden as e:
-            self.bot.log.error(f"Permission denied when trying to unban user {user_id}: {e}")
-            embed = discord.Embed(
-                title="Permissie Fout",
-                description="Ik heb geen permissie om gebruikers te unbannen.",
-                color=discord.Color.red(),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except discord.errors.HTTPException as e:
-            self.bot.log.error(f"HTTP error when trying to unban user {user_id}: {e}")
-            embed = discord.Embed(
-                title="Discord API Fout",
-                description=f"Unbannen mislukt door Discord API fout: {str(e)}",
-                color=discord.Color.red(),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            self.bot.log.error(
-                f"Unexpected error when trying to unban user {user_id}: {e}", exc_info=True
-            )
-            embed = discord.Embed(
-                title="Onverwachte Fout",
-                description=f"Er is een onverwachte fout opgetreden bij het unbannen: {str(e)}",
-                color=discord.Color.red(),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        await self.ban_system.execute_unban(interaction, user, reason)
 
     @app_commands.command(name="warn", description="Waarschuw een user")
     @has_role("The Council")

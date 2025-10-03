@@ -12,11 +12,11 @@ class ModerationTasks:
     """Handles background tasks for moderation operations."""
 
     def __init__(
-        self, bot, scheduled_unmutes_collection, scheduled_bans_collection, infractions_collection
+        self, bot, scheduled_unmutes_collection, scheduled_unbans_collection, infractions_collection
     ):
         self.bot = bot
         self.scheduled_unmutes_collection = scheduled_unmutes_collection
-        self.scheduled_bans_collection = scheduled_bans_collection
+        self.scheduled_unbans_collection = scheduled_unbans_collection
         self.infractions_collection = infractions_collection
         self.unmute_task = None
         self.unban_task = None
