@@ -32,7 +32,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.command(usage="[after] [close message]")
     @command(name="close", description="Sluit het ticket")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def close(
         self,
@@ -130,7 +130,7 @@ class Modmail(commands.Cog, name="modmail"):
         name="generate_transcript",
         description="Maakt een transcript en stuurt het naar het log kanaal",
     )
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def generate_transcript(
         self,
@@ -158,7 +158,7 @@ class Modmail(commands.Cog, name="modmail"):
             )
 
     @command(name="transcripts", description="Geeft transcripts van een bepaalde persoon")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def transcripts(
         self,
@@ -227,7 +227,7 @@ class Modmail(commands.Cog, name="modmail"):
         return mention
 
     @command(name="nsfw", description="Verandert Modmail-ticket naar NSFW status")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def nsfw(self, interaction: discord.Interaction):
         """Markeert een Modmail ticket als NSFW (niet veilig voor werk)."""
@@ -235,7 +235,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.response.send_message("🔞 Kanaal ingesteld op NSFW")
 
     @command(name="sfw", description="Verandert Modmail-ticket naar SFW status")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def sfw(self, interaction: discord.Interaction):
         """Markeert een Modmail ticket als SFW (veilig voor werk)."""
@@ -243,7 +243,7 @@ class Modmail(commands.Cog, name="modmail"):
         await interaction.response.send_message("⚠️ Kanaal ingesteld op SFW")
 
     @command(name="reply", description="Antwoordt op een Modmail-bericht")
-    @has_role("Moderator")
+    @has_role("777987142236241941")
     @checks.thread_only()
     async def reply(self, interaction: discord.Interaction, msg: str):
         """
@@ -274,7 +274,7 @@ class Modmail(commands.Cog, name="modmail"):
         await confirmation.delete()
 
     @command(name="areply", description="Antwoordt anoniem op een Modmail-bericht")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def areply(self, interaction: discord.Interaction, msg: str):
         """
@@ -304,7 +304,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.group(invoke_without_command=True)
     @command(name="note", description="Verduidelijking van modmail")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def note(self, interaction: discord.Interaction, msg: str):
         """
@@ -334,7 +334,7 @@ class Modmail(commands.Cog, name="modmail"):
         await confirmation.delete()
 
     @command(name="edit", description="Bewerkt een Modmail-bericht")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def edit(
         self, interaction: discord.Interaction, message: str, message_id: Optional[str] = ""
@@ -375,7 +375,7 @@ class Modmail(commands.Cog, name="modmail"):
 
     # @commands.command(usage="<user> [category] [options]")
     @command(name="contact", description="Opent een modmail ticket")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     async def contact(self, interaction: discord.Interaction, user: discord.Member | discord.User):
         """
         Create a thread with a specified member.
@@ -457,7 +457,7 @@ class Modmail(commands.Cog, name="modmail"):
             await interaction.delete_original_response()
 
     @command(name="delete", description="Verwijdert een modmail bericht.")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @checks.thread_only()
     async def delete(self, interaction: discord.Interaction, message_id: Optional[str] = ""):
         """
