@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from main import DEFAULT_GUILD_ID
-from utils.checks import developer
+from utils.has_role import has_role
 
 from .developer_management import DeveloperManagementView
 
@@ -1280,7 +1280,7 @@ class Configure(commands.Cog):
     @app_commands.describe(
         visible="Of de configuratie zichtbaar moet zijn voor anderen (standaard: waar)"
     )
-    @developer()
+    @has_role("TCouncilhe ")
     async def configure(self, interaction: discord.Interaction, visible: bool = True):
         """Open the configuration interface."""
         try:

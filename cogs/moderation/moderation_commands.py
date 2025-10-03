@@ -56,7 +56,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         self.tasks.stop_unban_checker()
 
     @app_commands.command(name="kick", description="Kick een member van de server.")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     async def kick(
         self,
         interaction: discord.Interaction,
@@ -194,7 +194,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await self.ban_system.execute_unban(interaction, user, reason)
 
     @app_commands.command(name="warn", description="Waarschuw een user")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     async def warn(
         self,
         interaction: discord.Interaction,
@@ -225,7 +225,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="removewarn", description="Verwijder een waarschuwing van een gebruiker."
     )
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(
         member="De gebruiker waarvan je een waarschuwing wilt verwijderen",
         warn_id="Het ID van de waarschuwing (te vinden via /history)",
@@ -278,7 +278,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     # Timeout commands
     @app_commands.command(name="timeout", description="Timeout een member in de server")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(
         member="De member om te timeouten",
         duration="De duration van de timeout (bijv. 1m, 5h, 1d, 1w, 1mo, 1y). Max 28 dagen voor timeout, longer durations use muted role.",
@@ -294,7 +294,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await self.timeout_system.handle_timeout_command(interaction, member, duration, reason)
 
     @app_commands.command(name="untimeout", description="Verwijdert timeout van een member")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(
         member="De member om de timeout van te verwijderen",
         reason="De reden voor het verwijderen van de timeout",
@@ -309,7 +309,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
 
     # Mute commands
     @app_commands.command(name="mute", description="Mute een member in de server")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     async def mute(
         self,
         interaction: discord.Interaction,
@@ -319,7 +319,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         await self.mute_system.handle_mute_command(interaction, member, reason)
 
     @app_commands.command(name="unmute", description="Unmute een member in de server.")
-    @has_role("The Council")
+    @has_role("860195356493742100")
     async def unmute(
         self,
         interaction: discord.Interaction,
@@ -331,7 +331,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
     @app_commands.command(
         name="history", description="Laat de recente straffen van een gebruiker zien."
     )
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(user="De gebruiker om de voorgaande straffen van te bekijken")
     async def history(self, interaction: discord.Interaction, user: discord.User):
         infractions = (
@@ -532,7 +532,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="lockdown",
         description="Prevent sending messages in a channel.",
     )
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(channel="The channel to lockdown", reason="The reason for the lockdown")
     async def lockdown(
         self,
@@ -562,7 +562,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
         name="unlockdown",
         description="Unlock a locked channel.",
     )
-    @has_role("The Council")
+    @has_role("860195356493742100")
     @app_commands.describe(channel="The channel to unlock", reason="The reason for the unlockdown")
     async def unlockdown(
         self,
