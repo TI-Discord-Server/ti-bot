@@ -532,10 +532,6 @@ class Bot(commands.Bot):
                 return
 
     async def __load_cogs(self) -> None:
-        # Configure jishaku to use database developers only
-        os.environ["JISHAKU_NO_UNDERSCORE"] = "True"
-        os.environ["JISHAKU_NO_DM_TRACEBACK"] = "True"
-        await self.load_extension("jishaku")
         for m in [x.replace(".py", "") for x in os.listdir("cogs") if ".py" in x]:
             if m not in [c.__module__.split(".")[-1] for c in self.cogs.values()]:
                 try:

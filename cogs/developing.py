@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.has_admin import has_admin
+from utils.checks import developer
 
 
 class AdminCommands(commands.Cog, name="AdminCommands"):
@@ -16,7 +16,7 @@ class AdminCommands(commands.Cog, name="AdminCommands"):
         self.bot = bot
 
     @app_commands.command(name="sync", description="Synchroniseer de slash commands met Discord.")
-    @has_admin()
+    @developer()
     async def sync(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
@@ -32,7 +32,7 @@ class AdminCommands(commands.Cog, name="AdminCommands"):
             await interaction.followup.send(f"❌ Sync mislukt: {e}", ephemeral=True)
 
     @app_commands.command(name="restart", description="Herstart de bot.")
-    @has_admin()
+    @developer()
     async def restart(self, interaction: discord.Interaction):
         await interaction.response.send_message("♻️ Bot wordt herstart...", ephemeral=True)
         self.bot.log.info(f"/restart uitgevoerd door {interaction.user} - bot gaat herstarten.")
