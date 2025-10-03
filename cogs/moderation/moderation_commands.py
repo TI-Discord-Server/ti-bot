@@ -5,6 +5,7 @@ import time
 
 import discord
 import pymongo
+from bson import ObjectId
 from discord import app_commands
 from discord.ext import commands
 
@@ -221,6 +222,60 @@ class ModCommands(commands.Cog, name="ModCommands"):
             reason,
         )
 
+    @app_commands.command(
+        name="removewarn", description="Verwijder een waarschuwing van een gebruiker."
+    )
+    @has_role("The Council")
+    @app_commands.describe(
+        member="De gebruiker waarvan je een waarschuwing wilt verwijderen",
+        warn_id="Het ID van de waarschuwing (te vinden via /history)",
+    )
+    async def removewarn(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        warn_id: str,
+    ):
+        try:
+            # Probeer het ID om te zetten naar een ObjectId
+            try:
+                warn_object_id = ObjectId(warn_id)
+            except Exception:
+                await interaction.response.send_message(
+                    f"❌ `{warn_id}` is geen geldig warn ID.", ephemeral=True
+                )
+                return
+
+            # Verwijder de specifieke warn
+            result = await self.infractions_collection.delete_one(
+                {
+                    "_id": warn_object_id,
+                    "guild_id": interaction.guild.id,
+                    "user_id": member.id,
+                    "type": "warn",
+                }
+            )
+
+            if result.deleted_count == 0:
+                await interaction.response.send_message(
+                    f"❌ Geen waarschuwing gevonden met ID `{warn_id}` voor {member.mention}.",
+                    ephemeral=True,
+                )
+                return
+
+            embed = discord.Embed(
+                title="✅ Waarschuwing verwijderd",
+                description=f"Waarschuwing `{warn_id}` voor {member.mention} is verwijderd.",
+                color=discord.Color.green(),
+            )
+            await interaction.response.send_message(embed=embed)
+
+        except Exception as e:
+            self.bot.log.error(f"Error removing warn {warn_id} for {member.id}: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ Er ging iets mis bij het verwijderen van de waarschuwing.", ephemeral=True
+            )
+
     # Timeout commands
     @app_commands.command(name="timeout", description="Timeout een member in de server")
     @has_role("The Council")
@@ -334,10 +389,15 @@ class ModCommands(commands.Cog, name="ModCommands"):
                 except Exception:
                     moderator_info = ""
 
+            # Voeg ID toe bij waarschuwingen
+            warn_id_info = ""
+            if infraction["type"] == "warn":
+                warn_id_info = f"\n**Warn ID:** `{str(infraction['_id'])[:8]}...`"
+
             infraction_list += (
                 f"<t:{int(time.mktime(localized_timestamp.timetuple()))}:f> "
                 f"- **{infraction_type}**{duration_info}{moderator_info}\n"
-                f"**Reden:** {reason}\n\n"
+                f"**Reden:** {reason}{warn_id_info}\n\n"
             )
 
         if not infraction_list:
