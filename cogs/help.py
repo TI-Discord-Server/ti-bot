@@ -2,6 +2,8 @@ import discord
 from discord.app_commands import command
 from discord.ext import commands
 
+from utils.has_admin import has_admin
+
 
 class Help(commands.Cog, name="help"):
     def __init__(self, bot):
@@ -36,79 +38,96 @@ class Help(commands.Cog, name="help"):
                 )
             else:
                 # Loop through all registered commands, filtering for slash commands only
-                slash_commands = []
+                allowed_commands = []
                 context_menus = []
 
                 for c in commands:
-                    # Check if it's a context menu command or slash command
-                    if hasattr(c, "type") and c.type in [2, 3]:  # USER or MESSAGE context menu
-                        context_menus.append(c)
-                    elif hasattr(c, "description"):  # Regular slash command
-                        slash_commands.append(c)
+                    try:
+                        if await c._check_can_run(interaction):
+                            if hasattr(c, "type") and c.type in [2, 3]:  # Context menu
+                                context_menus.append(c)
+                            elif hasattr(c, "description"):
+                                allowed_commands.append(c)
+                    except Exception:
+                        # Commando kan niet uitgevoerd worden door deze user
+                        continue
 
-                # Group commands by cog/category to avoid the 25 field limit
-                command_groups = {}
-                for c in slash_commands:
-                    # Try to get the cog name from the command
-                    cog_name = getattr(c, "module", "General")
-                    if cog_name.startswith("cogs."):
-                        cog_name = cog_name.split(".")[-1].title()
-
-                    if cog_name not in command_groups:
-                        command_groups[cog_name] = []
-                    command_groups[cog_name].append(c)
-
-                # If we have too many groups, combine them into a single field
-                # Discord limit is 25 fields, so we need to be conservative
-                if (
-                    len(command_groups) > 15
-                ):  # Leave room for context menus and potential field splits
-                    command_list = []
-                    for c in slash_commands:
-                        command_list.append(f"**/{c.name}** - {c.description or 'No description'}")
-
-                    # Split into chunks to avoid hitting character limits
-                    chunk_size = 20
-                    for i in range(0, len(command_list), chunk_size):
-                        chunk = command_list[i : i + chunk_size]
-                        field_name = f"📋 Commands ({i+1}-{min(i+chunk_size, len(command_list))})"
-                        embed.add_field(name=field_name, value="\n".join(chunk), inline=False)
+                if not allowed_commands and not context_menus:
+                    embed.add_field(
+                        name="Geen commando's",
+                        value="Je hebt momenteel geen toegankelijke commando's.",
+                        inline=False,
+                    )
                 else:
-                    # Add commands grouped by category
-                    field_count = 0
-                    max_fields = 24  # Leave room for context menus
+                    # Group commands by cog/category to avoid the 25 field limit
+                    command_groups = {}
+                    for c in allowed_commands:
+                        # Try to get the cog name from the command
+                        cog_name = getattr(c, "module", "General")
+                        if cog_name.startswith("cogs."):
+                            cog_name = cog_name.split(".")[-1].title()
 
-                    for cog_name, cog_commands in command_groups.items():
-                        if field_count >= max_fields:
-                            break
+                        if cog_name not in command_groups:
+                            command_groups[cog_name] = []
+                        command_groups[cog_name].append(c)
 
+                    # If we have too many groups, combine them into a single field
+                    # Discord limit is 25 fields, so we need to be conservative
+                    if (
+                        len(command_groups) > 15
+                    ):  # Leave room for context menus and potential field splits
                         command_list = []
-                        for c in cog_commands:
+                        for c in allowed_commands:
                             command_list.append(
                                 f"**/{c.name}** - {c.description or 'No description'}"
                             )
 
-                        # Check if the field value would be too long (Discord limit is 1024 chars)
-                        field_value = "\n".join(command_list)
-                        if len(field_value) > 1000:  # Leave some buffer
-                            # Split into multiple fields if too long
-                            chunk_size = 5
-                            for i in range(0, len(command_list), chunk_size):
-                                if field_count >= max_fields:
-                                    break
-                                chunk = command_list[i : i + chunk_size]
-                                chunk_value = "\n".join(chunk)
-                                if len(chunk_value) <= 1000:
-                                    field_name = (
-                                        f"📁 {cog_name}" if i == 0 else f"📁 {cog_name} (cont.)"
-                                    )
-                                    embed.add_field(
-                                        name=field_name, value=chunk_value, inline=False
-                                    )
-                                    field_count += 1
-                        else:
-                            embed.add_field(name=f"📁 {cog_name}", value=field_value, inline=False)
-                            field_count += 1
+                        # Split into chunks to avoid hitting character limits
+                        chunk_size = 20
+                        for i in range(0, len(command_list), chunk_size):
+                            chunk = command_list[i : i + chunk_size]
+                            field_name = (
+                                f"📋 Commands ({i+1}-{min(i+chunk_size, len(command_list))})"
+                            )
+                            embed.add_field(name=field_name, value="\n".join(chunk), inline=False)
+                    else:
+                        # Add commands grouped by category
+                        field_count = 0
+                        max_fields = 24  # Leave room for context menus
+
+                        for cog_name, cog_commands in command_groups.items():
+                            if field_count >= max_fields:
+                                break
+
+                            command_list = []
+                            for c in cog_commands:
+                                command_list.append(
+                                    f"**/{c.name}** - {c.description or 'No description'}"
+                                )
+
+                            # Check if the field value would be too long (Discord limit is 1024 chars)
+                            field_value = "\n".join(command_list)
+                            if len(field_value) > 1000:  # Leave some buffer
+                                # Split into multiple fields if too long
+                                chunk_size = 5
+                                for i in range(0, len(command_list), chunk_size):
+                                    if field_count >= max_fields:
+                                        break
+                                    chunk = command_list[i : i + chunk_size]
+                                    chunk_value = "\n".join(chunk)
+                                    if len(chunk_value) <= 1000:
+                                        field_name = (
+                                            f"📁 {cog_name}" if i == 0 else f"📁 {cog_name} (cont.)"
+                                        )
+                                        embed.add_field(
+                                            name=field_name, value=chunk_value, inline=False
+                                        )
+                                        field_count += 1
+                            else:
+                                embed.add_field(
+                                    name=f"📁 {cog_name}", value=field_value, inline=False
+                                )
+                                field_count += 1
 
                 # Add context menu info if any exist
                 if context_menus:
@@ -143,6 +162,7 @@ class Help(commands.Cog, name="help"):
     @command(
         name="debug_commands", description="Debug commando om geregistreerde commando's te bekijken"
     )
+    @has_admin()
     async def debug_commands(self, interaction: discord.Interaction):
         """Debug command to see what commands are registered."""
         try:

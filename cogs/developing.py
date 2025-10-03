@@ -43,6 +43,17 @@ class AdminCommands(commands.Cog, name="AdminCommands"):
         # Herstart via exec
         os.execv(sys.executable, ["python"] + sys.argv)
 
+    @app_commands.command(name="shutdown", description="Zet de bot uit.")
+    @developer()
+    async def shutdown(self, interaction: discord.Interaction):
+        await interaction.response.send_message("⏹️ Bot wordt afgesloten...", ephemeral=True)
+        self.bot.log.info(f"/shutdown uitgevoerd door {interaction.user} - bot gaat afsluiten.")
+
+        # Kleine delay zodat Discord het antwoord nog kan tonen
+        await asyncio.sleep(2)
+
+        await self.bot.close()
+
 
 async def setup(bot):
     await bot.add_cog(AdminCommands(bot))
