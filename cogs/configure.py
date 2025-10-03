@@ -79,6 +79,12 @@ class ConfigurationView(discord.ui.View):
                 description="Examenresultaten datum instellingen",
                 emoji="📊",
             ),
+            discord.SelectOption(
+                label="Job Info",
+                value="job_info",
+                description="Job info inzending systeem instellingen",
+                emoji="💼",
+            ),
         ],
     )
     async def category_select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -101,6 +107,8 @@ class ConfigurationView(discord.ui.View):
             view = UnbanRequestsConfigView(self.bot, self.user_id, self.visible)
         elif category == "exam_results":
             view = ExamResultsConfigView(self.bot, self.user_id, self.visible)
+        elif category == "job_info":
+            view = JobInfoConfigView(self.bot, self.user_id, self.visible)
 
         embed = await view.create_embed()
         await interaction.response.edit_message(embed=embed, view=view)
@@ -124,7 +132,8 @@ class ConfigurationView(discord.ui.View):
                     "✅ **Verificatie** - Verificatie systeem instellingen\n"
                     "🎭 **Rollen & Kanalen** - Rol en kanaal menu instellingen\n"
                     "🔓 **Unban Requests** - Unban aanvraag systeem instellingen\n"
-                    "📊 **Examenresultaten** - Examenresultaten datum instellingen"
+                    "📊 **Examenresultaten** - Examenresultaten datum instellingen\n"
+                    "💼 **Job Info** - Job info inzending systeem instellingen"
                 ),
                 inline=False,
             )
@@ -862,6 +871,9 @@ class ChannelSelectView(BaseConfigView):
                 self.bot.log.debug(
                     f"Returning to UnbanRequestsConfigView for field {self.field_name}"
                 )
+            elif self.settings_id == "job_info_settings":
+                config_view = JobInfoConfigView(self.bot, self.user_id, True)
+                self.bot.log.debug(f"Returning to JobInfoConfigView for field {self.field_name}")
             else:
                 config_view = ConfigurationView(self.bot, self.user_id, True)
                 self.bot.log.debug(
@@ -2101,7 +2113,13 @@ class UnbanRequestsConfigView(BaseConfigView):
                 color=discord.Color.blue(),
             )
 
-            await channel.send(embed=embed, view=unban_cog.unban_view)
+            message = await channel.send(embed=embed, view=unban_cog.unban_view)
+
+            if self.bot.persistent_view_manager:
+                await self.bot.persistent_view_manager.store_view_message(
+                    "unban_request", unban_request_kanaal_id, message.id, channel.guild.id
+                )
+
             await interaction.response.send_message(
                 f"✅ Unban request bericht verzonden naar {channel.mention}!", ephemeral=True
             )
@@ -2112,6 +2130,83 @@ class UnbanRequestsConfigView(BaseConfigView):
                 "❌ Er is een fout opgetreden bij het verzenden van het unban request bericht.",
                 ephemeral=True,
             )
+
+
+class JobInfoConfigView(BaseConfigView):
+    """Configuratie voor Job Info feature."""
+
+    async def create_embed(self):
+        self.settings_id = "baseconfig"
+        settings = await self.bot.db.settings.find_one({"_id": "job_info_settings"}) or {}
+
+        embed = discord.Embed(
+            title="💼 Job Info Instellingen",
+            description="Configuratie voor het Job Info systeem",
+            color=discord.Color.blue(),
+            timestamp=datetime.datetime.now(),
+        )
+
+        # Kanaal
+        channel_id = settings.get("job_info_channel_id", "Niet ingesteld")
+        if channel_id != "Niet ingesteld":
+            channel = self.bot.get_channel(channel_id)
+            channel_name = channel.mention if channel else f"Onbekend kanaal ({channel_id})"
+        else:
+            channel_name = "Niet ingesteld"
+
+        embed.add_field(
+            name="📢 Job Info Kanaal",
+            value=f"`{channel_id}`\n**Kanaal:** {channel_name}",
+            inline=True,
+        )
+
+        embed.set_footer(text="Gebruik de knoppen hieronder om instellingen aan te passen")
+        return embed
+
+    @discord.ui.button(label="Kanaal instellen", style=discord.ButtonStyle.primary, emoji="📢")
+    async def set_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Stel het kanaal in waar job info berichten komen."""
+        view = ChannelSelectView(
+            self.bot, self.user_id, "job_info_settings", "job_info_channel_id", "text"
+        )
+        embed = discord.Embed(
+            title="📢 Kanaal Selecteren",
+            description="Selecteer het kanaal waar anonieme job info inzendingen moeten verschijnen.",
+            color=discord.Color.blue(),
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Setup bericht sturen", style=discord.ButtonStyle.success, emoji="📝")
+    async def send_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Stuur een setup bericht naar het ingestelde kanaal."""
+        settings = await self.bot.db.settings.find_one({"_id": "job_info_settings"}) or {}
+        channel_id = settings.get("job_info_channel_id")
+
+        if not channel_id:
+            await interaction.response.send_message(
+                "❌ Er is nog geen kanaal ingesteld voor Job Info.", ephemeral=True
+            )
+            return
+
+        channel = interaction.guild.get_channel(channel_id)
+        if not channel:
+            await interaction.response.send_message(
+                "❌ Het ingestelde kanaal bestaat niet (meer).", ephemeral=True
+            )
+            return
+
+        # Stuur het setup bericht via de cog
+        job_info_cog = self.bot.get_cog("JobInfo")
+        if not job_info_cog:
+            await interaction.response.send_message(
+                "❌ De JobInfo cog is niet geladen.", ephemeral=True
+            )
+            return
+
+        await job_info_cog.send_setup_message(channel)
+        await interaction.response.send_message(
+            f"✅ Setup bericht verstuurd naar {channel.mention}", ephemeral=True
+        )
 
 
 async def setup(bot):
