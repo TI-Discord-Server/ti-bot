@@ -3,7 +3,6 @@
 import os
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from main import Bot
@@ -15,7 +14,7 @@ class owner(commands.Cog, name="owner"):
         super().__init__()
         self.bot: "Bot" = bot
 
-    @app_commands.command(hidden=True, brief="Executes code.")
+    @commands.command(hidden=True, brief="Executes code.")
     @developer()
     async def py(self, ctx: commands.Context[commands.AutoShardedBot]) -> None:
         """Executes code."""
@@ -41,7 +40,7 @@ class owner(commands.Cog, name="owner"):
             except Exception:
                 return
 
-    @app_commands.command(hidden=True, brief="Shows all parts of the bot.")
+    @commands.command(hidden=True, brief="Shows all parts of the bot.")
     @developer()
     async def cogs(self, ctx: commands.Context[commands.AutoShardedBot]) -> None:
         """Shows all parts of the bot."""
@@ -69,7 +68,7 @@ class owner(commands.Cog, name="owner"):
         except Exception:
             return
 
-    @app_commands.command(hidden=True, brief="Load a cog.")
+    @commands.command(hidden=True, brief="Load a cog.")
     @developer()
     async def load(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Load a cog."""
@@ -149,7 +148,7 @@ class owner(commands.Cog, name="owner"):
                 except Exception:
                     return
 
-    @app_commands.command(hidden=True, brief="Unloads a cog.")
+    @commands.command(hidden=True, brief="Unloads a cog.")
     @developer()
     async def unload(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Unloads a cog."""
@@ -257,7 +256,7 @@ class owner(commands.Cog, name="owner"):
                 except Exception:
                     return
 
-    @app_commands.command(hidden=True, brief="Reloads a cog.")
+    @commands.command(hidden=True, brief="Reloads a cog.")
     @developer()
     async def reload(self, ctx: commands.Context[commands.AutoShardedBot], *, module: str) -> None:
         """Reloads a cog."""
