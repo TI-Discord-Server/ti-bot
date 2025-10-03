@@ -870,7 +870,7 @@ class Verification(commands.Cog):
                     else:
                         self.bot.log.error(f"Failed to send kick failure message: {follow_e}")
 
-    @app_commands.commands.Cog.listener()
+    @commands.Cog.listener()
     async def on_member_remove(self, member):
         """Remove verification record when user leaves the server."""
         try:

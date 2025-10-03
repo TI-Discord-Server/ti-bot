@@ -2,7 +2,6 @@ import datetime
 from typing import List, Tuple
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 
@@ -258,7 +257,7 @@ class ChannelMenu(commands.Cog):
 
         return role
 
-    @app_commands.commands.Cog.listener()
+    @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
         """Wanneer een nieuw kanaal wordt aangemaakt in een jaarcategorie → rol aanmaken."""
         if not isinstance(channel, discord.TextChannel):
