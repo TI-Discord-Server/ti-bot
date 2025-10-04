@@ -1004,8 +1004,12 @@ class Bot(commands.Bot):
             self.log.info("Successfully connected to the MongoDB database.")
         except Exception as e:
             self.log.critical("Database connection error: %s", e)
-            # Exit the bot if the connection check fails
+            # Geef tijd aan de webhook handler om te verzenden
+            for handler in self.log.handlers:
+                if hasattr(handler, "async_close"):
+                    await handler.async_close()
             await asyncio.sleep(1)
+            # Exit the bot if the connection check fails
             sys.exit(1)
 
     async def graceful_shutdown(self):
