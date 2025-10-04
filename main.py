@@ -379,61 +379,6 @@ class Bot(commands.Bot):
             print(f"Warning: Failed to initialize PersistentViewManager: {e}")
             self.persistent_view_manager = None
 
-        # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
-        bot_log = logging.getLogger("bot")
-        bot_log.setLevel(logging.INFO)
-
-        # Create file handler with custom formatter
-        file_handler = RotatingFileHandler(
-            "bot.log",
-            encoding="utf-8",
-            mode="a",
-            maxBytes=1024 * 1024,
-            backupCount=1,
-        )
-        file_handler.setFormatter(PodUidFormatter())
-        bot_log.addHandler(file_handler)
-
-        self.log = bot_log
-
-        discord_log = logging.getLogger("discord")
-        discord_log.setLevel(logging.WARNING)
-
-        # Suppress discord.py webhook rate limit messages specifically
-        discord_webhook_log = logging.getLogger("discord.webhook")
-        discord_webhook_log.setLevel(logging.INFO)  # Only show errors, not warnings
-        discord_webhook_log.propagate = False  # Don't propagate to parent discord logger
-
-        # Create file handler with custom formatter for discord logs
-        discord_file_handler = RotatingFileHandler(
-            "bot.log",
-            encoding="utf-8",
-            mode="a",
-            maxBytes=1024 * 1024,
-            backupCount=1,
-        )
-        discord_file_handler.setFormatter(PodUidFormatter())
-        discord_log.addHandler(discord_file_handler)
-
-        # Add a console handler to log to the console as well.
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(PodUidFormatter())
-        bot_log.addHandler(console_handler)
-        discord_log.addHandler(console_handler)
-
-        # Add a webhook handler to log to a Discord webhook.
-        if WEBHOOK_URL:
-            try:
-                discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL, self)
-                discord_webhook_handler.setLevel(logging.INFO)
-                discord_webhook_handler.setFormatter(PodUidFormatter())
-                bot_log.addHandler(discord_webhook_handler)
-                discord_log.addHandler(discord_webhook_handler)
-            except Exception as e:
-                self.log.error(f"Failed to add Discord webhook handler: {e}")
-        else:
-            self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
-
         self.__started = False
         self.owner_ids: frozenset[int] = frozenset()  # Will be loaded from database
         self._guild_id: typing.Optional[int] = None  # Cached guild ID
@@ -498,6 +443,61 @@ class Bot(commands.Bot):
         # with contextlib.suppress(Exception):
         #     await self.tree.sync()
         #     self.log.info("Synchronized application commands")
+
+        # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
+        bot_log = logging.getLogger("bot")
+        bot_log.setLevel(logging.INFO)
+
+        # Create file handler with custom formatter
+        file_handler = RotatingFileHandler(
+            "bot.log",
+            encoding="utf-8",
+            mode="a",
+            maxBytes=1024 * 1024,
+            backupCount=1,
+        )
+        file_handler.setFormatter(PodUidFormatter())
+        bot_log.addHandler(file_handler)
+
+        self.log = bot_log
+
+        discord_log = logging.getLogger("discord")
+        discord_log.setLevel(logging.WARNING)
+
+        # Suppress discord.py webhook rate limit messages specifically
+        discord_webhook_log = logging.getLogger("discord.webhook")
+        discord_webhook_log.setLevel(logging.INFO)  # Only show errors, not warnings
+        discord_webhook_log.propagate = False  # Don't propagate to parent discord logger
+
+        # Create file handler with custom formatter for discord logs
+        discord_file_handler = RotatingFileHandler(
+            "bot.log",
+            encoding="utf-8",
+            mode="a",
+            maxBytes=1024 * 1024,
+            backupCount=1,
+        )
+        discord_file_handler.setFormatter(PodUidFormatter())
+        discord_log.addHandler(discord_file_handler)
+
+        # Add a console handler to log to the console as well.
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(PodUidFormatter())
+        bot_log.addHandler(console_handler)
+        discord_log.addHandler(console_handler)
+
+        # Add a webhook handler to log to a Discord webhook.
+        if WEBHOOK_URL:
+            try:
+                discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL, self)
+                discord_webhook_handler.setLevel(logging.INFO)
+                discord_webhook_handler.setFormatter(PodUidFormatter())
+                bot_log.addHandler(discord_webhook_handler)
+                discord_log.addHandler(discord_webhook_handler)
+            except Exception as e:
+                self.log.error(f"Failed to add Discord webhook handler: {e}")
+        else:
+            self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
 
     async def on_ready(self) -> None:
         self.log.info("Ready called")
