@@ -6,7 +6,6 @@ import logging
 import os
 import signal
 import sys
-import time
 import traceback
 import typing
 import urllib.parse
@@ -154,27 +153,23 @@ class Responder(Protocol):
 
 
 class DiscordWebhookHandler(logging.Handler):
-    """Asynchrone, veilige en rate-limit-bewuste webhook handler voor Discord logs."""
-
     def __init__(self, webhook_url, bot=None):
-        super().__init__(level=logging.DEBUG)
+        super().__init__()
         self.webhook_url = webhook_url
         self.bot = bot
+        # Do not create a ClientSession here—set it to None; it will be lazily created.
         self.session = None
-
-        # Queue-based verwerking → voorkomt verloren logs
-        self.queue = asyncio.Queue()
-        self.worker_task = asyncio.create_task(self._worker_task())
-
-        # Rate-limit en retry instellingen
-        self.base_delay = 2.0
-        self.max_delay = 60.0
-        self.last_send_time = 0
+        # Rate limiting and retry configuration
+        self.max_retries = 3
+        self.base_delay = 2.0  # Base delay in seconds
+        self.max_delay = 60.0  # Maximum delay in seconds
         self.failed_attempts = 0
+        self.last_failure_time = 0
 
-        # File logger voor interne foutmeldingen
+        # Create a file-only logger for webhook status messages
         self._file_logger = logging.getLogger("webhook_status")
         self._file_logger.setLevel(logging.INFO)
+        # Only add file handler if it doesn't already exist
         if not self._file_logger.handlers:
             file_handler = RotatingFileHandler(
                 "webhook_status.log",
@@ -187,100 +182,163 @@ class DiscordWebhookHandler(logging.Handler):
                 logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s")
             )
             self._file_logger.addHandler(file_handler)
+            # Prevent propagation to avoid webhook loops
             self._file_logger.propagate = False
 
     async def _ensure_session(self):
-        """Zorg dat er een aiohttp sessie actief is."""
+        # Create the ClientSession only when needed and within an async context.
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession()
 
     def emit(self, record):
-        """Stop logs in de async queue, zodat ze sequentieel verwerkt worden."""
         try:
-            msg = self.format(record)
-            self.queue.put_nowait((record, msg))
+            loop = None
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                loop.create_task(self._async_emit(record))
+            else:
+                # Geen loop actief → run synchronously
+                asyncio.run(self._async_emit(record))
         except Exception:
             self.handleError(record)
 
-    async def _worker_task(self):
-        """Werker die logs veilig en sequentieel naar Discord stuurt."""
-        while True:
-            record, msg = await self.queue.get()
+    async def _get_webhook_format(self):
+        """Get the webhook logging format from database settings."""
+        if self.bot:
             try:
-                await self._async_emit(record, msg)
-            except Exception as e:
-                self._file_logger.error(f"WEBHOOK Worker error: {type(e).__name__}: {e}")
-            finally:
-                self.queue.task_done()
+                settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
+                return settings.get("webhook_log_format", "embed")  # Default to embed
+            except Exception:
+                return "embed"  # Fallback to embed on error
+        return "embed"
 
-    async def _async_emit(self, record, msg):
-        """Zend één logbericht naar Discord, met rate limiting en retry logic."""
+    async def _async_emit(self, record):
+        import time
+
+        # Check if we should skip due to too many recent failures
+        current_time = time.time()
+        start_time = current_time
+        if self.failed_attempts >= self.max_retries:
+            # If it's been more than max_delay since last failure, reset counter
+            if current_time - self.last_failure_time > self.max_delay:
+                self.failed_attempts = 0
+                self._file_logger.info(
+                    f"WEBHOOK Failure counter reset after {current_time - self.last_failure_time:.2f}s cooldown"
+                )
+            else:
+                # Skip this log message to prevent infinite loops
+                self._file_logger.debug(
+                    f"WEBHOOK Skipping log message due to recent failures (failed_attempts: {self.failed_attempts})"
+                )
+                return
+
         await self._ensure_session()
-        webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
 
-        # Basic throttling (max 1 bericht per 2 seconden)
-        now = time.time()
-        elapsed = now - self.last_send_time
-        if elapsed < 2:
-            await asyncio.sleep(2 - elapsed)
-        self.last_send_time = time.time()
+        # Log start of webhook operation if we expect potential retries
+        if self.failed_attempts > 0:
+            self._file_logger.info(
+                f"WEBHOOK Starting log transmission (previous failures: {self.failed_attempts}, max_retries: {self.max_retries})"
+            )
 
-        # Truncate lange berichten (Discord limiet)
-        if len(msg) > 1900:
-            msg = msg[:1900] + "…"
-
-        format_type = await self._get_webhook_format()
-        color = self._get_color(record.levelname)
-
-        for attempt in range(3):  # max 3 pogingen
+        for attempt in range(self.max_retries + 1):
             try:
+                webhook = discord.Webhook.from_url(self.webhook_url, session=self.session)
+                msg = self.format(record)
+
+                # Add POD_UID prefix if available (first 5 characters only)
+                if POD_UID:
+                    pod_prefix = f"[{POD_UID[:5]}] "
+                    msg = pod_prefix + msg
+
+                # Get the current webhook format setting
+                format_type = await self._get_webhook_format()
+
                 if format_type == "plaintext":
+                    # Plaintext format with square brackets
                     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-                    content = f"[{record.levelname}] [{timestamp}] {msg}"
-                    await webhook.send(content=f"```\n{content}\n```")
+                    plaintext_msg = f"[{record.levelname}] [{timestamp}] {msg}"
+                    await webhook.send(content=f"```\n{plaintext_msg}\n```")
                 else:
+                    # Default embed format
                     embed = discord.Embed(
                         title="Log Entry",
                         description=f"```{msg}```",
-                        color=color,
+                        color=self._get_color(record.levelname),
                         timestamp=datetime.datetime.now(datetime.UTC),
                     )
                     embed.add_field(name="Level", value=record.levelname, inline=True)
                     embed.add_field(name="Logger", value=record.name, inline=True)
                     await webhook.send(embed=embed)
 
+                # Success! Reset failure counter and log success
+                total_time = time.time() - start_time
+                if attempt > 0:
+                    self._file_logger.info(
+                        f"WEBHOOK Log transmission successful after {attempt} retries in {total_time:.2f}s total"
+                    )
+                elif self.failed_attempts > 0:
+                    self._file_logger.info(
+                        f"WEBHOOK Log transmission successful on first attempt after previous failures (total time: {total_time:.2f}s)"
+                    )
+
                 self.failed_attempts = 0
-                return  # ✅ succes
+                return
 
             except discord.HTTPException as e:
                 if e.status == 429:  # Rate limited
                     self.failed_attempts += 1
-                    delay = min(self.base_delay * (2**attempt), self.max_delay)
-                    self._file_logger.warning(
-                        f"WEBHOOK rate limit (429) — retry {attempt+1}/3 after {delay:.1f}s"
-                    )
-                    await asyncio.sleep(delay)
+                    self.last_failure_time = current_time
+
+                    if attempt < self.max_retries:
+                        # Calculate exponential backoff delay
+                        delay = min(self.base_delay * (2**attempt), self.max_delay)
+                        retry_after = (
+                            getattr(e.response, "headers", {}).get("Retry-After")
+                            if hasattr(e, "response")
+                            else None
+                        )
+
+                        # Use file-only logger to avoid webhook loops
+                        self._file_logger.warning(
+                            f"WEBHOOK Rate limited (HTTP 429) on attempt {attempt + 1}/{self.max_retries + 1}. "
+                            f"Discord Retry-After: {retry_after}s, Using exponential backoff: {delay:.1f}s"
+                        )
+
+                        await asyncio.sleep(delay)
+
+                        elapsed_time = time.time() - start_time
+                        self._file_logger.info(
+                            f"WEBHOOK Resuming transmission attempt {attempt + 2}/{self.max_retries + 1} "
+                            f"after {elapsed_time:.2f}s total elapsed"
+                        )
+                        continue
+                    else:
+                        total_time = time.time() - start_time
+                        self._file_logger.error(
+                            f"WEBHOOK Max retries ({self.max_retries}) exceeded after {total_time:.2f}s. "
+                            f"Rate limiting prevented completion. Dropping log message. HTTP status: {e.status}"
+                        )
+                        return
                 else:
+                    # Other HTTP error, don't retry
+                    self.failed_attempts += 1
+                    self.last_failure_time = current_time
                     self._file_logger.error(f"WEBHOOK HTTP error {e.status}: {e.text}")
                     return
-            except Exception as e:
-                self.failed_attempts += 1
-                self._file_logger.error(f"WEBHOOK Unexpected error: {type(e).__name__}: {e}")
-                await asyncio.sleep(min(self.base_delay * (2**attempt), self.max_delay))
-        self._file_logger.error("WEBHOOK gave up after max retries.")
 
-    async def _get_webhook_format(self):
-        """Haal log-formaat op uit de database."""
-        if self.bot:
-            try:
-                settings = await self.bot.db.settings.find_one({"_id": "server_settings"}) or {}
-                return settings.get("webhook_log_format", "embed")
-            except Exception:
-                return "embed"
-        return "embed"
+            except Exception as e:
+                # Other error, don't retry
+                self.failed_attempts += 1
+                self.last_failure_time = current_time
+                self._file_logger.error(f"WEBHOOK Unexpected error: {type(e).__name__}: {e}")
+                return
 
     def _get_color(self, levelname):
-        """Kleur op basis van log level."""
+        # Map log level names to Discord color objects.
         colors = {
             "DEBUG": discord.Color.light_grey(),
             "INFO": discord.Color.green(),
@@ -291,19 +349,22 @@ class DiscordWebhookHandler(logging.Handler):
         return colors.get(levelname, discord.Color.default())
 
     async def async_close(self):
-        """Netjes afsluiten van sessie en queue."""
-        await self.queue.join()
-        if self.session and not self.session.closed:
+        """Async close method for proper cleanup."""
+        if self.session is not None and not self.session.closed:
             await self.session.close()
-        self._file_logger.info("WEBHOOK handler closed cleanly.")
+        super().close()
 
     def close(self):
-        """Compatibiliteit met sync shutdowns."""
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.async_close())
-        except RuntimeError:
-            pass
+        # If the session was created, schedule its closure.
+        if self.session is not None and not self.session.closed:
+            try:
+                # Try to fetch the running loop; if there isn’t one, skip closing.
+                loop = asyncio.get_running_loop()
+                # Schedule the asynchronous close
+                loop.create_task(self.session.close())
+            except RuntimeError:
+                # No running event loop available; session may be cleaned up on process exit.
+                pass
         super().close()
 
 
@@ -401,7 +462,7 @@ class Bot(commands.Bot):
 
         # Suppress discord.py webhook rate limit messages specifically
         discord_webhook_log = logging.getLogger("discord.webhook")
-        discord_webhook_log.setLevel(logging.INFO)  # Only show errors, not warnings
+        discord_webhook_log.setLevel(logging.ERROR)  # Only show errors, not warnings
         discord_webhook_log.propagate = False  # Don't propagate to parent discord logger
 
         # Create file handler with custom formatter for discord logs
@@ -423,14 +484,10 @@ class Bot(commands.Bot):
 
         # Add a webhook handler to log to a Discord webhook.
         if WEBHOOK_URL:
-            try:
-                discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL, self)
-                discord_webhook_handler.setLevel(logging.INFO)
-                discord_webhook_handler.setFormatter(PodUidFormatter())
-                bot_log.addHandler(discord_webhook_handler)
-                discord_log.addHandler(discord_webhook_handler)
-            except Exception as e:
-                self.log.error(f"Failed to add Discord webhook handler: {e}")
+            discord_webhook_handler = DiscordWebhookHandler(WEBHOOK_URL, self)
+            discord_webhook_handler.setLevel(logging.INFO)
+            bot_log.addHandler(discord_webhook_handler)
+            discord_log.addHandler(discord_webhook_handler)
         else:
             self.log.warning("No webhook URL provided; logging to Discord webhook disabled.")
 
