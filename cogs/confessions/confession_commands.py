@@ -23,24 +23,41 @@ class ConfessionCommands(commands.Cog):
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role(760195356493742100)
     async def force_review(self, interaction: discord.Interaction):
-        await self.tasks.daily_review()
-        await interaction.response.send_message(
-            "Confession beoordeling is geforceerd.", ephemeral=True
-        )
-        self.bot.log.info(f"{interaction.user} heeft handmatig een confession review getriggerd.")
+        try:
+            await interaction.response.defer(ephemeral=True)
+            await interaction.followup.send(
+                "Forceren van confession beoordeling...", ephemeral=True
+            )
+            await self.tasks.daily_review()
+            await interaction.followup.send("Confession beoordeling is geforceerd.", ephemeral=True)
+            self.bot.log.info(
+                f"{interaction.user} heeft handmatig een confession review getriggerd."
+            )
+        except Exception as e:
+            self.bot.log.error(f"Error forcing confession review: {e}")
+            await interaction.followup.send(
+                f"Er is een fout opgetreden bij het forceren van de review: {str(e)}",
+                ephemeral=True,
+            )
 
     @app_commands.command(name="force_post", description="Forceer het posten van confessions.")
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.has_role(760195356493742100)
     async def force_post(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "Forceren van confession posting...", ephemeral=True
-        )
-        await self.tasks.run_post_approved()
-        await interaction.followup.send(
-            "Beoordeling en posting van confessions is geforceerd.", ephemeral=True
-        )
-        self.bot.log.info(f"{interaction.user} heeft handmatig een confession post getriggerd.")
+        try:
+            await interaction.response.defer(ephemeral=True)
+            await interaction.followup.send("Forceren van confession posting...", ephemeral=True)
+            await self.tasks.run_post_approved()
+            await interaction.followup.send(
+                "Beoordeling en posting van confessions is geforceerd.", ephemeral=True
+            )
+            self.bot.log.info(f"{interaction.user} heeft handmatig een confession post getriggerd.")
+        except Exception as e:
+            self.bot.log.error(f"Error forcing confession post: {e}")
+            await interaction.followup.send(
+                f"Er is een fout opgetreden bij het forceren van de posting: {str(e)}",
+                ephemeral=True,
+            )
 
     @app_commands.command(
         name="setup_submit_message",
