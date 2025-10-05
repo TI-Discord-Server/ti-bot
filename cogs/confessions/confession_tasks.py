@@ -182,6 +182,13 @@ class ConfessionTasks(commands.Cog):
             self.bot.log.warning(
                 f"Geen matching message gevonden voor confession {confession['_id']}"
             )
+            try:
+                await self.bot.db.confessions.update_one(
+                    {"_id": confession["_id"]}, {"$set": {"status": "error"}}
+                )
+                await matching_message.delete()
+            except Exception as e:
+                self.bot.log.error(f"Fout bij het bijwerken van confession status: {e}")
             return
 
         allow_votes = 0
