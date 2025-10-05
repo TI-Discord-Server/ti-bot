@@ -184,7 +184,7 @@ class ConfessionTasks(commands.Cog):
             )
             try:
                 await self.bot.db.confessions.update_one(
-                    {"_id": confession["_id"]}, {"$set": {"status": "error"}}
+                    {"_id": confession["_id"]}, {"$set": {"status": "pending"}}
                 )
                 await matching_message.delete()
             except Exception as e:
