@@ -21,7 +21,7 @@ class ConfessionCommands(commands.Cog):
 
     @app_commands.command(name="force_review", description="Forceer de review van confessions.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(760195356493742100)
+    @app_commands.checks.has_role(777987142236241941)
     async def force_review(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
@@ -42,7 +42,7 @@ class ConfessionCommands(commands.Cog):
 
     @app_commands.command(name="force_post", description="Forceer het posten van confessions.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(760195356493742100)
+    @app_commands.checks.has_role(777987142236241941)
     async def force_post(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
@@ -64,7 +64,7 @@ class ConfessionCommands(commands.Cog):
         description="Post het submit confession bericht in het publieke kanaal.",
     )
     @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(760195356493742100)
+    @app_commands.checks.has_role(777987142236241941)
     async def setup_submit_message(self, interaction: discord.Interaction):
         public_channel_id = await self.tasks.get_public_channel_id()
         if not public_channel_id:
