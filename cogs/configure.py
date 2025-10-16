@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.unban_request import UnbanView
 from main import DEFAULT_GUILD_ID
 
 from .developer_management import DeveloperManagementView
@@ -2113,7 +2114,7 @@ class UnbanRequestsConfigView(BaseConfigView):
                 color=discord.Color.blue(),
             )
 
-            message = await channel.send(embed=embed, view=unban_cog.unban_view)
+            message = await channel.send(embed=embed, view=UnbanView(self.bot))
 
             if self.bot.persistent_view_manager:
                 await self.bot.persistent_view_manager.store_view_message(

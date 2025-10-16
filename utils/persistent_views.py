@@ -215,9 +215,9 @@ class PersistentViewManager:
                 return RulesView(self.bot)
 
             elif view_type == "unban_request":
-                unban_cog = self.bot.get_cog("UnbanRequest")
-                if unban_cog and hasattr(unban_cog, "unban_view"):
-                    return unban_cog.unban_view
+                from cogs.unban_request import UnbanView
+
+                return UnbanView(self.bot)
 
             else:
                 logger.warning(f"Unknown view type: {view_type}")
