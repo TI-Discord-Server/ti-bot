@@ -16,13 +16,13 @@ Volg onderstaande regels om de kwaliteit en stabiliteit van de bot te waarborgen
 ## Workflow voor contributors
 
 1. **Fork & clone** dit project.  
-2. Maak een nieuwe branch vanuit `staging`.  
+2. Maak een nieuwe branch aan vanuit `staging`.  
    - Naamgevingsconventie: `feature/<naam>` of `fix/<naam>`.  
    - Voorbeeld: `feature/role-selector` of `fix/logging-error`.
 3. Voer je aanpassingen door en **commit duidelijk en beknopt**.  
    - Schrijf commits in de vorm: `type(scope): beschrijving`.  
    - Voorbeeld: `fix(confessions): verbeter null check bij post_approved`.
-4. **Test altijd lokaal** of via de staging omgeving voor je code doorstuurt.  
+4. **Test altijd lokaal** of via de staging omgeving voordat je je code doorstuurt.  
 
 ---
 
@@ -63,7 +63,7 @@ Deze voeren automatisch checks en formatting uit bij elke commit.
    pre-commit install  
    ```
 
-3. Vanaf nu worden bij elke commit automatisch de checks uitgevoerd.
+3. Vanaf nu worden bij elke commit automatisch alle checks uitgevoerd.
 
 ### Tools die gebruikt worden
 
@@ -73,7 +73,7 @@ Deze voeren automatisch checks en formatting uit bij elke commit.
 
 ### Handmatig uitvoeren
 
-Soms wil je de checks zelf handmatig draaien:  
+Soms wil je de checks handmatig draaien:  
 
 - **Linting checken met Ruff**  
   ```bash

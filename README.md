@@ -6,7 +6,7 @@ Deze bot kan worden gestart met Python of via een container (Docker).
 
 ### Zonder Docker
 
-1. Maak een `.env` bestand aan en vul dit in zoals gebruikelijk (zie `.env.example` voor een voorbeeld).
+1. Maak een `.env` bestand aan en vul dit in zoals gebruikelijk (zie `.env.example` als voorbeeld).
 2. Start de bot met het volgende commando:
    ```bash
    # Zonder TLS (standaard)
@@ -40,7 +40,7 @@ docker build -t tibot-v3 -e TLS_ENABLED=true .
 ### 2. Docker Compose gebruiken
 
 1. Controleer het bestand `docker-compose.yml`.
-2. Maak een bestand genaamd `.env` aan door de inhoud van `examples.env` te kopiëren.
+2. Maak een bestand genaamd `.env` aan door de inhoud van `example.env` te kopiëren.
 
 #### Vereiste omgevingsvariabelen (.env)
 
@@ -69,7 +69,7 @@ MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
 MONGODB_PORT=27017
 MONGODB_USERNAME=bot
 MONGODB_DB=bot
-SMTP_PASSWORD='password' # Is niet het wachtwoord van het account, is een wachtwoord enkel voor SMTP
+SMTP_PASSWORD='password' # Is niet het wachtwoord van het account, maar een wachtwoord enkel voor SMTP
 SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
 SMTP_SERVER='smtp.gmail.com' # Bijvoorbeeld: smtp.forwardemail.net
 SMTP_PORT=587 # Bijvoorbeeld: 465 voor SSL, 587 voor STARTTLS
@@ -119,7 +119,7 @@ python3 main.py --tls=false
 python3 main.py --tls=no
 ```
 
-Bij gebruik van Docker kan TLS worden in/uitgeschakeld op verschillende manieren:
+Bij gebruik van Docker kan TLS worden in- of uitgeschakeld op verschillende manieren:
 
 1. Tijdens het bouwen van de image:
    ```bash
@@ -180,7 +180,7 @@ docker compose up webapp -d
 
 - Zorg ervoor dat MongoDB actief is vóór het starten van de bot.
 - Het `.env` bestand moet alle vereiste variabelen bevatten.
-- Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` juist is ingesteld.
+- Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` correct is ingesteld.
 - TLS is standaard uitgeschakeld voor lokale ontwikkeling, maar kan worden ingeschakeld met verschillende opties: `--tls`, `--tls=true`, `--tls=false`, etc.
 
 ---
