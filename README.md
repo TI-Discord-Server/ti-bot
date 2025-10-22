@@ -106,8 +106,8 @@ python3 main.py
 
 ## Getting Help
 
-- Check [6-TROUBLESHOOTING.md](6-TROUBLESHOOTING.md) for common issues
-- Review [4-COMMANDS_REFERENCE.md](4-COMMANDS_REFERENCE.md) for command usage
+- Check [6-TROUBLESHOOTING.md](docs/6-TROUBLESHOOTING.md) for common issues
+- Review [4-COMMANDS_REFERENCE.md](docs/4-COMMANDS_REFERENCE.md) for command usage
 - Contact the development team through modmail on the TI Discord server
 
 ## License
@@ -116,4 +116,4 @@ This project is maintained by the HOGENT TI Discord Server team.
 
 ---
 
-**Next Steps**: See [2-SETUP.md](2-SETUP.md) for detailed installation instructions.
+**Next Steps**: See [2-SETUP.md](docs/2-SETUP.md) for detailed installation instructions.
