@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 
 import discord
 import pymongo
@@ -9,7 +10,11 @@ from utils.timezone import to_local
 
 class UnbanView(discord.ui.View):
     def __init__(
-        self, bot, unban_request_kanaal_id, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2
+        self,
+        bot,
+        unban_request_kanaal_id,
+        aanvragen_log_kanaal_id_1,
+        aanvragen_log_kanaal_id_2: Optional[int] = None,
     ):
         super().__init__(timeout=None)
         self.bot = bot
@@ -25,15 +30,17 @@ class UnbanView(discord.ui.View):
         await interaction.response.send_modal(
             UnbanAanvraagModal(
                 self.bot,
+                interaction.user,
                 self.aanvragen_log_kanaal_id_1,
                 self.aanvragen_log_kanaal_id_2,
-                interaction.user,
             )
         )
 
 
 class UnbanAanvraagModal(discord.ui.Modal, title="Unban Aanvraag"):
-    def __init__(self, bot, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2, user):
+    def __init__(
+        self, bot, user, aanvragen_log_kanaal_id_1, aanvragen_log_kanaal_id_2: Optional[int] = None
+    ):
         super().__init__()
         self.bot = bot
         self.aanvragen_log_kanaal_id_1 = aanvragen_log_kanaal_id_1

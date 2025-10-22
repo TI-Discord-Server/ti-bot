@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.unban_request import UnbanView
 from main import DEFAULT_GUILD_ID
 
 from .developer_management import DeveloperManagementView
@@ -2083,6 +2084,7 @@ class UnbanRequestsConfigView(BaseConfigView):
 
             unban_request_kanaal_id = settings.get("unban_request_kanaal_id")
             aanvragen_log_kanaal_id_1 = settings.get("aanvragen_log_kanaal_id_1")
+            aanvragen_log_kanaal_id_2 = settings.get("aanvragen_log_kanaal_id_2")
 
             if not all([unban_request_kanaal_id, aanvragen_log_kanaal_id_1]):
                 await interaction.response.send_message(
@@ -2113,11 +2115,27 @@ class UnbanRequestsConfigView(BaseConfigView):
                 color=discord.Color.blue(),
             )
 
-            message = await channel.send(embed=embed, view=unban_cog.unban_view)
+            message = await channel.send(
+                embed=embed,
+                view=UnbanView(
+                    self.bot,
+                    unban_request_kanaal_id,
+                    aanvragen_log_kanaal_id_1,
+                    aanvragen_log_kanaal_id_2,
+                ),
+            )
 
             if self.bot.persistent_view_manager:
                 await self.bot.persistent_view_manager.store_view_message(
-                    "unban_request", unban_request_kanaal_id, message.id, channel.guild.id
+                    "unban_request",
+                    unban_request_kanaal_id,
+                    message.id,
+                    channel.guild.id,
+                    additional_data={
+                        "unban_request_kanaal_id": unban_request_kanaal_id,
+                        "aanvragen_log_kanaal_id_1": aanvragen_log_kanaal_id_1,
+                        "aanvragen_log_kanaal_id_2": aanvragen_log_kanaal_id_2,
+                    },
                 )
 
             await interaction.response.send_message(

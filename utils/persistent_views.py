@@ -215,9 +215,25 @@ class PersistentViewManager:
                 return RulesView(self.bot)
 
             elif view_type == "unban_request":
-                unban_cog = self.bot.get_cog("UnbanRequest")
-                if unban_cog and hasattr(unban_cog, "unban_view"):
-                    return unban_cog.unban_view
+                from cogs.unban_request import UnbanView
+
+                urc = additional_data.get("unban_request_kanaal_id")
+                log1 = additional_data.get("aanvragen_log_kanaal_id_1")
+                log2 = additional_data.get("aanvragen_log_kanaal_id_2")
+
+                if urc and log1:
+                    return UnbanView(self.bot, urc, log1, log2)
+
+                # Fallback: try to load from database if additional data is missing
+                try:
+                    settings = await self.bot.db.settings.find_one({"_id": "mod_settings"}) or {}
+                    urc = settings.get("unban_request_kanaal_id")
+                    log1 = settings.get("aanvragen_log_kanaal_id_1")
+                    log2 = settings.get("aanvragen_log_kanaal_id_2")
+                    if urc and log1:
+                        return UnbanView(self.bot, urc, log1, log2)
+                except Exception as e:
+                    logger.error(f"Missing data for unban request view: {e}")
 
             else:
                 logger.warning(f"Unknown view type: {view_type}")
