@@ -51,12 +51,12 @@ The TI Discord Bot is a comprehensive moderation and management system designed 
 
 This documentation is split into specialized guides:
 
-- **[2-SETUP.md](2-SETUP.md)** - Installation, configuration, and deployment instructions
-- **[3-ARCHITECTURE.md](3-ARCHITECTURE.md)** - Code structure, cogs overview, and system design
-- **[4-COMMANDS_REFERENCE.md](4-COMMANDS_REFERENCE.md)** - Complete command reference with examples
-- **[5-CONTRIBUTING.md](5-CONTRIBUTING.md)** - Guidelines for developers and contributors
-- **[6-TROUBLESHOOTING.md](6-TROUBLESHOOTING.md)** - Common issues and debugging tips
-- **[7-LIMITATIONS.md](7-LIMITATIONS.md)** - Known limitations and security considerations
+- **[2-SETUP.md](docs/2-SETUP.md)** - Installation, configuration, and deployment instructions
+- **[3-ARCHITECTURE.md](docs/3-ARCHITECTURE.md)** - Code structure, cogs overview, and system design
+- **[4-COMMANDS_REFERENCE.md](docs/4-COMMANDS_REFERENCE.md)** - Complete command reference with examples
+- **[5-CONTRIBUTING.md](docs/5-CONTRIBUTING.md)** - Guidelines for developers and contributors
+- **[6-TROUBLESHOOTING.md](docs/6-TROUBLESHOOTING.md)** - Common issues and debugging tips
+- **[7-LIMITATIONS.md](docs/7-LIMITATIONS.md)** - Known limitations and security considerations
 
 ## Quick Start (TL;DR)
 
