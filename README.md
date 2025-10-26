@@ -1,212 +1,119 @@
-# TI Discord Bot (Python versie 3.13)
+# TI Discord Bot Documentation
 
-## 🔧 Voor Ontwikkelaars: Tibot-v3 Uitvoeren
+## Overview
 
-Deze bot kan worden gestart met Python of via een container (Docker).
+The TI Discord Bot is a comprehensive moderation and management system designed for the HOGENT Applied Computer Science (Toegepaste Informatica) student Discord server. Built with Python 3.13 and discord.py, it provides student verification, moderation tools, anonymous confessions, modmail support, and various community features.
 
-### Zonder Docker
+## Key Features
 
-1. Maak een `.env` bestand aan en vul dit in zoals gebruikelijk (zie `.env.example` als voorbeeld).
-2. Start de bot met het volgende commando:
-   ```bash
-   # Zonder TLS (standaard)
-   python3 main.py
-   
-   # Met TLS ingeschakeld (alle onderstaande opties werken)
-   python3 main.py --tls
-   python3 main.py --tls=true
-   python3 main.py --tls=yes
-   
-   # TLS expliciet uitschakelen
-   python3 main.py --tls=false
-   python3 main.py --tls=no
-   ```
+### Verification System
+- Email-based verification for HOGENT students (`@student.hogent.be`)
+- Encrypted email storage using Fernet encryption
+- Migration support for graduated students
+- Manual verification tools for moderators
 
----
+### Moderation Suite
+- Complete moderation commands: kick, ban, unban, warn, timeout, mute
+- Warning system with history tracking
+- Case management and logging
+- Purge/bulk delete functionality
+- Ban checking and lookup
 
-## 🚀 Tibot-v3 Deployen met Docker
+### Communication Systems
+- **Modmail**: Private ticket system for member-staff communication
+- **Confessions**: Anonymous confession posting with approval workflow
+- **Reports**: User and message reporting system
+- **Job Info**: Platform for students to share job experiences
 
-### 1. Docker image bouwen
+### Server Management
+- Year and track-based channel access control
+- Role selection interface
+- Unban request system
+- Configurable settings via `/configure` command
+- Developer management system
 
-Voer het volgende commando uit in je CLI, vanuit de rootmap:
+### Utility Features
+- Custom help command
+- Exam results date announcements
+- Ping/latency checker
+- Webhook logging with Discord integration
+
+## Technology Stack
+
+- **Language**: Python 3.13
+- **Discord Library**: discord.py 2.4.0
+- **Database**: MongoDB with Motor (async driver)
+- **Email**: SMTP/IMAP support for verification
+- **Encryption**: Cryptography (Fernet) for secure data storage
+- **Code Quality**: Black, Ruff, pre-commit hooks
+
+## Documentation Structure
+
+This documentation is split into specialized guides:
+
+- **[2-SETUP.md](docs/2-SETUP.md)** - Installation, configuration, and deployment instructions
+- **[3-ARCHITECTURE.md](docs/3-ARCHITECTURE.md)** - Code structure, cogs overview, and system design
+- **[4-COMMANDS_REFERENCE.md](docs/4-COMMANDS_REFERENCE.md)** - Complete command reference with examples
+- **[5-CONTRIBUTING.md](docs/5-CONTRIBUTING.md)** - Guidelines for developers and contributors
+- **[6-TROUBLESHOOTING.md](docs/6-TROUBLESHOOTING.md)** - Common issues and debugging tips
+- **[7-LIMITATIONS.md](docs/7-LIMITATIONS.md)** - Known limitations and security considerations
+
+## Quick Start (TL;DR)
+
+### Prerequisites
+- Python 3.13 or Docker
+- MongoDB instance
+- Discord bot token
+- SMTP/IMAP email credentials
+
+### Docker Deployment (Recommended)
 ```bash
-# Standaard build (zonder TLS)
-docker build -t tibot-v3 .
+# 1. Copy environment template
+cp example.env .env
 
-# Build met TLS ingeschakeld
-docker build -t tibot-v3 -e TLS_ENABLED=true .
-```
+# 2. Edit .env with your credentials
+# (BOT_TOKEN, MONGODB settings, SMTP settings, etc.)
 
-### 2. Docker Compose gebruiken
-
-1. Controleer het bestand `docker-compose.yml`.
-2. Maak een bestand genaamd `.env` aan door de inhoud van `example.env` te kopiëren.
-
-#### Vereiste omgevingsvariabelen (.env)
-
-De bot gebruikt een `.env` bestand voor gevoelige gegevens. Zie `.env.example` als correcte template met onze `docker-compose.yml` configuratie. De volgende variabelen zijn vereist:
-
-- `BOT_TOKEN`: Je Discord bot-token
-- `MONGODB_IP_ADDRESS`: Het IP-adres van je MongoDB-server
-- `MONGODB_PASSWORD`: Het wachtwoord voor MongoDB-authenticatie
-- `MONGODB_PORT`: De poort van je MongoDB-server (standaardwaarde = 27017)
-- `MONGODB_USERNAME`: De naam van de MongoDB-gebruiker en database (standaard = bot)
-- `MONGODB_DB`: De naam van de MongoDB-database (standaard = bot)
-- `SMTP_PASSWORD`: Het wachtwoord voor SMTP-authenticatie (voor e-mailverificatie)
-- `SMTP_EMAIL`: Het e-mailadres dat gebruikt wordt voor het versturen van verificatie-e-mails
-- `SMTP_SERVER`: De SMTP-server voor het versturen van e-mails (bijv. smtp.gmail.com)
-- `SMTP_PORT`: De poort van de SMTP-server (bijv. 465 voor SSL, 587 voor STARTTLS)
-- `IMAP_SERVER`: De IMAP-server voor het ontvangen van e-mails (bijv. imap.gmail.com)
-- `IMAP_PORT`: De poort van de IMAP-server (standaard IMAP SSL poort = 993)
-- `ENCRYPTION_KEY`: Een Fernet-encryptiesleutel voor het beveiligen van gevoelige gegevens
-- `EMAIL_INDEX_KEY`: Een 32-tekens lange sleutel voor het indexeren van e-mailadressen
-
-**Voorbeeld (.env):**
-```env
-BOT_TOKEN='XXX'
-MONGODB_IP_ADDRESS='mongo' # Laat dit ongewijzigd bij gebruik van docker-compose
-MONGODB_PASSWORD='yourpassword123!' # Moet overeenkomen met docker-compose.yml
-MONGODB_PORT=27017
-MONGODB_USERNAME=bot
-MONGODB_DB=bot
-SMTP_PASSWORD='password' # Is niet het wachtwoord van het account, maar een wachtwoord enkel voor SMTP
-SMTP_EMAIL='toegepasteinformaticadiscord@gmail.com'
-SMTP_SERVER='smtp.gmail.com' # Bijvoorbeeld: smtp.forwardemail.net
-SMTP_PORT=587 # Bijvoorbeeld: 465 voor SSL, 587 voor STARTTLS
-IMAP_SERVER='imap.gmail.com' # Bijvoorbeeld: imap.forwardemail.net
-IMAP_PORT=993 # Standaard IMAP SSL poort
-ENCRYPTION_KEY='password'
-EMAIL_INDEX_KEY='another_32_characters_long_key!'
-```
-
-### Fernet Encryptiesleutel Genereren
-
-Voor het beveiligen van gevoelige gegevens gebruikt de bot een Fernet-encryptiesleutel. Gebruik het meegeleverde Python script om een veilige sleutel te genereren:
-
-```bash
-# Voer het script uit om een sleutel te genereren
+# 3. Generate encryption keys
 python3 generate_key.py
-```
 
-Kopieer de gegenereerde sleutel naar je `.env` bestand als `ENCRYPTION_KEY='gegenereerde_sleutel'`.
-
-### Migratie van Oude Verificatiegegevens
-
-De bot ondersteunt migratie van verificatiegegevens uit een oude database. Dit is optioneel en alleen nodig als je gebruikers wilt migreren van een vorige versie van de bot.
-
-**Configuratie:**
-- Voeg `OLD_CONNECTION_STRING` toe aan je `.env` bestand met de MongoDB connection string van de oude database
-- De connection string moet het formaat hebben: `mongodb://username:password@host:port/database`
-- Als deze variabele niet is ingesteld, is de migratiefunctionaliteit uitgeschakeld
-
-**Gebruik:**
-- Gebruikers kunnen hun oude verificatie migreren via de verificatie-interface
-- Het systeem controleert automatisch op e-mail bounces en blokkeert migratie indien nodig
-- Gemigreerde gebruikers worden gemarkeerd in de database om dubbele migratie te voorkomen
-
-### TLS Configuratie
-
-De bot ondersteunt nu een optionele TLS-verbinding voor MongoDB. Standaard is TLS uitgeschakeld voor lokale ontwikkeling, maar het kan worden ingeschakeld met verschillende opties:
-
-```bash
-# TLS inschakelen bij het starten van de bot (alle opties werken)
-python3 main.py --tls
-python3 main.py --tls=true
-python3 main.py --tls=yes
-
-# TLS expliciet uitschakelen
-python3 main.py --tls=false
-python3 main.py --tls=no
-```
-
-Bij gebruik van Docker kan TLS worden in- of uitgeschakeld op verschillende manieren:
-
-1. Tijdens het bouwen van de image:
-   ```bash
-   docker build -t tibot-v3 -e TLS_ENABLED=true .
-   ```
-
-2. In docker-compose.yml (wijzig de TLS_ENABLED waarde):
-   ```yaml
-     webapp:
-       image: tibot-v3
-       depends_on:
-         - mongo
-       networks:
-         - discord-network
-       env_file:
-         - .env
-       environment:
-         TLS_ENABLED: false    # Waarde tls
-   ```
-### 3. Services starten met Docker Compose
-
-Start MongoDB:
-```bash
+# 4. Start MongoDB
 docker compose up mongo -d
-```
 
-### 4. MongoDB-gebruiker toevoegen
+# 5. Create MongoDB user (see 2-SETUP.md for details)
 
-Als je nog geen gebruiker hebt voor de bot:
-1. Connecteer met een MongoDB CLI of GUI app met deze connection string:
-   ```
-   mongodb://root:yourpassword123!@localhost:27017/
-   ```
-2. Voer deze commando's uit om een nieuwe gebruiker aan te maken:
-   ```javascript
-   use bot
-   
-   db.createUser({
-     user: "bot",
-     pwd: "yourpassword123!",
-     roles: [
-       { role: "readWrite", db: "bot" }
-     ]
-   })
-   ```
-3. Gebruik dit wachtwoord als `MONGODB_PASSWORD` in je `.env` bestand.
-
-### 5. Bot starten
-
-Start de bot container:
-```bash
+# 6. Start bot
 docker compose up webapp -d
 ```
 
+### Local Development
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Set up .env file (copy from example.env)
+
+# 3. Run the bot
+python3 main.py
+```
+
+## Intended Audience
+
+- **Server Administrators**: Configure and manage bot features
+- **Moderators**: Use moderation tools and handle reports/tickets
+- **Developers**: Contribute to bot development or deploy custom instances
+- **Students**: Understand available bot features and commands
+
+## Getting Help
+
+- Check [6-TROUBLESHOOTING.md](docs/6-TROUBLESHOOTING.md) for common issues
+- Review [4-COMMANDS_REFERENCE.md](docs/4-COMMANDS_REFERENCE.md) for command usage
+- Contact the development team through modmail on the TI Discord server
+
+## License
+
+This project is maintained by the HOGENT TI Discord Server team.
+
 ---
 
-## 🛠️ Notities
-
-- Zorg ervoor dat MongoDB actief is vóór het starten van de bot.
-- Het `.env` bestand moet alle vereiste variabelen bevatten.
-- Bij netwerkproblemen: controleer of `MONGODB_IP_ADDRESS` correct is ingesteld.
-- TLS is standaard uitgeschakeld voor lokale ontwikkeling, maar kan worden ingeschakeld met verschillende opties: `--tls`, `--tls=true`, `--tls=false`, etc.
-
----
-
-## 📚 Repository Regels
-
-- Gebruik [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) en [Black](https://black.readthedocs.io/en/stable/) voor linting en formatting.  
-  Deze worden automatisch uitgevoerd via [pre-commit](https://pre-commit.com/).  
-  - **Lokaal**: installeer pre-commit en run `pre-commit install` (tussen drie backticks) om te zorgen dat elke commit automatisch gecheckt en gefixt wordt.  
-  - **CI/CD**: in GitHub Actions draait pre-commit automatisch op alle bestanden bij elke push en pull request, maar dan enkel in **check-modus** (zonder fix).  
-- Maak een Discord bot aan via de [Discord Developer Portal](https://discord.com/developers/applications) om te testen.  
-- Gebruik `./cogs` voor interactiecommando’s en `./utils` voor herbruikbare backend-logica.  
-- Upload emoji’s naar de Discord Developer Portal om permissieproblemen te vermijden.  
-
-
----
-
-## ⚡ Slash Commands
-
-- Zie je slash-commands niet? Herstart de Discord-applicatie.
-- Soms duurt het even voordat nieuwe slash-commands zichtbaar zijn.
-
----
-
-## 😊 Emoji’s
-
-- Upload emoji’s [hier](https://discord.com/developers/applications/1334455177616556154/emojis).
-- Gebruik ze als volgt: `<:emoji_naam:emoji_id>`
-
+**Next Steps**: See [2-SETUP.md](docs/2-SETUP.md) for detailed installation instructions.
