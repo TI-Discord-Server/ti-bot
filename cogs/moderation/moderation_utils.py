@@ -84,7 +84,7 @@ def format_duration(duration: datetime.timedelta) -> str:
     # Handle negative durations
     if duration.total_seconds() < 0:
         return "verlopen timeout"
-    
+
     days = duration.days
     hours, remainder = divmod(duration.seconds, 3600)
     minutes, _ = divmod(remainder, 60)
