@@ -75,13 +75,10 @@ class TimeoutSystem:
         try:
             await member.timeout(timeout_until, reason=reason)
 
-            # Calculate the actual timeout duration from Discord's API
-            actual_timeout_until = member.timed_out_until or timeout_until
-            current_time = discord.utils.utcnow()
-            actual_duration = actual_timeout_until - current_time
-
-            # Format the actual duration in a human-readable way
-            duration_str = format_duration(actual_duration)
+            # Use the original requested duration for consistency
+            # (member.timed_out_until may contain stale/expired data)
+            duration_str = format_duration(duration_timedelta)
+            actual_timeout_until = timeout_until
 
             # Send DM with actual timeout information
             bot_icon_url = self.bot.user.avatar.url if self.bot.user.avatar else None
