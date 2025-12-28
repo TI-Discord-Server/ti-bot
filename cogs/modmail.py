@@ -157,7 +157,7 @@ class Modmail(commands.Cog, name="modmail"):
     @app_commands.command(
         name="transcripts", description="Geeft transcripts van een bepaalde persoon"
     )
-    @is_council
+    @is_council()
     @checks.thread_only()
     async def transcripts(
         self,
