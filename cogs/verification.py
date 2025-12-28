@@ -711,8 +711,8 @@ class Verification(commands.Cog):
         name="check_email",
         description="Check of een e-mailadres al gebruikt wordt (Moderator only)",
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(860195356493742100)
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(email="Het e-mailadres dat je wil controleren")
     async def check_email(self, interaction: Interaction, email: str):
         # Antwoord altijd ephemeral (privacy)
@@ -765,8 +765,8 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="unverify", description="Verwijder een verificatie en kick de gebruiker"
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(860195356493742100)
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         email="Het e-mailadres om te verwijderen (optioneel)",
         user="De gebruiker om te unverifiëren (optioneel)",
@@ -1129,8 +1129,8 @@ class Verification(commands.Cog):
     @app_commands.describe(
         user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres"
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(777987142236241941)
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_role(777987142236241941)
     async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
         await interaction.response.defer(ephemeral=True)
 
