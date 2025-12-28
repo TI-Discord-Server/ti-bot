@@ -85,6 +85,10 @@ def developer():
 
 def is_council():
     async def predicate(interaction: discord.Interaction) -> bool:
+        if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Council")
+            return False
+
         if interaction.guild.id == PROD_GUILD_ID:
             return _has_any_role(interaction, {COUNCIL_ROLE_ID, ADMIN_ROLE_ID})
 
@@ -101,6 +105,10 @@ def is_council():
 
 def is_moderator():
     async def predicate(interaction: discord.Interaction) -> bool:
+        if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Moderator")
+            return False
+
         if interaction.guild.id == PROD_GUILD_ID:
             return _has_any_role(interaction, {MODERATOR_ROLE_ID, COUNCIL_ROLE_ID, ADMIN_ROLE_ID})
 
@@ -116,6 +124,10 @@ def is_moderator():
 
 def is_admin():
     async def predicate(interaction: discord.Interaction) -> bool:
+        if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Admin")
+            return False
+
         if interaction.guild.id == PROD_GUILD_ID:
             return _has_any_role(interaction, {ADMIN_ROLE_ID})
 
