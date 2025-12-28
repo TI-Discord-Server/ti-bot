@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.confessions.confession_tasks import ConfessionTasks
+from utils.checks import is_moderator
 
 
 class ConfessionCommands(commands.Cog):
@@ -20,8 +21,7 @@ class ConfessionCommands(commands.Cog):
         return any(role.id == moderator_role_id for role in interaction.user.roles)
 
     @app_commands.command(name="force_review", description="Forceer de review van confessions.")
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(777987142236241941)
+    @is_moderator()
     async def force_review(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
@@ -41,8 +41,7 @@ class ConfessionCommands(commands.Cog):
             )
 
     @app_commands.command(name="force_post", description="Forceer het posten van confessions.")
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(777987142236241941)
+    @is_moderator()
     async def force_post(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
@@ -63,8 +62,7 @@ class ConfessionCommands(commands.Cog):
         name="setup_submit_message",
         description="Post het submit confession bericht in het publieke kanaal.",
     )
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(777987142236241941)
+    @is_moderator()
     async def setup_submit_message(self, interaction: discord.Interaction):
         public_channel_id = await self.tasks.get_public_channel_id()
         if not public_channel_id:
