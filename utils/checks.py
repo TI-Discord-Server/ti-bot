@@ -16,6 +16,15 @@ MODERATOR_ROLE_ID = 777987142236241941
 ADMIN_ROLE_ID = 771520361618472961
 
 
+def _log_unexpected_guild_access(interaction: discord.Interaction, check_type: str) -> None:
+    """Log when a command is used in an unexpected guild."""
+    logger.warning(
+        f"{check_type} check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+        f"used in unexpected guild ID {interaction.guild.id} "
+        f"by user ID {interaction.user.id}"
+    )
+
+
 def developer():
     async def predicate(ctx):
         # Detecteer of dit een Interaction (slash) of Context (prefix) is
@@ -68,11 +77,7 @@ def is_council():
             return True
 
         # Log unexpected guild access attempt
-        logger.warning(
-            f"Council check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
-            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
-            f"by user {interaction.user.name} (ID: {interaction.user.id})"
-        )
+        _log_unexpected_guild_access(interaction, "Council")
         return False
 
     return check(predicate)
@@ -87,11 +92,7 @@ def is_moderator():
             return True
 
         # Log unexpected guild access attempt
-        logger.warning(
-            f"Moderator check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
-            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
-            f"by user {interaction.user.name} (ID: {interaction.user.id})"
-        )
+        _log_unexpected_guild_access(interaction, "Moderator")
         return False
 
     return check(predicate)
@@ -106,11 +107,7 @@ def is_admin():
             return True
 
         # Log unexpected guild access attempt
-        logger.warning(
-            f"Admin check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
-            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
-            f"by user {interaction.user.name} (ID: {interaction.user.id})"
-        )
+        _log_unexpected_guild_access(interaction, "Admin")
         return False
 
     return check(predicate)
