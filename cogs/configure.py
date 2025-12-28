@@ -6,8 +6,8 @@ from discord.ext import commands
 
 from cogs.unban_request import UnbanView
 from main import DEFAULT_GUILD_ID
-
 from utils.checks import is_council
+
 from .developer_management import DeveloperManagementView
 
 
