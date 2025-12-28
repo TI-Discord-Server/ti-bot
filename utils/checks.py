@@ -1,6 +1,10 @@
+import logging
+
 import discord
 from discord.app_commands import check
 from discord.ext import commands
+
+logger = logging.getLogger(__name__)
 
 # ===== Guild IDs =====
 PROD_GUILD_ID = 771394209419624489  # main server
@@ -10,6 +14,27 @@ TEST_GUILD_ID = 1334456602324897792  # test server
 COUNCIL_ROLE_ID = 860195356493742100
 MODERATOR_ROLE_ID = 777987142236241941
 ADMIN_ROLE_ID = 771520361618472961
+
+
+def _log_unexpected_guild_access(interaction: discord.Interaction, check_type: str) -> None:
+    """Log when a command is used in an unexpected guild.
+
+    Args:
+        interaction: The Discord interaction.
+        check_type: The type of check that failed (e.g., "Council", "Moderator", "Admin").
+    """
+    if interaction.guild is None:
+        logger.warning(
+            f"{check_type} check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+            f"used outside of guild context by user ID {interaction.user.id}"
+        )
+        return
+
+    logger.warning(
+        f"{check_type} check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+        f"used in unexpected guild ID {interaction.guild.id} "
+        f"by user ID {interaction.user.id}"
+    )
 
 
 def developer():
@@ -57,6 +82,7 @@ def developer():
 def is_council():
     async def predicate(interaction: discord.Interaction) -> bool:
         if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Council")
             return False
 
         if interaction.guild.id == PROD_GUILD_ID:
@@ -66,6 +92,8 @@ def is_council():
             # In testserver: alles toelaten (of pas aan naar wens)
             return True
 
+        # Log unexpected guild access attempt
+        _log_unexpected_guild_access(interaction, "Council")
         return False
 
     return check(predicate)
@@ -74,6 +102,7 @@ def is_council():
 def is_moderator():
     async def predicate(interaction: discord.Interaction) -> bool:
         if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Moderator")
             return False
 
         if interaction.guild.id == PROD_GUILD_ID:
@@ -82,6 +111,8 @@ def is_moderator():
         if interaction.guild.id == TEST_GUILD_ID:
             return True
 
+        # Log unexpected guild access attempt
+        _log_unexpected_guild_access(interaction, "Moderator")
         return False
 
     return check(predicate)
@@ -90,6 +121,7 @@ def is_moderator():
 def is_admin():
     async def predicate(interaction: discord.Interaction) -> bool:
         if not interaction.guild:
+            _log_unexpected_guild_access(interaction, "Admin")
             return False
 
         if interaction.guild.id == PROD_GUILD_ID:
@@ -98,6 +130,8 @@ def is_admin():
         if interaction.guild.id == TEST_GUILD_ID:
             return True
 
+        # Log unexpected guild access attempt
+        _log_unexpected_guild_access(interaction, "Admin")
         return False
 
     return check(predicate)

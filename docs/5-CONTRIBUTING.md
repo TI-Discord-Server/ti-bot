@@ -80,7 +80,7 @@ Create a test Discord server with:
 
 - Bot added with necessary permissions
 - Test channels for each feature
-- Moderator role (update hardcoded ID `860195356493742100` or create role with this ID)
+- Moderator role (configure role IDs in `utils/checks.py` for your test server, or ensure your test server uses the guild ID defined as `TEST_GUILD_ID` in `utils/checks.py` to bypass role checks)
 - Test users for verification testing
 
 ### 6. Initialize Database
