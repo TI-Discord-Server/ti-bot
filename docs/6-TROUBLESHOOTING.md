@@ -209,8 +209,7 @@ await self.bot.db.collection.find_one({"_id": id}, timeout=5000)
 **1. Check Required Permissions**
 ```python
 # Look for decorators in code
-@app_commands.checks.has_permissions(manage_messages=True)
-@app_commands.checks.has_role(860195356493742100)
+@is_moderator()
 ```
 
 **2. Verify Role ID**
