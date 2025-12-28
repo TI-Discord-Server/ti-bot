@@ -718,7 +718,7 @@ class Verification(commands.Cog):
         # Antwoord altijd ephemeral (privacy)
         await interaction.response.defer(ephemeral=True)
 
-        email_norm = email.strip()
+        email_norm = email.lower().strip()
         if not EMAIL_REGEX.match(email_norm):
             await interaction.followup.send("❌ Ongeldig e-mailadres.", ephemeral=True)
             return
