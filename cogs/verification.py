@@ -757,7 +757,10 @@ class Verification(commands.Cog):
             )
 
         except Exception as e:
-            self.bot.log.error(f"check_email error (requested by {interaction.user.id}): {e}")
+            self.bot.log.error(
+                f"check_email error (requested by {interaction.user.id}): {e}",
+                exc_info=True,
+            )
             await interaction.followup.send(
                 "❌ Er liep iets mis bij het controleren.", ephemeral=True
             )
