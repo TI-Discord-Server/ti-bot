@@ -717,7 +717,7 @@ class Verification(commands.Cog):
         # Antwoord altijd ephemeral (privacy)
         await interaction.response.defer(ephemeral=True)
 
-        email_norm = email.strip()
+        email_norm = email.lower().strip()
         if not EMAIL_REGEX.match(email_norm):
             await interaction.followup.send("❌ Ongeldig e-mailadres.", ephemeral=True)
             return
@@ -756,7 +756,10 @@ class Verification(commands.Cog):
             )
 
         except Exception as e:
-            self.bot.log.error(f"check_email error (requested by {interaction.user.id}): {e}")
+            self.bot.log.error(
+                f"check_email error (requested by {interaction.user.id}): {e}",
+                exc_info=True,
+            )
             await interaction.followup.send(
                 "❌ Er liep iets mis bij het controleren.", ephemeral=True
             )
