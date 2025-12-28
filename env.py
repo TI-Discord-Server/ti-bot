@@ -27,7 +27,6 @@ MIGRATION_IMAP_SERVER: Final[str] = cast(str, getenv("MIGRATION_IMAP_SERVER", "i
 MIGRATION_IMAP_PORT: Final[int] = int(cast(str, getenv("MIGRATION_IMAP_PORT", "993")))
 ENCRYPTION_KEY: Final[str] = cast(str, getenv("ENCRYPTION_KEY"))
 EMAIL_INDEX_KEY: Final[str] = cast(str, getenv("EMAIL_INDEX_KEY"))
-HMAC_KEY: Final[str] = cast(str, getenv("HMAC_KEY"))
 OLD_CONNECTION_STRING: Final[str] = cast(str, getenv("OLD_CONNECTION_STRING", ""))
 POD_UID: Final[str] = cast(str, getenv("POD_UID", ""))
 DISCORD_GUILD_ID_RAW = getenv("DISCORD_GUILD_ID", "").strip()
