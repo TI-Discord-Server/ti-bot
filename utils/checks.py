@@ -20,12 +20,8 @@ def _log_unexpected_guild_access(interaction: discord.Interaction, check_type: s
     """Log when a command is used in an unexpected guild.
 
     Args:
-        interaction: The Discord interaction. Must have a valid guild.
+        interaction: The Discord interaction.
         check_type: The type of check that failed (e.g., "Council", "Moderator", "Admin").
-
-    Note:
-        This function assumes interaction.guild is not None. It should only be called
-        after verifying the guild exists.
     """
     if interaction.guild is None:
         logger.warning(
