@@ -708,10 +708,65 @@ class Verification(commands.Cog):
             )
 
     @app_commands.command(
+        name="check_email",
+        description="Check of een e-mailadres al gebruikt wordt (Moderator only)",
+    )
+    # @app_commands.checks.has_permissions(manage_messages=True)
+    # @app_commands.checks.has_role(860195356493742100)
+    @app_commands.describe(email="Het e-mailadres dat je wil controleren")
+    async def check_email(self, interaction: Interaction, email: str):
+        # Antwoord altijd ephemeral (privacy)
+        await interaction.response.defer(ephemeral=True)
+
+        email_norm = email.strip()
+        if not EMAIL_REGEX.match(email_norm):
+            await interaction.followup.send("❌ Ongeldig e-mailadres.", ephemeral=True)
+            return
+
+        try:
+            idx = make_email_index(email_norm)
+
+            record = await self.bot.db.verifications.find_one(
+                {"email_index": idx},
+                {"user_id": 1, "migrated": 1},  # project enkel wat je nodig hebt
+            )
+
+            if not record:
+                await interaction.followup.send(
+                    "✅ Dit e-mailadres is **nog niet** in gebruik.", ephemeral=True
+                )
+                self.bot.log.info(
+                    f"check_email: email not in use (requested by {interaction.user.id})"
+                )
+                return
+
+            user_id = record.get("user_id")
+            migrated = record.get("migrated", False)
+
+            # Probeer member te resolven (kan None zijn als niet in guild cache)
+            member = interaction.guild.get_member(user_id) if interaction.guild else None
+            user_label = member.mention if member else f"`{user_id}`"
+
+            extra = " 🔄 (gemigreerd)" if migrated else ""
+            await interaction.followup.send(
+                f"⚠️ Dit e-mailadres is **al in gebruik** door: {user_label}{extra}", ephemeral=True
+            )
+
+            self.bot.log.info(
+                f"check_email: email in use by {user_id} (requested by {interaction.user.id})"
+            )
+
+        except Exception as e:
+            self.bot.log.error(f"check_email error (requested by {interaction.user.id}): {e}")
+            await interaction.followup.send(
+                "❌ Er liep iets mis bij het controleren.", ephemeral=True
+            )
+
+    @app_commands.command(
         name="unverify", description="Verwijder een verificatie en kick de gebruiker"
     )
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(860195356493742100)
+    # @app_commands.checks.has_permissions(manage_messages=True)
+    # @app_commands.checks.has_role(860195356493742100)
     @app_commands.describe(
         email="Het e-mailadres om te verwijderen (optioneel)",
         user="De gebruiker om te unverifiëren (optioneel)",
@@ -1074,8 +1129,8 @@ class Verification(commands.Cog):
     @app_commands.describe(
         user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres"
     )
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(777987142236241941)
+    # @app_commands.checks.has_permissions(manage_messages=True)
+    # @app_commands.checks.has_role(777987142236241941)
     async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
         await interaction.response.defer(ephemeral=True)
 
