@@ -1,6 +1,10 @@
+import logging
+
 import discord
 from discord.app_commands import check
 from discord.ext import commands
+
+logger = logging.getLogger(__name__)
 
 # ===== Guild IDs =====
 PROD_GUILD_ID = 771394209419624489  # main server
@@ -63,6 +67,12 @@ def is_council():
             # In testserver: alles toelaten (of pas aan naar wens)
             return True
 
+        # Log unexpected guild access attempt
+        logger.warning(
+            f"Council check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
+            f"by user {interaction.user.name} (ID: {interaction.user.id})"
+        )
         return False
 
     return check(predicate)
@@ -76,6 +86,12 @@ def is_moderator():
         if interaction.guild.id == TEST_GUILD_ID:
             return True
 
+        # Log unexpected guild access attempt
+        logger.warning(
+            f"Moderator check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
+            f"by user {interaction.user.name} (ID: {interaction.user.id})"
+        )
         return False
 
     return check(predicate)
@@ -89,6 +105,12 @@ def is_admin():
         if interaction.guild.id == TEST_GUILD_ID:
             return True
 
+        # Log unexpected guild access attempt
+        logger.warning(
+            f"Admin check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+            f"used in unexpected guild (ID: {interaction.guild.id}, Name: {interaction.guild.name}) "
+            f"by user {interaction.user.name} (ID: {interaction.user.id})"
+        )
         return False
 
     return check(predicate)
