@@ -1,5 +1,15 @@
+import discord
 from discord.app_commands import check
 from discord.ext import commands
+
+# ===== Guild IDs =====
+PROD_GUILD_ID = 771394209419624489  # main server
+TEST_GUILD_ID = 1334456602324897792  # test server
+
+# ===== Role IDs (PROD) =====
+COUNCIL_ROLE_ID = 860195356493742100
+MODERATOR_ROLE_ID = 777987142236241941
+ADMIN_ROLE_ID = 771520361618472961
 
 
 def developer():
@@ -42,6 +52,57 @@ def developer():
         return False
 
     return check(predicate)
+
+
+def is_council():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.guild.id == PROD_GUILD_ID:
+            return _has_any_role(interaction, {COUNCIL_ROLE_ID, ADMIN_ROLE_ID})
+
+        if interaction.guild.id == TEST_GUILD_ID:
+            # In testserver: alles toelaten (of pas aan naar wens)
+            return True
+
+        return False
+
+    return check(predicate)
+
+
+def is_moderator():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.guild.id == PROD_GUILD_ID:
+            return _has_any_role(interaction, {MODERATOR_ROLE_ID, COUNCIL_ROLE_ID, ADMIN_ROLE_ID})
+
+        if interaction.guild.id == TEST_GUILD_ID:
+            return True
+
+        return False
+
+    return check(predicate)
+
+
+def is_admin():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.guild.id == PROD_GUILD_ID:
+            return _has_any_role(interaction, {ADMIN_ROLE_ID})
+
+        if interaction.guild.id == TEST_GUILD_ID:
+            return True
+
+        return False
+
+    return check(predicate)
+
+
+def _has_any_role(interaction: discord.Interaction, role_ids: set[int]) -> bool:
+    if not interaction.guild or not isinstance(interaction.user, discord.Member):
+        return False
+
+    # Admin permission = altijd toegestaan
+    if interaction.user.guild_permissions.administrator:
+        return True
+
+    return any(role.id in role_ids for role in interaction.user.roles)
 
 
 def thread_only():

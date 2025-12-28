@@ -29,6 +29,7 @@ from env import (
     SMTP_PASSWORD,
     SMTP_SERVER,
 )
+from utils.checks import is_admin, is_moderator
 from utils.crypto import make_email_index
 from utils.email_sender import send_email
 from utils.verification_check import ensure_verified_role
@@ -668,8 +669,7 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="get_email", description="Haal het e-mailadres van een gebruiker op (Moderator only)"
     )
-    @app_commands.checks.has_permissions(manage_messages=True)
-    @app_commands.checks.has_role(860195356493742100)
+    @is_moderator()
     @app_commands.describe(user="De gebruiker waarvan je het e-mailadres wilt opvragen")
     async def get_email(self, interaction: Interaction, user: discord.Member):
         record = await self.bot.db.verifications.find_one({"user_id": user.id})
@@ -711,8 +711,7 @@ class Verification(commands.Cog):
         name="check_email",
         description="Check of een e-mailadres al gebruikt wordt (Moderator only)",
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(860195356493742100)
+    @is_moderator()
     @app_commands.describe(email="Het e-mailadres dat je wil controleren")
     async def check_email(self, interaction: Interaction, email: str):
         # Antwoord altijd ephemeral (privacy)
@@ -765,8 +764,7 @@ class Verification(commands.Cog):
     @app_commands.command(
         name="unverify", description="Verwijder een verificatie en kick de gebruiker"
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(860195356493742100)
+    @is_moderator()
     @app_commands.describe(
         email="Het e-mailadres om te verwijderen (optioneel)",
         user="De gebruiker om te unverifiëren (optioneel)",
@@ -1076,7 +1074,7 @@ class Verification(commands.Cog):
         name="cleanup_unverified",
         description="Verwijder alle rollen van leden die niet verified zijn.",
     )
-    @app_commands.default_permissions(administrator=True)
+    @is_admin()
     async def cleanup_unverified(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
@@ -1129,8 +1127,7 @@ class Verification(commands.Cog):
     @app_commands.describe(
         user="De gebruiker die je wil verifiëren", email="Het HOGENT studentenmailadres"
     )
-    # @app_commands.checks.has_permissions(manage_messages=True)
-    # @app_commands.checks.has_role(777987142236241941)
+    @is_moderator()
     async def manual_verify(self, interaction: Interaction, user: discord.Member, email: str):
         await interaction.response.defer(ephemeral=True)
 
