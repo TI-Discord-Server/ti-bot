@@ -17,7 +17,23 @@ ADMIN_ROLE_ID = 771520361618472961
 
 
 def _log_unexpected_guild_access(interaction: discord.Interaction, check_type: str) -> None:
-    """Log when a command is used in an unexpected guild."""
+    """Log when a command is used in an unexpected guild.
+
+    Args:
+        interaction: The Discord interaction. Must have a valid guild.
+        check_type: The type of check that failed (e.g., "Council", "Moderator", "Admin").
+
+    Note:
+        This function assumes interaction.guild is not None. It should only be called
+        after verifying the guild exists.
+    """
+    if interaction.guild is None:
+        logger.warning(
+            f"{check_type} check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
+            f"used outside of guild context by user ID {interaction.user.id}"
+        )
+        return
+
     logger.warning(
         f"{check_type} check failed: Command '{interaction.command.name if interaction.command else 'unknown'}' "
         f"used in unexpected guild ID {interaction.guild.id} "
