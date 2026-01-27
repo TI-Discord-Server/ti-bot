@@ -9,7 +9,7 @@ from bson import ObjectId
 from discord import app_commands
 from discord.ext import commands
 
-from utils.checks import is_council
+from utils.checks import is_council, is_moderator
 from utils.timezone import LOCAL_TIMEZONE, to_local
 
 from .ban_system import BanSystem
@@ -128,7 +128,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="ban", description="Ban een member van de server.")
-    @app_commands.default_permissions(administrator=True)
+    @is_moderator()
     @app_commands.describe(
         member="Het lid dat je wilt bannen",
         duration="Optioneel: de duur van de ban (bijv. 1h, 1d, 1w). Laat leeg voor permanent.",
@@ -171,7 +171,7 @@ class ModCommands(commands.Cog, name="ModCommands"):
             )
 
     @app_commands.command(name="unban", description="Unban een gebruiker van de server.")
-    @app_commands.default_permissions(administrator=True)
+    @is_moderator()
     @app_commands.describe(
         user_id="Het Discord ID van de gebruiker om te unbannen",
         reason="De reden voor het unbannen",
