@@ -365,7 +365,7 @@ class Bot(commands.Bot):
         self.session = aiohttp.ClientSession(loop=loop)
         self.uptime = datetime.datetime.now()
 
-        self.activity = discord.CustomActivity("DM mij om de staff te contacteren")
+        self.activity = discord.CustomActivity("DM mij om staff te contacteren")
         self.status = discord.Status.online
 
         self.threads = ThreadManager(self)
